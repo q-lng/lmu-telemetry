@@ -1,0 +1,595 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --page-plane: #0d0d0d;
+  --surface-1: #1a1a19;
+  --surface-2: #202020;
+  --primary-ink: #ffffff;
+  --secondary-ink: #c3c2b7;
+  --muted-ink: #898781;
+  --gridline: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255, 255, 255, 0.1);
+  --accent: #3987e5;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--page-plane);
+  color: var(--primary-ink);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+}
+
+.app {
+  display: flex;
+  height: 100vh;
+  position: relative;
+}
+
+.sidebar {
+  width: 300px;
+  flex-shrink: 0;
+  background: var(--surface-1);
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-right: 1px solid var(--border);
+  transition: width 0.22s ease;
+}
+
+.sidebar.collapsed {
+  width: 0;
+  border-right-color: transparent;
+}
+
+.sidebar-inner {
+  width: 300px;
+  padding: 16px;
+}
+
+.sidebar-toggle {
+  position: absolute;
+  top: 12px;
+  left: 300px;
+  z-index: 40;
+  background: var(--surface-2);
+  color: var(--secondary-ink);
+  border: 1px solid var(--border);
+  border-left: none;
+  border-radius: 0 4px 4px 0;
+  width: 18px;
+  height: 36px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  transition: left 0.22s ease;
+}
+
+.sidebar-toggle:hover {
+  color: var(--primary-ink);
+  border-color: var(--accent);
+}
+
+.sidebar.collapsed + .sidebar-toggle {
+  left: 0;
+}
+
+.sidebar h1 {
+  font-size: 16px;
+  margin: 0 0 16px;
+  color: var(--primary-ink);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  color: var(--secondary-ink);
+}
+
+.field select,
+.field input {
+  background: var(--surface-2);
+  color: var(--primary-ink);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.field select:disabled {
+  opacity: 0.5;
+}
+
+.upload-btn {
+  background: var(--surface-2);
+  color: var(--primary-ink);
+  border: 1px dashed var(--muted-ink);
+  border-radius: 4px;
+  padding: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.upload-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.upload-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.upload-error {
+  color: #e66767;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.guest-active {
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--secondary-ink);
+  margin-bottom: 6px;
+}
+
+.guest-active strong {
+  color: var(--primary-ink);
+}
+
+.segmented {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.segmented button {
+  flex: 1;
+  background: var(--surface-2);
+  color: var(--secondary-ink);
+  border: none;
+  padding: 6px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.segmented button + button {
+  border-left: 1px solid var(--border);
+}
+
+.segmented button.active {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.segmented button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.field-hint {
+  color: var(--muted-ink);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.compare-source-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--secondary-ink);
+  cursor: pointer;
+}
+
+.compare-file-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px;
+}
+
+.compare-warning {
+  color: #e66767;
+}
+
+.preset-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.preset-row select,
+.preset-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.preset-row button {
+  background: var(--surface-2);
+  color: var(--secondary-ink);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 8px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.preset-row button:hover:not(:disabled) {
+  color: var(--primary-ink);
+  border-color: var(--muted-ink);
+}
+
+.preset-row button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.info-panel {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--secondary-ink);
+}
+
+.info-panel strong {
+  color: var(--primary-ink);
+}
+
+.selected-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.selected-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 3px;
+  background: var(--surface-2);
+}
+
+.selected-item .selected-name {
+  flex: 1;
+  color: var(--primary-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selected-item.is-group {
+  border: 1px solid var(--accent);
+  flex-wrap: wrap;
+}
+
+.selected-item .group-name-input {
+  flex: 1;
+  min-width: 60px;
+  background: transparent;
+  border: none;
+  color: var(--primary-ink);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0;
+}
+
+.selected-item .group-name-input:focus {
+  outline: 1px solid var(--accent);
+}
+
+.selected-item .group-members {
+  flex-basis: 100%;
+  color: var(--muted-ink);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-btn {
+  margin-top: 6px;
+  width: 100%;
+  background: var(--accent);
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  padding: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.group-btn:hover {
+  opacity: 0.9;
+}
+
+.selected-item button {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--secondary-ink);
+  border-radius: 3px;
+  width: 20px;
+  height: 20px;
+  line-height: 1;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.selected-item button:hover:not(:disabled) {
+  color: var(--primary-ink);
+  border-color: var(--muted-ink);
+}
+
+.selected-item button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.channel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.channel-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--secondary-ink);
+}
+
+.channel-checkbox:hover {
+  background: var(--surface-2);
+  color: var(--primary-ink);
+}
+
+.channel-checkbox .unit {
+  color: var(--muted-ink);
+  margin-left: auto;
+  font-size: 11px;
+}
+
+/* ---- Main telemetry area ---- */
+
+.main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  /* No page scroll — the whole graphs block is sized to fill exactly what's
+     available (see .telemetry-block/.lane below), so it never needs one. */
+  overflow: hidden;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* MoTeC-style proportions: a narrow fixed map column, everything else (legend +
+   the whole stacked graph block) fills the rest of the width. */
+.content-row {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.map-column {
+  width: 300px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.graphs-column {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.track-map {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px;
+}
+
+.telemetry-legend {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.legend-empty {
+  color: var(--muted-ink);
+  font-size: 12px;
+  padding: 8px 0;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 2px 0;
+}
+
+.legend-swatch {
+  width: 16px;
+  height: 0;
+  border-top: 2px solid;
+  flex-shrink: 0;
+}
+
+.legend-swatch.dashed {
+  border-top-style: dashed;
+}
+
+.legend-label {
+  color: var(--secondary-ink);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legend-value {
+  color: var(--primary-ink);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.legend-unit {
+  color: var(--muted-ink);
+  font-weight: 400;
+  font-size: 11px;
+}
+
+/* One unified bordered block containing every stacked lane, MoTeC-style: a single
+   shared time axis at the bottom, hairline dividers between lanes instead of
+   separate cards. */
+.telemetry-block {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(26, 26, 25, 0.85);
+  color: var(--secondary-ink);
+  font-size: 13px;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.lane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 28px;
+  border-bottom: 1px solid var(--gridline);
+}
+
+.lane:last-child {
+  border-bottom: none;
+}
+
+.lane-canvas {
+  flex: 1;
+  min-height: 0;
+}
+
+.lane-label {
+  position: absolute;
+  top: 2px;
+  left: 44px;
+  font-size: 10px;
+  color: var(--secondary-ink);
+  background: rgba(26, 26, 25, 0.75);
+  padding: 1px 5px;
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.lane-resize-handle {
+  height: 7px;
+  margin-top: -7px;
+  cursor: ns-resize;
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lane-resize-handle::before {
+  content: '';
+  width: 28px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--axis);
+}
+
+.lane-resize-handle:hover::before {
+  background: var(--accent);
+}
+
+.u-legend {
+  display: none !important;
+}
+
+/* uPlot's default selection-box fill (7% black) is invisible on our dark theme */
+.u-select {
+  background: rgba(57, 135, 229, 0.18) !important;
+  border-left: 1px solid var(--accent);
+  border-right: 1px solid var(--accent);
+}

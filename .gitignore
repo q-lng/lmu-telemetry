@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+*.log
+
+# Telemetry data files (large, user-specific)
+data/*.duckdb
+
+# Env
+.env
+.env.local
+
+# Claude Code local settings (machine-specific permissions)
+.claude/

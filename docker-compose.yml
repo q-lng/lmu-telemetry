@@ -1,0 +1,25 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "3891:3001"
+    volumes:
+      - ./backend/src:/app/src
+      - ./data:/data
+    environment:
+      DATA_DIR: /data
+      PORT: 3001
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+    environment:
+      BACKEND_URL: http://backend:3001
+    depends_on:
+      - backend
