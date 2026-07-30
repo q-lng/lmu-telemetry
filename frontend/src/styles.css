@@ -76,13 +76,30 @@ body {
   flex: 1;
 }
 
-.navbar-login-badge {
-  margin-left: 4px;
-  font-size: 10px;
-  color: var(--muted-ink);
+.navbar-account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.navbar-user {
+  color: var(--primary-ink);
+  font-size: 13px;
+}
+
+.navbar-logout {
+  background: none;
   border: 1px solid var(--border);
-  border-radius: 3px;
-  padding: 1px 4px;
+  color: var(--secondary-ink);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.navbar-logout:hover {
+  color: var(--primary-ink);
+  border-color: var(--muted-ink);
 }
 
 /* Scroll boundary: scrolls when its content is taller than available space
@@ -155,9 +172,27 @@ body {
   margin: 0;
 }
 
-.connexion-placeholder {
-  padding: 40px 24px;
-  color: var(--secondary-ink);
+/* ---- Auth (connexion / inscription) ---- */
+
+.auth-page {
+  max-width: 360px;
+  margin: 0 auto;
+  padding: 60px 24px;
+}
+
+.auth-tabs {
+  margin-bottom: 20px;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-error {
+  color: #e66767;
+  font-size: 12px;
+  margin-bottom: 10px;
 }
 
 .app {

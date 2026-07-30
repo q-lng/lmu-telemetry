@@ -32,6 +32,14 @@ export interface ChannelSeries {
   values: Record<string, (number | boolean | null)[]>;
 }
 
+export interface PublicUser {
+  id: number;
+  email: string;
+  pseudo: string;
+  nom: string;
+  prenom: string;
+}
+
 export interface LapInfo {
   lap: number;
   startTs: number;
