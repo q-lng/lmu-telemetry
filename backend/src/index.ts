@@ -7,15 +7,18 @@ import { pipeline } from 'node:stream/promises';
 import { listChannels, getChannelSeries, getLaps, evictStartTsCache } from './channels.js';
 import { listSessions, getSessionMetadata } from './metadata.js';
 import { DATA_DIR, evictDb } from './db.js';
-import { initAuthSchema } from './pg.js';
+import { initAuthSchema, initSocialSchema } from './pg.js';
 import { registerAuth } from './auth.js';
+import { registerSocial } from './social.js';
 
 const app = Fastify({ logger: true });
 await app.register(cors, { origin: true });
 await app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024 * 1024 } });
 
 await initAuthSchema();
+await initSocialSchema();
 await registerAuth(app);
+await registerSocial(app);
 
 app.get('/api/health', async () => ({ ok: true }));
 

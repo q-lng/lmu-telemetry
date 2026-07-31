@@ -22,12 +22,15 @@ export function Navbar() {
           Accueil
         </NavLink>
         <NavLink to="/app">Application</NavLink>
+        {user && <NavLink to="/amis">Amis</NavLink>}
       </div>
       <div className="navbar-spacer" />
       {!loading && (
         user ? (
           <div className="navbar-account">
-            <span className="navbar-user">{user.pseudo}</span>
+            <Link to={`/u/${encodeURIComponent(user.pseudo)}`} className="navbar-user">
+              {user.pseudo}
+            </Link>
             <button className="navbar-logout" onClick={handleLogout}>
               Déconnexion
             </button>

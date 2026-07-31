@@ -74,3 +74,12 @@ export async function findUserById(id: number): Promise<User | null> {
   const rows = await pgQuery<UserRow>(`SELECT * FROM users WHERE id = $1`, [id]);
   return rows[0] ? fromRow(rows[0]) : null;
 }
+
+/** Prefix search on pseudo, case-insensitive, excluding the searching user themselves. */
+export async function searchUsersByPseudo(query: string, excludeUserId: number, limit = 20): Promise<User[]> {
+  const rows = await pgQuery<UserRow>(
+    `SELECT * FROM users WHERE pseudo ILIKE $1 || '%' AND id <> $2 ORDER BY pseudo LIMIT $3`,
+    [query, excludeUserId, limit],
+  );
+  return rows.map(fromRow);
+}
