@@ -290,16 +290,15 @@ export function ChannelPlot({
       hooks: {
         setCursor: [
           (u) => {
-            const lock = cursorLockRef.current;
-            if (lock.locked && lock.value != null) {
-              // Recomputed from the locked data value every time (not a fixed pixel)
-              // so it stays correctly placed across pan/zoom while locked.
-              const lockedLeft = u.valToPos(lock.value, 'x');
-              if (Math.abs((u.cursor.left ?? -1000) - lockedLeft) > 0.5) {
-                u.setCursor({ left: lockedLeft, top: u.cursor.top ?? 0 });
-                return; // this setCursor call re-enters the hook with the corrected position
-              }
-            }
+            // While locked, just stop reporting hover-driven positions at all —
+            // trying to additionally force uPlot's own native crosshair pixel
+            // back to the locked value (via a re-entrant u.setCursor call) turned
+            // out to misbehave over sparse/event data (e.g. Gear): hovering
+            // exactly over one of its few real points could win the race and
+            // drag the "locked" value along with it. This keeps every reported
+            // value — and thus the legend/labels/track map — correctly frozen;
+            // the native crosshair line may still cosmetically follow the mouse.
+            if (cursorLockRef.current.locked) return;
             if (!onCursorMove) return;
             const idx = u.cursor.idx;
             onCursorMove(idx == null ? null : (u.data[0][idx] as number));

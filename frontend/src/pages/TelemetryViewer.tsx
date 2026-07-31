@@ -176,6 +176,13 @@ function displayLapTime(l: LapInfo): { seconds: number; official: boolean } {
   return l.lapTime ? { seconds: l.lapTime, official: true } : { seconds: l.elapsedTime, official: false };
 }
 
+/** CompareSeries values are number|null only (no booleans) — same conversion
+ * resampleStep normally does internally, needed here since event channels skip
+ * resampling at this stage (see alignEventCompares). */
+function toNumericOrNull(values: (number | boolean | null)[]): (number | null)[] {
+  return values.map((v) => (typeof v === 'boolean' ? (v ? 1 : 0) : v));
+}
+
 function toDistanceX(t: number[], distRef: ChannelSeries | null): number[] {
   if (!distRef) return t;
   const refValues = distRef.values.value as (number | null)[];
@@ -649,19 +656,26 @@ export default function TelemetryViewer() {
 
         if (useDistance && lapDistRef) {
           const lapDist = toDistanceX(tRel, lapDistRef);
-          const primaryDist = toDistanceX(primary.t, distRef);
-          const resampled =
-            s.kind === 'continuous'
-              ? resampleContinuous(lapDist, s.values[col] as (number | null)[], primaryDist)
-              : resampleStep(lapDist, s.values[col], primaryDist);
-          perChannel[name] = { t: primaryDist, values: { [col]: resampled } };
-        } else {
+          if (s.kind === 'continuous') {
+            const primaryDist = toDistanceX(primary.t, distRef);
+            const resampled = resampleContinuous(lapDist, s.values[col] as (number | null)[], primaryDist);
+            perChannel[name] = { t: primaryDist, values: { [col]: resampled } };
+          } else {
+            // Event/step channel (Gear, In Pits, ...): only has a sample at each
+            // change, on its OWN timing — resampling straight onto the reference
+            // lap's own sparse points here would silently discard this lap's real
+            // change points, snapping them onto wherever the reference happens to
+            // change instead. Keep this lap's own timestamps (just axis-converted)
+            // and defer the final hold-last-value resample to the lanes builder's
+            // alignEventCompares, once every compared lap's own points are known.
+            perChannel[name] = { t: lapDist, values: { [col]: toNumericOrNull(s.values[col]) } };
+          }
+        } else if (s.kind === 'continuous') {
           const grid = primary.t;
-          const resampled =
-            s.kind === 'continuous'
-              ? resampleContinuous(tRel, s.values[col] as (number | null)[], grid)
-              : resampleStep(tRel, s.values[col], grid);
+          const resampled = resampleContinuous(tRel, s.values[col] as (number | null)[], grid);
           perChannel[name] = { t: grid, values: { [col]: resampled } };
+        } else {
+          perChannel[name] = { t: tRel, values: { [col]: toNumericOrNull(s.values[col]) } };
         }
       });
       return [cl.id, perChannel];
@@ -872,6 +886,32 @@ export default function TelemetryViewer() {
       return out;
     }
 
+    // Single-column event channels (Gear, In Pits, ...) only have a sample at
+    // each change — each compare's own change-point timestamps were preserved
+    // as-is (see the compare-fetch effect above), so build the union of the
+    // reference's own points and every compared lap's own points, then
+    // hold-last-value resample EVERYTHING (reference included) onto that
+    // shared grid. Otherwise a compared lap's changes would only ever show up
+    // at whichever points the reference happens to change.
+    function alignEventCompares(series: ChannelSeries, compares: LaneCompare[]): { series: ChannelSeries; compares: LaneCompare[] } {
+      if (series.kind !== 'event' || compares.length === 0) return { series, compares };
+      const col = series.valueColumns[0];
+      const gridSet = new Set<number>(series.t);
+      compares.forEach((cmp) => cmp.series.t.forEach((x) => gridSet.add(x)));
+      const grid = Array.from(gridSet).sort((a, b) => a - b);
+      const alignedSeries: ChannelSeries = {
+        ...series,
+        t: grid,
+        values: { ...series.values, [col]: resampleStep(series.t, series.values[col], grid) },
+      };
+      const alignedCompares = compares.map((cmp) => {
+        const compareValues = cmp.series.values[col];
+        if (!compareValues) return cmp;
+        return { ...cmp, series: { t: grid, values: { [col]: resampleStep(cmp.series.t, compareValues, grid) } } };
+      });
+      return { series: alignedSeries, compares: alignedCompares };
+    }
+
     for (const item of layout) {
       if (item.type === 'group') {
         const present = item.channels.filter((c) => seriesByName[c]);
@@ -886,13 +926,14 @@ export default function TelemetryViewer() {
               ? [...present].sort((a, b) => PEDALS_SPLIT_ORDER.indexOf(a) - PEDALS_SPLIT_ORDER.indexOf(b))
               : present;
           orderedPresent.forEach((c) => {
-            const series = withXAxis(seriesByName[c]);
+            const rawSeries = withXAxis(seriesByName[c]);
+            const { series, compares } = alignEventCompares(rawSeries, buildLaneCompares([c], rawSeries));
             result.push({
               key: `${item.id}__${c}`,
               label: c,
               series,
               columnStyles: [{ label: c, color: nextColor(c) }],
-              compares: buildLaneCompares([c], series),
+              compares,
               boxId: item.id,
               boxLabel: item.name,
             });
@@ -901,13 +942,14 @@ export default function TelemetryViewer() {
         }
         if (present.length === 1) {
           const c = present[0];
-          const series = withXAxis(seriesByName[c]);
+          const rawSeries = withXAxis(seriesByName[c]);
+          const { series, compares } = alignEventCompares(rawSeries, buildLaneCompares([c], rawSeries));
           result.push({
             key: item.id,
             label: item.name,
             series,
             columnStyles: [{ label: c, color: nextColor(c) }],
-            compares: buildLaneCompares([c], series),
+            compares,
           });
         } else {
           // withXAxis first: compare data is already aligned to each member's own
@@ -931,15 +973,18 @@ export default function TelemetryViewer() {
           ? CORNER_STYLE.slice(0, series.valueColumns.length)
           : [{ label: item.name, color: nextColor(item.name) }];
         const withAxis = withXAxis(series);
+        // 4-wheel channels (isMulti) keep their fixed corner color+dash styling
+        // regardless of compare — overlaying per-lap colors on top of that would
+        // lose the FL/FR/RL/RR identity without gaining a clear lap identity.
+        const { series: finalSeries, compares } = isMulti
+          ? { series: withAxis, compares: [] as LaneCompare[] }
+          : alignEventCompares(withAxis, buildLaneCompares([item.name], withAxis));
         result.push({
           key: item.name,
           label: item.name,
-          series: withAxis,
+          series: finalSeries,
           columnStyles,
-          // 4-wheel channels (isMulti) keep their fixed corner color+dash styling
-          // regardless of compare — overlaying per-lap colors on top of that would
-          // lose the FL/FR/RL/RR identity without gaining a clear lap identity.
-          compares: isMulti ? [] : buildLaneCompares([item.name], withAxis),
+          compares,
         });
       }
     }
