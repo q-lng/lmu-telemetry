@@ -106,7 +106,7 @@ export async function canViewLap(filename: string, lapNumber: number, viewerId: 
 export async function listVisibleFiles(
   viewerId: number | null,
   filter: { track?: string; car?: string } = {},
-  opts: { excludeOwn?: boolean } = {},
+  opts: { publicOnly?: boolean } = {},
 ): Promise<FileRecord[]> {
   const conditions: string[] = [];
   const params: unknown[] = [];
@@ -118,7 +118,12 @@ export async function listVisibleFiles(
 
   const visibilityClauses = [`visibility = 'public'`];
   if (viewerId !== null) {
-    if (!opts.excludeOwn) visibilityClauses.push(`owner_id = ${addParam(viewerId)}`);
+    // publicOnly ("Parcourir"): pure visibility rules, no extra access just because
+    // the viewer happens to own the file — this naturally still surfaces the
+    // viewer's OWN public files (visibility='public' doesn't care who owns it),
+    // it just stops granting access to their own private/unlisted ones the way the
+    // normal session picker does.
+    if (!opts.publicOnly) visibilityClauses.push(`owner_id = ${addParam(viewerId)}`);
     visibilityClauses.push(
       `(visibility = 'friends' AND owner_id IN (
         SELECT CASE WHEN user_a_id = ${addParam(viewerId)} THEN user_b_id ELSE user_a_id END
@@ -127,13 +132,6 @@ export async function listVisibleFiles(
     );
   }
   conditions.push(`(${visibilityClauses.join(' OR ')})`);
-
-  // "Parcourir" (excludeOwn) is explicitly for discovering OTHER people's shared
-  // content — the viewer's own files (even public ones) stay exclusive to "Mes
-  // sessions" / the normal session picker, not mixed into search results.
-  if (opts.excludeOwn && viewerId !== null) {
-    conditions.push(`(owner_id IS NULL OR owner_id <> ${addParam(viewerId)})`);
-  }
 
   if (filter.track) conditions.push(`track ILIKE ${addParam(`%${filter.track}%`)}`);
   if (filter.car) conditions.push(`car ILIKE ${addParam(`%${filter.car}%`)}`);
@@ -149,8 +147,11 @@ export async function listVisibleFiles(
 export async function searchSharedLaps(
   viewerId: number | null,
   filter: { track?: string; car?: string } = {},
-  opts: { excludeOwn?: boolean } = {},
 ): Promise<{ filename: string; lapNumber: number; track: string | null; car: string | null }[]> {
+  // Lap shares have no separate "owner shortcut" the way whole files do (a lap row
+  // only ever exists to grant friends/public access beyond the file's own
+  // visibility), so there's no publicOnly variant to make here — it's already
+  // exactly "public, or friends-of-owner", which is what Browse wants too.
   const conditions: string[] = [`ls.visibility = 'public'`];
   const params: unknown[] = [];
 
@@ -164,10 +165,6 @@ export async function searchSharedLaps(
       SELECT CASE WHEN user_a_id = ${addParam(viewerId)} THEN user_b_id ELSE user_a_id END
       FROM friendships WHERE user_a_id = ${addParam(viewerId)} OR user_b_id = ${addParam(viewerId)}
     )))`;
-  }
-
-  if (opts.excludeOwn && viewerId !== null) {
-    conditions.push(`(tf.owner_id IS NULL OR tf.owner_id <> ${addParam(viewerId)})`);
   }
 
   const extra: string[] = [];

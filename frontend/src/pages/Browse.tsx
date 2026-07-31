@@ -13,11 +13,17 @@ export function Browse() {
   async function runSearch() {
     setSearching(true);
     try {
-      // "Parcourir" is for discovering what OTHERS have shared — the viewer's own
-      // files (even public ones) already live in "Mes sessions"/the session picker,
-      // not mixed into search results here.
-      const filter = { track: track.trim() || undefined, car: car.trim() || undefined, excludeMine: true };
-      const [s, l] = await Promise.all([fetchSessions(filter), searchSharedLaps(filter)]);
+      const trackFilter = track.trim() || undefined;
+      const carFilter = car.trim() || undefined;
+      // Sessions: excludeMine drops the "it's mine" ownership shortcut so only real
+      // public/friends visibility counts — this still shows the viewer's own
+      // PUBLIC sessions (visibility alone already grants that), just not their
+      // private ones. Shared laps are already public-or-friends-only by
+      // definition, no equivalent flag needed there.
+      const [s, l] = await Promise.all([
+        fetchSessions({ track: trackFilter, car: carFilter, excludeMine: true }),
+        searchSharedLaps({ track: trackFilter, car: carFilter }),
+      ]);
       setSessions(s);
       setLaps(l);
       setSearched(true);

@@ -33,7 +33,7 @@ export async function registerFiles(app: FastifyInstance): Promise<void> {
     const files = await listVisibleFiles(
       req.userId,
       { track: req.query.track, car: req.query.car },
-      { excludeOwn: req.query.excludeMine === 'true' },
+      { publicOnly: req.query.excludeMine === 'true' },
     );
     return Promise.all(
       files.map(async (f): Promise<SessionSummary> => {
@@ -273,14 +273,10 @@ export async function registerFiles(app: FastifyInstance): Promise<void> {
     },
   );
 
-  app.get<{ Querystring: { track?: string; car?: string; excludeMine?: string } }>(
+  app.get<{ Querystring: { track?: string; car?: string } }>(
     '/api/shared-laps/search',
     async (req) => {
-      const laps = await searchSharedLaps(
-        req.userId,
-        { track: req.query.track, car: req.query.car },
-        { excludeOwn: req.query.excludeMine === 'true' },
-      );
+      const laps = await searchSharedLaps(req.userId, { track: req.query.track, car: req.query.car });
       return { laps };
     },
   );
