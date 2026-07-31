@@ -31,14 +31,14 @@ export default function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<LandingPage />} />
-        <Route path="telemetrie" element={<TelemetryViewer />} />
-        <Route path="connexion" element={<Connexion />} />
+        <Route path="telemetry" element={<TelemetryViewer />} />
+        <Route path="login" element={<Connexion />} />
         <Route path="forgot-password" element={<ForgotPassword />} />
         <Route path="reset-password" element={<ResetPassword />} />
-        <Route path="parcourir" element={<Browse />} />
-        <Route path="partage/:file/:lap" element={<SharedLap />} />
+        <Route path="browse" element={<Browse />} />
+        <Route path="shared/:file/:lap" element={<SharedLap />} />
         <Route
-          path="amis"
+          path="friends"
           element={
             <RequireAuth>
               <Social />
@@ -54,7 +54,7 @@ export default function App() {
           }
         />
         <Route
-          path="mes-sessions"
+          path="my-sessions"
           element={
             <RequireAuth>
               <MesSessions />

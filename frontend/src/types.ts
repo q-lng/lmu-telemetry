@@ -95,10 +95,38 @@ export interface CompareSeries {
   values: Record<string, (number | null)[]>;
 }
 
+// A lap checked for comparison against the reference lap — `id` is a stable key
+// (`${sourceId}:${lapNumber}`), `sourceId` is 'primary' (the open session) or an
+// ExternalSource's id. Deliberately has no `color` field — color is derived
+// purely from this lap's current position in the comparedLaps list (see
+// TelemetryViewer's `comparedLapColorAt`), so toggling the same lap off and
+// back on always gives it back the same color instead of drifting forward.
+export interface ComparedLap {
+  id: string;
+  sourceId: string;
+  lapNumber: number;
+}
+
+export interface LaneCompare {
+  id: string; // matches the originating ComparedLap.id
+  label: string;
+  color: string;
+  series: CompareSeries;
+}
+
 export interface Lane {
   key: string; // stable identity (React key, height persistence) — may be an opaque group id
   label: string; // human-readable name shown in the chart
   series: ChannelSeries;
   columnStyles: ColumnStyle[]; // same order/length as series.valueColumns
-  compare?: CompareSeries | null; // only meaningful when series.valueColumns.length === 1
+  compares: LaneCompare[]; // one entry per compared lap that has data for this lane, empty when none
+  // When set, this lane renders as its own separate graph but stays visually
+  // enclosed with every other lane sharing the same boxId (consecutive in the
+  // lane list), under a header showing boxLabel — used for "ungrouped but
+  // still boxed together" display (e.g. Pedals split into separate graphs).
+  boxId?: string;
+  boxLabel?: string;
+  // Forces the Y-axis range to be symmetric around 0 (e.g. the delta-time
+  // channel) instead of the usual tight fit around the actual data span.
+  centerYOnZero?: boolean;
 }

@@ -45,6 +45,20 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function putJson<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const parsed = await res.json().catch(() => ({}));
+    throw new Error(tError((parsed as { error?: string }).error));
+  }
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
 /** POST/DELETE calls with no request body (accept/decline/follow/unfollow/remove). */
 async function apiCall(url: string, method: 'POST' | 'DELETE'): Promise<void> {
   const res = await fetch(url, { method });
@@ -219,4 +233,15 @@ export function fetchSharedLapLaps(file: string, lap: number): Promise<LapInfo[]
 
 export function fetchSharedLapChannelSeries(file: string, lap: number, name: string): Promise<ChannelSeries> {
   return getJson(`/api/shared-lap/${encodeURIComponent(file)}/${lap}/channel/${encodeURIComponent(name)}`);
+}
+
+// Generic per-user preferences store (backend-persisted — never localStorage,
+// see CLAUDE.md/project convention). PUT shallow-merges `patch`'s top-level
+// keys, so unrelated features can each own their own key.
+export function fetchPreferences(): Promise<Record<string, unknown>> {
+  return getJson<{ data: Record<string, unknown> }>('/api/preferences').then((r) => r.data);
+}
+
+export function updatePreferences(patch: Record<string, unknown>): Promise<Record<string, unknown>> {
+  return putJson<{ data: Record<string, unknown> }>('/api/preferences', { data: patch }).then((r) => r.data);
 }

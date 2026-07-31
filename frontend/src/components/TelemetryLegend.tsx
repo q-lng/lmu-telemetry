@@ -1,12 +1,23 @@
 import type { Lane } from '../types';
 import { nearestValue } from '../nearest';
-import { COMPARE_COLOR } from '../palette';
 import { t } from '../i18n';
+
+interface ComparedLapColumn {
+  id: string;
+  label: string;
+  color: string;
+}
 
 interface Props {
   lanes: Lane[];
   cursorT: number | null;
+  comparedLapColumns: ComparedLapColumn[];
 }
+
+// Beyond this many compared-lap columns, the table stops fitting sensibly no
+// matter how narrow each column gets — cap it and say how many are hidden
+// (still fully visible in the graphs themselves) rather than degrading silently.
+const MAX_LEGEND_LAP_COLUMNS = 3;
 
 function formatValue(v: number | boolean | null): string {
   if (v === null || v === undefined) return '–';
@@ -14,49 +25,109 @@ function formatValue(v: number | boolean | null): string {
   return Number.isInteger(v) ? String(v) : v.toFixed(2);
 }
 
-export function TelemetryLegend({ lanes, cursorT }: Props) {
-  const rows = lanes.flatMap((lane) => {
-    const isMulti = lane.series.valueColumns.length > 1;
-    const primary = lane.series.valueColumns.map((col, i) => ({
-      key: `${lane.key}__${col}`,
-      color: lane.columnStyles[i].color,
-      dashed: !!lane.columnStyles[i].dash,
-      label: lane.columnStyles[i].label,
-      unit: lane.series.unit,
-      value: nearestValue(lane.series.t, lane.series.values[col], cursorT),
-    }));
-    // One compare row per column that actually has compare data — a grouped lane
-    // (e.g. Pedals) can have a comparison for every member, not just the first.
-    if (lane.compare) {
-      const compare = lane.compare;
-      lane.series.valueColumns.forEach((col, i) => {
-        const compareValues = compare.values[col];
+function formatDelta(v: number): string {
+  const sign = v >= 0 ? '+' : '-';
+  const abs = Math.abs(v);
+  return `${sign}${Number.isInteger(abs) ? String(abs) : abs.toFixed(2)}`;
+}
+
+interface Row {
+  key: string;
+  label: string;
+  color: string;
+  dashed: boolean;
+  unit: string;
+  referenceValue: number | boolean | null;
+  // keyed by ComparedLapColumn.id — absent when this channel has no data for that lap
+  compares: Record<string, { value: number | boolean | null; delta: string | null }>;
+}
+
+export function TelemetryLegend({ lanes, cursorT, comparedLapColumns }: Props) {
+  const rows: Row[] = lanes.flatMap((lane) =>
+    lane.series.valueColumns.map((col, i) => {
+      const referenceValue = nearestValue(lane.series.t, lane.series.values[col], cursorT);
+      const compares: Row['compares'] = {};
+      lane.compares.forEach((cmp) => {
+        const compareValues = cmp.series.values[col];
         if (!compareValues) return;
-        primary.push({
-          key: `${lane.key}__${col}__compare`,
-          color: isMulti ? lane.columnStyles[i].color : COMPARE_COLOR,
-          dashed: true,
-          label: `${lane.columnStyles[i].label}${t('telemetryLegend.comparedSuffix')}`,
-          unit: lane.series.unit,
-          value: nearestValue(compare.t, compareValues, cursorT),
-        });
+        const compareValue = nearestValue(cmp.series.t, compareValues, cursorT);
+        const delta =
+          typeof compareValue === 'number' && typeof referenceValue === 'number'
+            ? formatDelta(compareValue - referenceValue)
+            : null;
+        compares[cmp.id] = { value: compareValue, delta };
       });
-    }
-    return primary;
-  });
+      return {
+        key: `${lane.key}__${col}`,
+        label: lane.columnStyles[i].label,
+        color: lane.columnStyles[i].color,
+        dashed: !!lane.columnStyles[i].dash,
+        unit: lane.series.unit,
+        referenceValue,
+        compares,
+      };
+    }),
+  );
+
+  if (rows.length === 0) {
+    return (
+      <div className="telemetry-legend">
+        <div className="legend-empty">{t('telemetryLegend.selectChannelsHint')}</div>
+      </div>
+    );
+  }
+
+  const shownColumns = comparedLapColumns.slice(0, MAX_LEGEND_LAP_COLUMNS);
+  const hiddenCount = comparedLapColumns.length - shownColumns.length;
+  const otherColumnWidth = 68 / (1 + shownColumns.length);
 
   return (
     <div className="telemetry-legend">
-      {rows.length === 0 && <div className="legend-empty">{t('telemetryLegend.selectChannelsHint')}</div>}
-      {rows.map((r) => (
-        <div className="legend-row" key={r.key}>
-          <span className={`legend-swatch${r.dashed ? ' dashed' : ''}`} style={{ borderColor: r.color }} />
-          <span className="legend-label">{r.label}</span>
-          <span className="legend-value">
-            {formatValue(r.value)} <span className="legend-unit">{r.unit}</span>
-          </span>
-        </div>
-      ))}
+      <table className="telemetry-legend-table">
+        <colgroup>
+          <col style={{ width: '32%' }} />
+          <col style={{ width: `${otherColumnWidth}%` }} />
+          {shownColumns.map((col) => (
+            <col key={col.id} style={{ width: `${otherColumnWidth}%` }} />
+          ))}
+        </colgroup>
+        <thead>
+          <tr>
+            <th>{t('telemetryLegend.channel')}</th>
+            <th>{t('telemetryLegend.reference')}</th>
+            {shownColumns.map((col) => (
+              <th key={col.id} style={{ color: col.color }}>
+                {col.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.key}>
+              <td className="legend-channel-cell" title={r.label}>
+                <span className={`legend-swatch${r.dashed ? ' dashed' : ''}`} style={{ borderColor: r.color }} />
+                <span className="legend-channel-name">{r.label}</span>
+              </td>
+              <td className="legend-value-cell">
+                {formatValue(r.referenceValue)} <span className="legend-unit">{r.unit}</span>
+              </td>
+              {shownColumns.map((col) => {
+                const entry = r.compares[col.id];
+                return (
+                  <td key={col.id} className="legend-value-cell">
+                    {entry ? formatValue(entry.value) : '–'}
+                    {entry?.delta && <span className="legend-delta"> Δ {entry.delta}</span>}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {hiddenCount > 0 && (
+        <div className="legend-overflow-hint">{t('telemetryLegend.moreLapsHidden', { count: hiddenCount })}</div>
+      )}
     </div>
   );
 }

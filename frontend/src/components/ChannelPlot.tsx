@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import uPlot from 'uplot';
 import type { Lane } from '../types';
-import { CHART_CHROME, COMPARE_COLOR } from '../palette';
+import { CHART_CHROME } from '../palette';
+import { nearestValue } from '../nearest';
 import { t } from '../i18n';
 
 function formatTime(s: number): string {
@@ -17,9 +18,25 @@ function formatDistance(m: number): string {
   return Math.abs(m) >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${Math.round(m)}m`;
 }
 
+function formatDelta(v: number): string {
+  const sign = v >= 0 ? '+' : '-';
+  const abs = Math.abs(v);
+  return `${sign}${Number.isInteger(abs) ? String(abs) : abs.toFixed(2)}`;
+}
+
+function formatValue(v: number | boolean | null): string {
+  if (v === null || v === undefined) return '–';
+  if (typeof v === 'boolean') return v ? t('telemetryLegend.on') : t('telemetryLegend.off');
+  return Number.isInteger(v) ? String(v) : v.toFixed(2);
+}
+
 function numeric(values: (number | boolean | null)[]): (number | null)[] {
   return values.map((v) => (typeof v === 'boolean' ? (v ? 1 : 0) : v));
 }
+
+// Reference and compared-lap traces are the same thickness — color is what
+// tells them apart now, not weight.
+const LINE_WIDTH = 2;
 
 /** Fixed Y range computed once from the lane's full data — uPlot's default "auto"
  * y-scale rescales to whatever is currently visible on X, so the vertical scale
@@ -43,15 +60,37 @@ function computeFixedYRange(data: (number | null)[][]): [number, number] {
   return [min - pad, max + pad];
 }
 
+/** Same idea, but symmetric around 0 — [-M, M] instead of a tight fit around
+ * the actual data span — for lanes like delta-time where 0 (dead even with
+ * the reference lap) needs to sit at the vertical center of the graph rather
+ * than wherever the data happens to average out. */
+function computeZeroCenteredYRange(data: (number | null)[][]): [number, number] {
+  let magnitude = 0;
+  for (let i = 1; i < data.length; i++) {
+    for (const v of data[i]) {
+      if (v == null) continue;
+      const abs = Math.abs(v);
+      if (abs > magnitude) magnitude = abs;
+    }
+  }
+  if (magnitude === 0) magnitude = 1;
+  const padded = magnitude * 1.05;
+  return [-padded, padded];
+}
+
 const ZOOM_FACTOR = 0.85;
+// Below this much horizontal movement, a mousedown+mouseup counts as a click
+// (freeze the cursor there) rather than a pan drag.
+const CLICK_MOVE_THRESHOLD = 4;
 
 /** Wheel-to-zoom (centered on cursor) + click-drag-to-pan on the x scale, applied
  * to every lane sharing `syncKey` — `cursor.sync.scales` only syncs uPlot's own
  * native cursor/drag interactions, not externally-invoked `setScale()` calls, so
  * the resulting range is pushed by hand to every plot in `uPlot.sync(syncKey)`.
  * Bounds are taken from the actual x data (not `u.scales.x`, which reflects the
- * current — possibly already zoomed — view and can lag right after construction). */
-function attachZoomPan(u: uPlot, syncKey: string): () => void {
+ * current — possibly already zoomed — view and can lag right after construction).
+ * `onClickAt` fires instead of a pan when the mouse barely moved between down/up. */
+function attachZoomPan(u: uPlot, syncKey: string, onClickAt?: (value: number) => void): () => void {
   const over = u.over;
   const xs = u.data[0] as number[];
   const fullMin = xs[0];
@@ -126,6 +165,9 @@ function attachZoomPan(u: uPlot, syncKey: string): () => void {
         const v1 = u.posToVal(x1, 'x');
         applyScale(Math.min(v0, v1), Math.max(v0, v1));
       }
+    } else if (dragMode === 'pan' && onClickAt && Math.abs(e.clientX - dragStartX) < CLICK_MOVE_THRESHOLD) {
+      const rect = over.getBoundingClientRect();
+      onClickAt(u.posToVal(e.clientX - rect.left, 'x'));
     }
     dragMode = null;
   }
@@ -164,8 +206,27 @@ interface Props {
    * always fills exactly the available vertical space, so lanes are sized purely
    * by their weight relative to each other, never by an absolute pixel height. */
   weight: number;
+  /** Shared default X range across every lane (from a dense reference channel) —
+   * without this, a sparse event channel (Gear, ...) would auto-range to just its
+   * own data span, narrower than dense channels, throwing off cursor.sync until a
+   * zoom forces every lane back to the identical [min,max]. */
+  xDomain?: [number, number] | null;
+  /** Current pan/zoom window, restored on (re)construction via a ref (NOT a
+   * dependency of the rebuild effect below) so a lane rebuilding for an unrelated
+   * reason (toggling a compared lap, etc.) doesn't lose the user's current zoom —
+   * only reading this fresh every time would itself force a rebuild on every zoom. */
+  viewRange?: { min: number; max: number } | null;
+  /** Cursor position, only used to show a live per-compared-lap delta next to the
+   * label — deliberately NOT in the uPlot-rebuild effect's dependency array below,
+   * so a mousemove re-renders just this label text, never tears down the chart. */
+  cursorT?: number | null;
+  /** When true, the cursor is pinned at `cursorT` (click-to-freeze) — the crosshair
+   * is forced back there on every mousemove instead of following the mouse. */
+  cursorLocked?: boolean;
   onWeightChange?: (key: string, weight: number) => void;
   onCursorMove?: (t: number | null) => void;
+  /** Fires on a genuine click (not a pan drag) with the clicked x-value. */
+  onCursorClick?: (t: number) => void;
   onViewRangeChange?: (range: { min: number; max: number }) => void;
 }
 
@@ -175,53 +236,78 @@ export function ChannelPlot({
   showXAxis,
   xAxisMode,
   weight,
+  xDomain,
+  viewRange,
+  cursorT,
+  cursorLocked,
   onWeightChange,
   onCursorMove,
+  onCursorClick,
   onViewRangeChange,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const plotRef = useRef<uPlot | null>(null);
+  const viewRangeRef = useRef(viewRange);
+  useEffect(() => {
+    viewRangeRef.current = viewRange;
+  }, [viewRange]);
+  // Read fresh inside the setCursor/draw hooks below (which are only rebuilt when
+  // `lane` changes, not on every cursor tick) — a plain closure over cursorT/
+  // cursorLocked would go stale the moment the user moves the mouse after locking.
+  const cursorLockRef = useRef<{ locked: boolean; value: number | null }>({ locked: false, value: null });
+  // uPlot's own crosshair keeps following the mouse while locked (see the
+  // setCursor hook below) — only actual chart redraws repaint the canvas, so
+  // locking/unlocking needs to explicitly trigger one to show/hide our own
+  // persistent line for the locked position. Tracked separately from the ref
+  // update above so a plain hover (cursorT changing while NOT locked) never
+  // forces a full redraw — only an actual lock/unlock transition does.
+  const wasLockedRef = useRef(false);
+  useEffect(() => {
+    cursorLockRef.current = { locked: !!cursorLocked, value: cursorT ?? null };
+    if (wasLockedRef.current !== !!cursorLocked) {
+      wasLockedRef.current = !!cursorLocked;
+      plotRef.current?.redraw();
+    }
+  }, [cursorLocked, cursorT]);
 
   useEffect(() => {
     if (!containerRef.current) return;
-    const { series, columnStyles, compare } = lane;
+    const { series, columnStyles, compares } = lane;
     const isEvent = series.kind === 'event';
     const stepPaths = isEvent ? uPlot.paths.stepped!({ align: 1 }) : undefined;
 
-    const isMulti = series.valueColumns.length > 1;
     const data: (number | null)[][] = [series.t, ...series.valueColumns.map((col) => numeric(series.values[col]))];
     const seriesOpts: uPlot.Series[] = [
       {},
       ...series.valueColumns.map((col, i) => ({
         label: columnStyles[i].label,
         stroke: columnStyles[i].color,
-        // slightly thicker when a comparison lap overlays it, so the primary trace stays the clear focal line
-        width: compare ? 2 : 1.5,
+        width: LINE_WIDTH,
         dash: columnStyles[i].dash,
         paths: stepPaths,
         points: { show: false },
       })),
     ];
 
-    if (compare) {
+    // Each compared lap gets its own solid color (no more dashing — the color
+    // itself is what tells laps apart now), applied to every value column of
+    // this lane for that lap (a grouped lane's members aren't distinguished
+    // from one another within a single compared lap's overlay). Same width as
+    // the reference trace — color alone is what tells them apart now.
+    compares.forEach((cmp) => {
       series.valueColumns.forEach((col, i) => {
-        const compareValues = compare.values[col];
+        const compareValues = cmp.series.values[col];
         if (!compareValues) return;
         data.push(compareValues);
         seriesOpts.push({
-          label: `${columnStyles[i].label}${t('channelPlot.comparedSuffix')}`,
-          // a single-channel lane uses a fixed neutral hue so the ghost trace never
-          // disappears into the primary; a grouped lane already has one color per
-          // member, so reuse that instead — a second neutral trace couldn't be told
-          // apart from the others'.
-          stroke: isMulti ? columnStyles[i].color : COMPARE_COLOR,
-          width: 2.5,
-          dash: [3, 5],
+          label: `${columnStyles[i].label}${t('channelPlot.comparedSuffix')} — ${cmp.label}`,
+          stroke: cmp.color,
+          width: LINE_WIDTH,
           paths: stepPaths,
           points: { show: false },
         });
       });
-    }
+    });
 
     const opts: uPlot.Options = {
       width: containerRef.current.clientWidth,
@@ -229,7 +315,10 @@ export function ChannelPlot({
       padding: [4, 8, showXAxis ? 4 : 0, 0],
       cursor: { drag: { x: false, y: false }, sync: { key: syncKey, scales: ['x', null] } },
       legend: { show: false },
-      scales: { x: { time: false }, y: { range: computeFixedYRange(data) } },
+      scales: {
+        x: { time: false },
+        y: { range: lane.centerYOnZero ? computeZeroCenteredYRange(data) : computeFixedYRange(data) },
+      },
       axes: [
         {
           show: true,
@@ -249,6 +338,15 @@ export function ChannelPlot({
       hooks: {
         setCursor: [
           (u) => {
+            // While locked, just stop reporting hover-driven positions at all —
+            // trying to additionally force uPlot's own native crosshair pixel
+            // back to the locked value (via a re-entrant u.setCursor call) turned
+            // out to misbehave over sparse/event data (e.g. Gear): hovering
+            // exactly over one of its few real points could win the race and
+            // drag the "locked" value along with it. This keeps every reported
+            // value — and thus the legend/labels/track map — correctly frozen;
+            // the native crosshair line may still cosmetically follow the mouse.
+            if (cursorLockRef.current.locked) return;
             if (!onCursorMove) return;
             const idx = u.cursor.idx;
             onCursorMove(idx == null ? null : (u.data[0][idx] as number));
@@ -264,12 +362,50 @@ export function ChannelPlot({
             if (min != null && max != null) onViewRangeChange({ min, max });
           },
         ],
+        // uPlot's native crosshair (a DOM overlay) keeps following the mouse even
+        // while locked — this paints our own persistent marker for the locked
+        // position directly on the canvas instead, distinct in color/width from
+        // the live hover crosshair. `draw` only fires on actual chart redraws
+        // (data/scale/size changes, or our own explicit redraw() call above), not
+        // on every mousemove, so this never runs at hover frequency.
+        draw: [
+          (u) => {
+            const lock = cursorLockRef.current;
+            if (!lock.locked || lock.value == null) return;
+            const x = u.valToPos(lock.value, 'x', true);
+            if (x < u.bbox.left || x > u.bbox.left + u.bbox.width) return;
+            const ctx = u.ctx;
+            ctx.save();
+            ctx.strokeStyle = CHART_CHROME.lockedCursor;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 4]);
+            ctx.beginPath();
+            ctx.moveTo(x, u.bbox.top);
+            ctx.lineTo(x, u.bbox.top + u.bbox.height);
+            ctx.stroke();
+            ctx.restore();
+          },
+        ],
       },
     };
 
     const plot = new uPlot(opts, data as uPlot.AlignedData, containerRef.current);
     plotRef.current = plot;
-    const detachZoomPan = attachZoomPan(plot, syncKey);
+    // Set the scale explicitly exactly once at construction — restoring
+    // whatever pan/zoom window was active before this instance was rebuilt
+    // (e.g. toggling a compared lap), or else the shared xDomain so every lane
+    // starts in sync instead of each auto-ranging to its own data span (see
+    // xDomain above). A ONE-TIME imperative setScale call, same method
+    // attachZoomPan itself uses for actual zoom/pan — NOT a persistent
+    // `scales.x.range` config, which fought with attachZoomPan's own setScale
+    // calls on every redraw and broke zooming entirely.
+    const savedRange = viewRangeRef.current;
+    if (savedRange) {
+      plot.setScale('x', { min: savedRange.min, max: savedRange.max });
+    } else if (xDomain) {
+      plot.setScale('x', { min: xDomain[0], max: xDomain[1] });
+    }
+    const detachZoomPan = attachZoomPan(plot, syncKey, onCursorClick);
 
     if (showXAxis && onViewRangeChange && plot.scales.x.min != null && plot.scales.x.max != null) {
       onViewRangeChange({ min: plot.scales.x.min, max: plot.scales.x.max });
@@ -292,7 +428,7 @@ export function ChannelPlot({
       plotRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lane, syncKey, showXAxis, xAxisMode]);
+  }, [lane, syncKey, showXAxis, xAxisMode, xDomain]);
 
   function handleResizeStart(e: ReactMouseEvent) {
     e.preventDefault();
@@ -322,7 +458,41 @@ export function ChannelPlot({
 
   return (
     <div className="lane" style={{ flexGrow: weight }}>
-      <div className="lane-label">{lane.label}</div>
+      <div className="lane-label">
+        {lane.label}
+        {cursorT != null && (
+          <span className="lane-label-values">
+            {lane.series.valueColumns.map((col, i) => {
+              const referenceValue = nearestValue(lane.series.t, lane.series.values[col], cursorT);
+              return (
+                <span key={col} className="lane-label-column">
+                  {lane.series.valueColumns.length > 1 && (
+                    <span className="lane-label-column-name" style={{ color: lane.columnStyles[i].color }}>
+                      {lane.columnStyles[i].label}
+                    </span>
+                  )}
+                  <span style={{ color: lane.columnStyles[i].color }}>{formatValue(referenceValue)}</span>
+                  {lane.compares.map((cmp) => {
+                    const compareValues = cmp.series.values[col];
+                    if (!compareValues) return null;
+                    const compareValue = nearestValue(cmp.series.t, compareValues, cursorT);
+                    const delta =
+                      typeof compareValue === 'number' && typeof referenceValue === 'number'
+                        ? formatDelta(compareValue - referenceValue)
+                        : null;
+                    return (
+                      <span key={cmp.id} className="lane-label-delta" style={{ color: cmp.color }}>
+                        {formatValue(compareValue)}
+                        {delta && ` (Δ ${delta})`}
+                      </span>
+                    );
+                  })}
+                </span>
+              );
+            })}
+          </span>
+        )}
+      </div>
       <div ref={containerRef} className="lane-canvas" />
       <div className="lane-resize-handle" onMouseDown={handleResizeStart} title={t('channelPlot.resize')} />
     </div>

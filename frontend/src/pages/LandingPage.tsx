@@ -13,7 +13,7 @@ export function LandingPage() {
       <section className="landing-hero">
         <h1>{t('landing.heroTitle')}</h1>
         <p>{t('landing.heroSubtitle')}</p>
-        <a href="/telemetrie" className="landing-cta">
+        <a href="/telemetry" className="landing-cta">
           {t('landing.cta')}
         </a>
       </section>

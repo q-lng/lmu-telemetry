@@ -20,7 +20,7 @@ export function ResetPassword() {
     setSubmitting(true);
     try {
       await resetPassword(token, password);
-      window.location.href = '/connexion';
+      window.location.href = '/login';
     } catch (err) {
       setError((err as Error).message);
       setSubmitting(false);

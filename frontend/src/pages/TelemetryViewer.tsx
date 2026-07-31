@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { TouchEvent as ReactTouchEvent } from 'react';
+import type { ReactNode, TouchEvent as ReactTouchEvent } from 'react';
 import { fetchSessions, setFileVisibility, setLapVisibility, uploadSession } from '../api';
 import type {
   ChannelDescriptor,
   ChannelSeries,
+  ComparedLap,
   CompareSeries,
   Lane,
+  LaneCompare,
   LapInfo,
   LapVisibility,
   SessionMetadata,
@@ -15,10 +17,26 @@ import { createServerDataSource, createWasmDataSource, type DataSource } from '.
 import { ChannelPlot } from '../components/ChannelPlot';
 import { TrackMap } from '../components/TrackMap';
 import { TelemetryLegend } from '../components/TelemetryLegend';
-import { channelColor, CORNER_STYLE } from '../palette';
+import { channelColor, comparedLapColor, CORNER_STYLE, REFERENCE_UNIFORM_COLOR } from '../palette';
 import { resampleContinuous, resampleStep } from '../resample';
 import { useAuth } from '../AuthContext';
+import { usePreferences } from '../PreferencesContext';
 import { t } from '../i18n';
+
+const COMPARED_LAP_COLOR_SLOTS = 9;
+
+// A second session opened just to borrow laps from it for comparison — has its
+// own DataSource/laps/metadata, independent of the primary session's. Page-local
+// (not in types.ts) since it carries a live DataSource handle, not a wire shape.
+interface ExternalSource {
+  id: string;
+  label: string;
+  dataSource: DataSource;
+  laps: LapInfo[];
+  metadata: SessionMetadata | null;
+}
+
+type ColorMode = 'byChannel' | 'byLap';
 
 interface ChannelLayoutItem {
   type: 'channel';
@@ -29,6 +47,16 @@ interface GroupLayoutItem {
   id: string;
   name: string;
   channels: string[];
+  // false = each member gets its own separate graph, still enclosed together in
+  // a labeled box (see the `lanes` builder's boxId/boxLabel) — absent/true means
+  // today's single combined-overlay lane. Only ever toggled via the UI for the
+  // built-in Pedals group (see `special`); a user-made group (grouped via the
+  // sidebar's "Group" button) is always fully combined, and fully dissolved
+  // (not toggled) to go back to loose standalone channels.
+  grouped?: boolean;
+  // Marks the built-in Pedals group so the sidebar can show its extra
+  // clutch/group-display toggles — not set on user-made groups.
+  special?: 'pedals';
 }
 type LayoutItem = ChannelLayoutItem | GroupLayoutItem;
 
@@ -43,10 +71,26 @@ const KNOWN_COLORS: Record<string, string> = {
   'Clutch Pos Unfiltered': '#3987e5',
 };
 
+const CLUTCH_CHANNEL = 'Clutch Pos Unfiltered';
+// Display order when the Pedals group is split into separate graphs — brake
+// above throttle, clutch (if enabled) last.
+const PEDALS_SPLIT_ORDER = ['Brake Pos Unfiltered', 'Throttle Pos Unfiltered', CLUTCH_CHANNEL];
+
+// Reserved synthetic channel name — never a real backend channel, special-cased
+// throughout (excluded from selectedChannels' real fetch, built entirely
+// client-side in the lanes builder from distRef + deltaByLapId).
+const DELTA_CHANNEL_NAME = 'Delta Time';
+
 const INITIAL_LAYOUT: LayoutItem[] = [
   { type: 'channel', name: 'Ground Speed' },
   { type: 'channel', name: 'Gear' },
-  { type: 'group', id: 'default-pedals', name: t('tv.defaultGroupPedals'), channels: ['Throttle Pos Unfiltered', 'Brake Pos Unfiltered'] },
+  {
+    type: 'group',
+    id: 'default-pedals',
+    name: t('tv.defaultGroupPedals'),
+    channels: ['Throttle Pos Unfiltered', 'Brake Pos Unfiltered'],
+    special: 'pedals',
+  },
   { type: 'channel', name: 'Steering Pos' },
   { type: 'group', id: 'default-pits', name: 'In Pits / Speed Limiter', channels: ['In Pits', 'Speed Limiter'] },
 ];
@@ -61,6 +105,7 @@ const INITIAL_LANE_WEIGHTS: Record<string, number> = {
   'default-pedals': LANE_SIZE.tall,
   'Steering Pos': LANE_SIZE.medium,
   'default-pits': LANE_SIZE.small,
+  [DELTA_CHANNEL_NAME]: LANE_SIZE.small,
 };
 
 function buildCombinedSeries(names: string[], seriesByName: Record<string, ChannelSeries>, name: string): ChannelSeries {
@@ -137,6 +182,13 @@ function displayLapTime(l: LapInfo): { seconds: number; official: boolean } {
   return l.lapTime ? { seconds: l.lapTime, official: true } : { seconds: l.elapsedTime, official: false };
 }
 
+/** CompareSeries values are number|null only (no booleans) — same conversion
+ * resampleStep normally does internally, needed here since event channels skip
+ * resampling at this stage (see alignEventCompares). */
+function toNumericOrNull(values: (number | boolean | null)[]): (number | null)[] {
+  return values.map((v) => (typeof v === 'boolean' ? (v ? 1 : 0) : v));
+}
+
 function toDistanceX(t: number[], distRef: ChannelSeries | null): number[] {
   if (!distRef) return t;
   const refValues = distRef.values.value as (number | null)[];
@@ -199,6 +251,43 @@ async function findDistanceLapRange(
   return { from: trueStart, to: trueEnd - 0.01 };
 }
 
+/** Inverts a lap's own (time, distance) pairs — which naturally give distance
+ * as a function of time — into time as a function of distance, by reusing
+ * resampleContinuous with the two roles swapped: distance becomes the "source
+ * x domain" (ascending within one isolated lap window, same assumption
+ * findDistanceLapRange/toDistanceX already rely on) and time becomes the
+ * "source values" resampled onto the query distances. Used by the delta-time
+ * channel: "how long did this lap take to reach distance d" for each of the
+ * reference lap's own distance samples, for every compared lap. */
+function invertTimeAtDistance(
+  t: number[],
+  distanceValues: (number | null)[],
+  queryDistances: (number | null)[],
+): (number | null)[] {
+  const cleanDist: number[] = [];
+  const cleanTime: number[] = [];
+  for (let i = 0; i < t.length; i++) {
+    const d = distanceValues[i];
+    if (d == null) continue;
+    cleanDist.push(d);
+    cleanTime.push(t[i]);
+  }
+  const validIdx: number[] = [];
+  const validQuery: number[] = [];
+  queryDistances.forEach((d, i) => {
+    if (d != null) {
+      validIdx.push(i);
+      validQuery.push(d);
+    }
+  });
+  const resampled = resampleContinuous(cleanDist, cleanTime, validQuery);
+  const out: (number | null)[] = new Array(queryDistances.length).fill(null);
+  validIdx.forEach((originalIdx, k) => {
+    out[originalIdx] = resampled[k];
+  });
+  return out;
+}
+
 interface DisplayPreset {
   layout: LayoutItem[];
   laneWeights: Record<string, number>;
@@ -222,6 +311,9 @@ function savePresets(presets: Record<string, DisplayPreset>) {
 
 export default function TelemetryViewer() {
   const { user } = useAuth();
+  const { preferences, setPreference } = usePreferences();
+  const preferredReferenceLapColor = preferences.referenceLapColor as string | undefined;
+  const preferredComparedLapColors = preferences.comparedLapColors as string[] | undefined;
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   // Guest mode: a .duckdb file opened straight in the browser via DuckDB-WASM —
@@ -244,17 +336,83 @@ export default function TelemetryViewer() {
   const [channels, setChannels] = useState<ChannelDescriptor[]>([]);
   const [laps, setLaps] = useState<LapInfo[]>([]);
   const [selectedLap, setSelectedLap] = useState<number | 'full'>('full');
-  const [compareLap, setCompareLap] = useState<number | 'none'>('none');
   const [xAxisMode, setXAxisMode] = useState<'time' | 'distance'>('time');
   const [layout, setLayout] = useState<LayoutItem[]>(INITIAL_LAYOUT);
+  // Apply the saved Pedals grouped/clutch preference once, as soon as it's
+  // loaded (preferences load async, after INITIAL_LAYOUT's own defaults have
+  // already rendered) — guarded so it never clobbers the user's own later
+  // toggles once applied (or for guests/fresh accounts, where it just never fires).
+  const appliedPedalsPrefsRef = useRef(false);
+  useEffect(() => {
+    if (appliedPedalsPrefsRef.current) return;
+    if (preferences.pedalsGrouped === undefined && preferences.pedalsClutch === undefined) return;
+    appliedPedalsPrefsRef.current = true;
+    setLayout((prev) =>
+      prev.map((item) => {
+        if (item.type !== 'group' || item.special !== 'pedals') return item;
+        const grouped = typeof preferences.pedalsGrouped === 'boolean' ? preferences.pedalsGrouped : item.grouped;
+        const wantsClutch = !!preferences.pedalsClutch;
+        const hasClutch = item.channels.includes(CLUTCH_CHANNEL);
+        const channels =
+          wantsClutch === hasClutch
+            ? item.channels
+            : wantsClutch
+              ? [...item.channels, CLUTCH_CHANNEL]
+              : item.channels.filter((c) => c !== CLUTCH_CHANNEL);
+        return { ...item, grouped, channels };
+      }),
+    );
+  }, [preferences]);
+  // Same pattern for the delta-time channel: whether it's shown, and (once the
+  // user drags it somewhere) which position to restore it at — defaults to the
+  // top (index 0) the first time it's ever enabled.
+  const appliedDeltaPrefsRef = useRef(false);
+  useEffect(() => {
+    if (appliedDeltaPrefsRef.current) return;
+    if (preferences.deltaChannelShown === undefined) return;
+    appliedDeltaPrefsRef.current = true;
+    if (preferences.deltaChannelShown === true) {
+      const idx = typeof preferences.deltaChannelIndex === 'number' ? preferences.deltaChannelIndex : 0;
+      setLayout((prev) => {
+        if (prev.some((it) => it.type === 'channel' && it.name === DELTA_CHANNEL_NAME)) return prev;
+        const next = [...prev];
+        next.splice(Math.min(Math.max(idx, 0), next.length), 0, { type: 'channel', name: DELTA_CHANNEL_NAME });
+        return next;
+      });
+    }
+  }, [preferences]);
+  // Whenever the layout changes, remember the delta channel's current position
+  // (if shown) so re-enabling it later restores where the user last dragged it
+  // to, instead of always resetting to the top.
+  useEffect(() => {
+    const idx = layout.findIndex((it) => it.type === 'channel' && it.name === DELTA_CHANNEL_NAME);
+    if (idx !== -1) setPreference('deltaChannelIndex', idx);
+  }, [layout]);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [groupSelection, setGroupSelection] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState('');
   const [seriesByName, setSeriesByName] = useState<Record<string, ChannelSeries>>({});
   const [seriesLoading, setSeriesLoading] = useState(false);
-  const [compareByName, setCompareByName] = useState<Record<string, CompareSeries>>({});
+  const [comparesByLapId, setComparesByLapId] = useState<Record<string, Record<string, CompareSeries>>>({});
+  // Delta-time channel: one array per compared lap, sharing distRef's own time
+  // grid — see invertTimeAtDistance and the fetch effect below.
+  const [deltaByLapId, setDeltaByLapId] = useState<Record<string, (number | null)[]>>({});
   const [distRef, setDistRef] = useState<ChannelSeries | null>(null);
   const [gps, setGps] = useState<{ t: number[]; lat: number[]; lon: number[] } | null>(null);
   const [cursorT, setCursorT] = useState<number | null>(null);
+  // Click-to-freeze: a click on any graph pins the cursor there so the legend/
+  // in-graph values/track map keep showing that point after the mouse moves
+  // away; clicking again anywhere unlocks. Uses the updater form of setState so
+  // this stays correct even called from a stale closure captured by ChannelPlot's
+  // uPlot-rebuild effect (see cursorLockRef there).
+  const [cursorLocked, setCursorLocked] = useState(false);
+  function handleGraphClick(value: number) {
+    setCursorLocked((prevLocked) => {
+      if (prevLocked) return false;
+      setCursorT(value);
+      return true;
+    });
+  }
   const [viewRange, setViewRange] = useState<{ min: number; max: number } | null>(null);
   const [uploadState, setUploadState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
   const [laneWeights, setLaneWeights] = useState<Record<string, number>>(INITIAL_LANE_WEIGHTS);
@@ -277,21 +435,98 @@ export default function TelemetryViewer() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const guestFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Cross-file comparison: the compare lap normally comes from this SAME file
-  // (default), but can instead come from a second, independently-loaded file
-  // (server session or local guest file) — e.g. comparing two different drivers'
-  // laps on the same circuit.
-  const [compareSameFile, setCompareSameFile] = useState(true);
-  const [compareSelectedFile, setCompareSelectedFile] = useState<string | null>(null);
-  const [compareGuestFile, setCompareGuestFile] = useState<File | null>(null);
-  const [compareGuestState, setCompareGuestState] = useState<{ busy: boolean; error: string | null }>({
+  // Multi-lap comparison: any number of laps checked against the reference lap,
+  // each either from this same (primary) session or from a separately-opened
+  // "external source" session (server session or local guest file) — e.g.
+  // comparing your own two laps, plus a friend's fastest lap from another file.
+  const [comparedLaps, setComparedLaps] = useState<ComparedLap[]>([]);
+  const [colorMode, setColorMode] = useState<ColorMode>('byChannel');
+  const [colorPrefsOpen, setColorPrefsOpen] = useState(false);
+  // Preferences load async — apply the saved color mode once, as soon as it
+  // arrives, without clobbering any toggle the user makes before/after that.
+  const appliedColorModeRef = useRef(false);
+  useEffect(() => {
+    if (appliedColorModeRef.current) return;
+    if (preferences.colorMode !== 'byChannel' && preferences.colorMode !== 'byLap') return;
+    appliedColorModeRef.current = true;
+    setColorMode(preferences.colorMode);
+  }, [preferences]);
+  function setColorModeAndSave(mode: ColorMode) {
+    setColorMode(mode);
+    setPreference('colorMode', mode);
+  }
+
+  const [externalSources, setExternalSources] = useState<ExternalSource[]>([]);
+  const [addSourceOpen, setAddSourceOpen] = useState(false);
+  const [addSourceState, setAddSourceState] = useState<{ busy: boolean; error: string | null }>({
     busy: false,
     error: null,
   });
-  const [compareDataSource, setCompareDataSource] = useState<DataSource | null>(null);
-  const [compareLaps, setCompareLaps] = useState<LapInfo[]>([]);
-  const [compareMetadata, setCompareMetadata] = useState<SessionMetadata | null>(null);
-  const compareGuestFileInputRef = useRef<HTMLInputElement>(null);
+  const addSourceGuestFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Color is purely a function of a compared lap's CURRENT position in the list
+  // (matching the "compared lap 1/2/3..." color preferences) — never stored, so
+  // toggling the same lap off and back on always gives it back the same color,
+  // and editing a color preference updates every currently-selected lap live.
+  function comparedLapColorAt(index: number): string {
+    return preferredComparedLapColors?.[index] ?? comparedLapColor(index);
+  }
+
+  function isLapCompared(sourceId: string, lapNumber: number): boolean {
+    return comparedLaps.some((cl) => cl.sourceId === sourceId && cl.lapNumber === lapNumber);
+  }
+
+  function toggleComparedLap(sourceId: string, lapNumber: number) {
+    setComparedLaps((prev) => {
+      if (prev.some((cl) => cl.sourceId === sourceId && cl.lapNumber === lapNumber)) {
+        return prev.filter((cl) => !(cl.sourceId === sourceId && cl.lapNumber === lapNumber));
+      }
+      const id = `${sourceId}:${lapNumber}`;
+      return [...prev, { id, sourceId, lapNumber }];
+    });
+  }
+
+  async function addExternalSource(file: File | string) {
+    setAddSourceState({ busy: true, error: null });
+    try {
+      const id = crypto.randomUUID();
+      const ds = typeof file === 'string' ? createServerDataSource(file) : await createWasmDataSource(file);
+      const label =
+        typeof file === 'string' ? sessions.find((s) => s.file === file)?.track ?? file : file.name;
+      const [sourceLaps, sourceMetadata] = await Promise.all([ds.fetchLaps(), ds.fetchMetadata()]);
+      setExternalSources((prev) => [...prev, { id, label, dataSource: ds, laps: sourceLaps, metadata: sourceMetadata }]);
+      setAddSourceState({ busy: false, error: null });
+      setAddSourceOpen(false);
+    } catch (err) {
+      setAddSourceState({ busy: false, error: (err as Error).message });
+    }
+  }
+
+  function removeExternalSource(id: string) {
+    const source = externalSources.find((s) => s.id === id);
+    source?.dataSource.close?.();
+    setExternalSources((prev) => prev.filter((s) => s.id !== id));
+    setComparedLaps((prev) => prev.filter((cl) => cl.sourceId !== id));
+  }
+
+  function resolveComparedLapSource(cl: ComparedLap): { ds: DataSource; lapInfo: LapInfo } | null {
+    if (cl.sourceId === 'primary') {
+      if (!dataSource) return null;
+      const lapInfo = laps.find((l) => l.lap === cl.lapNumber);
+      return lapInfo ? { ds: dataSource, lapInfo } : null;
+    }
+    const source = externalSources.find((s) => s.id === cl.sourceId);
+    if (!source) return null;
+    const lapInfo = source.laps.find((l) => l.lap === cl.lapNumber);
+    return lapInfo ? { ds: source.dataSource, lapInfo } : null;
+  }
+
+  function comparedLapLabel(cl: ComparedLap): string {
+    const base = t('lap.number', { n: cl.lapNumber });
+    if (cl.sourceId === 'primary') return base;
+    const source = externalSources.find((s) => s.id === cl.sourceId);
+    return source ? `${base} (${source.label})` : base;
+  }
 
   function applyPreset(name: string) {
     const preset = presets[name];
@@ -320,18 +555,22 @@ export default function TelemetryViewer() {
   }
 
   const selectedChannels = useMemo(
-    () => layout.flatMap((it) => (it.type === 'channel' ? [it.name] : it.channels)),
+    () =>
+      layout
+        .flatMap((it) => (it.type === 'channel' ? [it.name] : it.channels))
+        .filter((name) => name !== DELTA_CHANNEL_NAME),
     [layout],
   );
 
   function reloadSessions(selectFile?: string) {
     fetchSessions().then((s) => {
       setSessions(s);
+      // Only ever select a session explicitly (a deep link's ?file=, or the
+      // file just uploaded) — never auto-pick one just because the list is
+      // non-empty; the user chooses from the dropdown themselves otherwise.
       if (selectFile) {
         setGuestFile(null);
         setSelectedFile(selectFile);
-      } else if (!selectedFile && !guestFile && s.length > 0) {
-        setSelectedFile(s[0].file);
       }
     });
   }
@@ -384,11 +623,12 @@ export default function TelemetryViewer() {
     setChannels([]);
     setLaps([]);
     setSelectedLap('full');
-    setCompareLap('none');
-    // A new primary file makes any previously-picked comparison file meaningless.
-    setCompareSameFile(true);
-    setCompareSelectedFile(null);
-    setCompareGuestFile(null);
+    // A new primary file makes any previously-picked comparison laps/sources meaningless.
+    setComparedLaps([]);
+    setExternalSources((prev) => {
+      prev.forEach((s) => s.dataSource.close?.());
+      return [];
+    });
     Promise.all([dataSource.fetchMetadata(), dataSource.fetchChannels(), dataSource.fetchLaps()]).then(
       ([m, c, l]) => {
         setMetadata(m);
@@ -397,68 +637,6 @@ export default function TelemetryViewer() {
       },
     );
   }, [dataSource]);
-
-  // Build the comparison DataSource: null when comparing within the same file
-  // (the primary `dataSource` is reused directly for that case).
-  useEffect(() => {
-    let cancelled = false;
-    if (compareSameFile) {
-      setCompareDataSource(null);
-      return;
-    }
-    if (compareGuestFile) {
-      setCompareGuestState({ busy: true, error: null });
-      createWasmDataSource(compareGuestFile)
-        .then((ds) => {
-          if (cancelled) return;
-          setCompareDataSource(ds);
-          setCompareGuestState({ busy: false, error: null });
-        })
-        .catch((err) => {
-          if (cancelled) return;
-          setCompareGuestState({ busy: false, error: (err as Error).message });
-          setCompareGuestFile(null);
-        });
-    } else if (compareSelectedFile) {
-      setCompareDataSource(createServerDataSource(compareSelectedFile));
-    } else {
-      setCompareDataSource(null);
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [compareSameFile, compareGuestFile, compareSelectedFile]);
-
-  useEffect(() => {
-    return () => {
-      compareDataSource?.close?.();
-    };
-  }, [compareDataSource]);
-
-  // Laps (and metadata, for the track-mismatch warning) for whichever source the
-  // comparison lap currently comes from.
-  useEffect(() => {
-    if (compareSameFile) {
-      setCompareLaps(laps);
-      setCompareMetadata(metadata);
-      return;
-    }
-    setCompareLap('none');
-    if (!compareDataSource) {
-      setCompareLaps([]);
-      setCompareMetadata(null);
-      return;
-    }
-    let cancelled = false;
-    Promise.all([compareDataSource.fetchLaps(), compareDataSource.fetchMetadata()]).then(([l, m]) => {
-      if (cancelled) return;
-      setCompareLaps(l);
-      setCompareMetadata(m);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [compareSameFile, compareDataSource, laps, metadata]);
 
   const range = useMemo(() => {
     if (selectedLap === 'full') return undefined;
@@ -546,88 +724,144 @@ export default function TelemetryViewer() {
     };
   }, [dataSource, effectiveRange]);
 
-  // Comparison lap — resampled onto the primary lap's x-grid, single-value channels only.
-  // In time mode that's elapsed-time alignment; in distance mode it MUST be aligned by
-  // track position instead (lap B's own Lap Dist), or two laps with different pace
-  // just show lap B's value at a mismatched point on the track.
+  // Compared laps — each resampled onto the reference lap's x-grid, single-value
+  // channels only. In time mode that's elapsed-time alignment; in distance mode
+  // it MUST be aligned by track position instead (each compared lap's own Lap
+  // Dist), or a lap with different pace just shows its value at a mismatched
+  // point on the track.
   useEffect(() => {
-    const compareDs = compareSameFile ? dataSource : compareDataSource;
-    if (!dataSource || !compareDs || selectedLap === 'full' || compareLap === 'none') {
-      setCompareByName({});
+    if (!dataSource || selectedLap === 'full' || comparedLaps.length === 0) {
+      setComparesByLapId({});
       return;
     }
-    const lapBInfo = compareLaps.find((l) => l.lap === compareLap);
-    if (!lapBInfo) return;
-    const lapB = lapBInfo;
-    const ds = compareDs;
     const targets = selectedChannels.filter((name) => seriesByName[name]?.valueColumns.length === 1);
     const useDistance = xAxisMode === 'distance';
     let cancelled = false;
 
-    async function run() {
-      const lapBRange = useDistance
-        ? await findDistanceLapRange(ds, lapB.startTs, lapB.endTs)
-        : { from: lapB.startTs, to: lapB.endTs };
-      const lapBOffset = lapBRange.from;
+    async function runForLap(cl: ComparedLap): Promise<[string, Record<string, CompareSeries>] | null> {
+      const resolved = resolveComparedLapSource(cl);
+      if (!resolved) return null;
+      const { ds, lapInfo } = resolved;
 
-      const [lapBDistRaw, ...results] = await Promise.all([
-        useDistance ? ds.fetchChannelSeries('Lap Dist', lapBRange).catch(() => null) : Promise.resolve(null),
+      const lapRange = useDistance
+        ? await findDistanceLapRange(ds, lapInfo.startTs, lapInfo.endTs)
+        : { from: lapInfo.startTs, to: lapInfo.endTs };
+      const lapOffset = lapRange.from;
+
+      const [lapDistRaw, ...results] = await Promise.all([
+        useDistance ? ds.fetchChannelSeries('Lap Dist', lapRange).catch(() => null) : Promise.resolve(null),
         ...targets.map((name) =>
           ds
-            .fetchChannelSeries(name, lapBRange)
+            .fetchChannelSeries(name, lapRange)
             .then((s) => ({ name, s }))
             .catch(() => null),
         ),
       ]);
-      if (cancelled) return;
-      const lapBDistRef = lapBDistRaw ? { ...lapBDistRaw, t: lapBDistRaw.t.map((x) => x - lapBOffset) } : null;
+      const lapDistRef = lapDistRaw ? { ...lapDistRaw, t: lapDistRaw.t.map((x) => x - lapOffset) } : null;
 
-      const next: Record<string, CompareSeries> = {};
-      // A channel missing from the comparison file (different car/track) just
+      const perChannel: Record<string, CompareSeries> = {};
+      // A channel missing from the comparison source (different car/track) just
       // resolves to null above and is skipped rather than breaking the whole compare.
       (results.filter(Boolean) as { name: string; s: ChannelSeries }[]).forEach(({ name, s }) => {
         const col = s.valueColumns[0];
-        const tRel = s.t.map((x) => x - lapBOffset);
+        const tRel = s.t.map((x) => x - lapOffset);
         const primary = seriesByName[name];
 
-        if (useDistance && lapBDistRef) {
-          const lapBDist = toDistanceX(tRel, lapBDistRef);
-          const primaryDist = toDistanceX(primary.t, distRef);
-          const resampled =
-            s.kind === 'continuous'
-              ? resampleContinuous(lapBDist, s.values[col] as (number | null)[], primaryDist)
-              : resampleStep(lapBDist, s.values[col], primaryDist);
-          next[name] = { t: primaryDist, values: { [col]: resampled } };
-        } else {
+        if (useDistance && lapDistRef) {
+          const lapDist = toDistanceX(tRel, lapDistRef);
+          if (s.kind === 'continuous') {
+            const primaryDist = toDistanceX(primary.t, distRef);
+            const resampled = resampleContinuous(lapDist, s.values[col] as (number | null)[], primaryDist);
+            perChannel[name] = { t: primaryDist, values: { [col]: resampled } };
+          } else {
+            // Event/step channel (Gear, In Pits, ...): only has a sample at each
+            // change, on its OWN timing — resampling straight onto the reference
+            // lap's own sparse points here would silently discard this lap's real
+            // change points, snapping them onto wherever the reference happens to
+            // change instead. Keep this lap's own timestamps (just axis-converted)
+            // and defer the final hold-last-value resample to the lanes builder's
+            // alignEventCompares, once every compared lap's own points are known.
+            perChannel[name] = { t: lapDist, values: { [col]: toNumericOrNull(s.values[col]) } };
+          }
+        } else if (s.kind === 'continuous') {
           const grid = primary.t;
-          const resampled =
-            s.kind === 'continuous'
-              ? resampleContinuous(tRel, s.values[col] as (number | null)[], grid)
-              : resampleStep(tRel, s.values[col], grid);
-          next[name] = { t: grid, values: { [col]: resampled } };
+          const resampled = resampleContinuous(tRel, s.values[col] as (number | null)[], grid);
+          perChannel[name] = { t: grid, values: { [col]: resampled } };
+        } else {
+          perChannel[name] = { t: tRel, values: { [col]: toNumericOrNull(s.values[col]) } };
         }
       });
-      setCompareByName(next);
+      return [cl.id, perChannel];
     }
 
-    run();
+    Promise.all(comparedLaps.map(runForLap)).then((entries) => {
+      if (cancelled) return;
+      const next: Record<string, Record<string, CompareSeries>> = {};
+      entries.forEach((entry) => {
+        if (entry) next[entry[0]] = entry[1];
+      });
+      setComparesByLapId(next);
+    });
+
     return () => {
       cancelled = true;
     };
-  }, [
-    dataSource,
-    compareDataSource,
-    compareSameFile,
-    selectedChannels,
-    selectedLap,
-    compareLap,
-    compareLaps,
-    seriesByName,
-    xAxisMode,
-    distRef,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataSource, externalSources, comparedLaps, selectedChannels, selectedLap, seriesByName, xAxisMode, distRef]);
+
+  // Delta-time channel — independent of xAxisMode (the underlying math always
+  // needs distance-based correspondence between laps, regardless of which axis
+  // is currently displayed), only computed when the channel is actually toggled
+  // on. Each compared lap's own Lap Dist is fetched over ITS OWN
+  // distance-corrected range and inverted (see invertTimeAtDistance) to get
+  // "time at distance d" for each of the reference's own distance samples, then
+  // delta = that compared-lap time minus the reference's own elapsed time there.
+  const deltaChannelShown = layout.some((it) => it.type === 'channel' && it.name === DELTA_CHANNEL_NAME);
+  useEffect(() => {
+    if (!deltaChannelShown || !dataSource || selectedLap === 'full' || comparedLaps.length === 0 || !distRef) {
+      setDeltaByLapId({});
+      return;
+    }
+    const refDist = distRef.values.value as (number | null)[];
+    let cancelled = false;
+
+    async function computeForLap(cl: ComparedLap): Promise<[string, (number | null)[]] | null> {
+      const resolved = resolveComparedLapSource(cl);
+      if (!resolved) return null;
+      const { ds, lapInfo } = resolved;
+      const lapRange = await findDistanceLapRange(ds, lapInfo.startTs, lapInfo.endTs);
+      const lapOffset = lapRange.from;
+      const s = await ds.fetchChannelSeries('Lap Dist', lapRange).catch(() => null);
+      if (!s) return null;
+      const tRel = s.t.map((x) => x - lapOffset);
+      const timeAtRefDist = invertTimeAtDistance(tRel, s.values.value as (number | null)[], refDist);
+      const delta = timeAtRefDist.map((tc, i) => (tc == null || distRef == null ? null : tc - distRef.t[i]));
+      return [cl.id, delta];
+    }
+
+    Promise.all(comparedLaps.map(computeForLap)).then((entries) => {
+      if (cancelled) return;
+      const next: Record<string, (number | null)[]> = {};
+      entries.forEach((entry) => {
+        if (entry) next[entry[0]] = entry[1];
+      });
+      setDeltaByLapId(next);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deltaChannelShown, dataSource, externalSources, comparedLaps, selectedLap, distRef]);
 
   function toggleChannel(name: string) {
+    // Keep the "shown" preference in sync regardless of which UI affordance
+    // removes/adds it (the dedicated checkbox, or the generic "✕" in the
+    // "Channels shown" list) — delegate to the same function either way.
+    if (name === DELTA_CHANNEL_NAME) {
+      toggleDeltaChannel();
+      return;
+    }
     setLayout((prev) => {
       const standaloneIdx = prev.findIndex((it) => it.type === 'channel' && it.name === name);
       if (standaloneIdx >= 0) return prev.filter((_, i) => i !== standaloneIdx);
@@ -647,12 +881,12 @@ export default function TelemetryViewer() {
     });
   }
 
-  function moveItem(index: number, dir: -1 | 1) {
+  function moveItemTo(from: number, to: number) {
     setLayout((prev) => {
-      const swap = index + dir;
-      if (swap < 0 || swap >= prev.length) return prev;
+      if (from === to || from < 0 || to < 0 || from >= prev.length || to >= prev.length) return prev;
       const next = [...prev];
-      [next[index], next[swap]] = [next[swap], next[index]];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
       return next;
     });
   }
@@ -680,6 +914,50 @@ export default function TelemetryViewer() {
       next[index] = { ...item, name };
       return next;
     });
+  }
+
+  function togglePedalsClutch(index: number) {
+    const item = layout[index];
+    if (item.type !== 'group') return;
+    const has = item.channels.includes(CLUTCH_CHANNEL);
+    setPreference('pedalsClutch', !has);
+    setLayout((prev) => {
+      const cur = prev[index];
+      if (cur.type !== 'group') return prev;
+      const channels = has ? cur.channels.filter((c) => c !== CLUTCH_CHANNEL) : [...cur.channels, CLUTCH_CHANNEL];
+      const next = [...prev];
+      next[index] = { ...cur, channels };
+      return next;
+    });
+  }
+
+  function togglePedalsGrouped(index: number) {
+    const item = layout[index];
+    if (item.type !== 'group') return;
+    const grouped = item.grouped === false ? true : false;
+    setPreference('pedalsGrouped', grouped);
+    setLayout((prev) => {
+      const cur = prev[index];
+      if (cur.type !== 'group') return prev;
+      const next = [...prev];
+      next[index] = { ...cur, grouped };
+      return next;
+    });
+  }
+
+  function toggleDeltaChannel() {
+    const isShown = layout.some((it) => it.type === 'channel' && it.name === DELTA_CHANNEL_NAME);
+    setPreference('deltaChannelShown', !isShown);
+    if (isShown) {
+      setLayout((prev) => prev.filter((it) => !(it.type === 'channel' && it.name === DELTA_CHANNEL_NAME)));
+    } else {
+      const savedIdx = typeof preferences.deltaChannelIndex === 'number' ? preferences.deltaChannelIndex : 0;
+      setLayout((prev) => {
+        const next = [...prev];
+        next.splice(Math.min(Math.max(savedIdx, 0), next.length), 0, { type: 'channel', name: DELTA_CHANNEL_NAME });
+        return next;
+      });
+    }
   }
 
   function toggleGroupSelection(name: string) {
@@ -741,19 +1019,19 @@ export default function TelemetryViewer() {
   const filteredChannels = channels.filter((c) => c.name.toLowerCase().includes(filter.toLowerCase()));
   // lapTime can be 0 on an anomalous/incomplete lap (seen on some files) — exclude
   // those from "fastest lap" consideration.
-  const fastestLap = laps.filter((l) => l.lapTime).reduce<LapInfo | null>(
-    (best, l) => (best === null || l.lapTime! < best.lapTime!) ? l : best,
-    null,
-  );
-  const compareFastestLap = compareLaps.filter((l) => l.lapTime).reduce<LapInfo | null>(
-    (best, l) => (best === null || l.lapTime! < best.lapTime!) ? l : best,
-    null,
-  );
-  const trackMismatch =
-    !compareSameFile &&
-    !!metadata?.info.TrackName &&
-    !!compareMetadata?.info.TrackName &&
-    metadata.info.TrackName !== compareMetadata.info.TrackName;
+  function fastestLapOf(list: LapInfo[]): LapInfo | null {
+    return list.filter((l) => l.lapTime).reduce<LapInfo | null>(
+      (best, l) => (best === null || l.lapTime! < best.lapTime!) ? l : best,
+      null,
+    );
+  }
+  function trackMismatchFor(sourceMetadata: SessionMetadata | null): boolean {
+    return (
+      !!metadata?.info.TrackName &&
+      !!sourceMetadata?.info.TrackName &&
+      metadata.info.TrackName !== sourceMetadata.info.TrackName
+    );
+  }
   const validGroupSelection = new Set([...groupSelection].filter((n) => layout.some((it) => it.type === 'channel' && it.name === n)));
 
   // Distance only ever makes sense for a single lap: "Lap Dist" resets to 0 at
@@ -763,12 +1041,39 @@ export default function TelemetryViewer() {
   // invalid combination through.
   const effectiveXAxisMode: 'time' | 'distance' = selectedLap === 'full' ? 'time' : xAxisMode;
 
+  // Shared X-axis domain for every lane, derived from distRef (a dense, always-
+  // fetched continuous channel — "Lap Dist") rather than letting each ChannelPlot
+  // auto-range from its OWN data. Without this, a sparse event channel (Gear, In
+  // Pits...) whose own timestamps don't span the full lap window gets a narrower
+  // default scale than dense channels — cursor.sync maps position via each plot's
+  // OWN scale, so the same instant lands on a different pixel until a zoom forces
+  // uPlot to sync them to the identical [min,max] via attachZoomPan.
+  const xDomain = useMemo<[number, number] | null>(() => {
+    if (!distRef || distRef.t.length === 0) return null;
+    function minMax(values: (number | null)[]): [number, number] | null {
+      let min = Infinity;
+      let max = -Infinity;
+      for (const v of values) {
+        if (v == null) continue;
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+      return isFinite(min) && isFinite(max) ? [min, max] : null;
+    }
+    if (effectiveXAxisMode === 'distance') return minMax(distRef.values.value as (number | null)[]);
+    return minMax(distRef.t);
+  }, [distRef, effectiveXAxisMode]);
+
   // Memoized so a bare cursor move (very high frequency) never rebuilds lane objects —
   // that would otherwise tear down and recreate every uPlot canvas on each mousemove.
   const lanes: Lane[] = useMemo(() => {
     const result: Lane[] = [];
     let colorIdx = 0;
     function nextColor(name: string): string {
+      // "By lap" mode: every reference channel shares one neutral color, so the
+      // eye follows compared-lap colors instead of per-channel hues — including
+      // ignoring the throttle/brake/clutch conventional-color overrides below.
+      if (colorMode === 'byLap') return preferredReferenceLapColor ?? REFERENCE_UNIFORM_COLOR;
       return KNOWN_COLORS[name] ?? channelColor(colorIdx++);
     }
 
@@ -777,18 +1082,84 @@ export default function TelemetryViewer() {
       return { ...series, t: toDistanceX(series.t, distRef) };
     }
 
+    function buildLaneCompares(names: string[], targetSeries: ChannelSeries): LaneCompare[] {
+      const out: LaneCompare[] = [];
+      comparedLaps.forEach((cl, index) => {
+        const perChannel = comparesByLapId[cl.id];
+        if (!perChannel) return;
+        const series = names.length === 1
+          ? perChannel[names[0]] ?? null
+          : buildCombinedCompare(names, perChannel, seriesByName, targetSeries.t);
+        if (!series) return;
+        out.push({ id: cl.id, label: comparedLapLabel(cl), color: comparedLapColorAt(index), series });
+      });
+      return out;
+    }
+
+    // Single-column event channels (Gear, In Pits, ...) only have a sample at
+    // each change — each compare's own change-point timestamps were preserved
+    // as-is (see the compare-fetch effect above), so build the union of the
+    // reference's own points and every compared lap's own points, then
+    // hold-last-value resample EVERYTHING (reference included) onto that
+    // shared grid. Otherwise a compared lap's changes would only ever show up
+    // at whichever points the reference happens to change.
+    function alignEventCompares(series: ChannelSeries, compares: LaneCompare[]): { series: ChannelSeries; compares: LaneCompare[] } {
+      if (series.kind !== 'event' || compares.length === 0) return { series, compares };
+      const col = series.valueColumns[0];
+      const gridSet = new Set<number>(series.t);
+      compares.forEach((cmp) => cmp.series.t.forEach((x) => gridSet.add(x)));
+      const grid = Array.from(gridSet).sort((a, b) => a - b);
+      const alignedSeries: ChannelSeries = {
+        ...series,
+        t: grid,
+        values: { ...series.values, [col]: resampleStep(series.t, series.values[col], grid) },
+      };
+      const alignedCompares = compares.map((cmp) => {
+        const compareValues = cmp.series.values[col];
+        if (!compareValues) return cmp;
+        return { ...cmp, series: { t: grid, values: { [col]: resampleStep(cmp.series.t, compareValues, grid) } } };
+      });
+      return { series: alignedSeries, compares: alignedCompares };
+    }
+
     for (const item of layout) {
       if (item.type === 'group') {
         const present = item.channels.filter((c) => seriesByName[c]);
         if (present.length === 0) continue;
+        if (item.grouped === false) {
+          // Ungrouped-but-boxed: each member is its own separate lane/graph, but
+          // tagged with the same boxId so the render layer keeps them visually
+          // enclosed together under the group's name instead of scattering them
+          // into the general layout.
+          const orderedPresent =
+            item.special === 'pedals'
+              ? [...present].sort((a, b) => PEDALS_SPLIT_ORDER.indexOf(a) - PEDALS_SPLIT_ORDER.indexOf(b))
+              : present;
+          orderedPresent.forEach((c) => {
+            const rawSeries = withXAxis(seriesByName[c]);
+            const { series, compares } = alignEventCompares(rawSeries, buildLaneCompares([c], rawSeries));
+            result.push({
+              key: `${item.id}__${c}`,
+              label: c,
+              series,
+              columnStyles: [{ label: c, color: nextColor(c) }],
+              compares,
+              boxId: item.id,
+              boxLabel: item.name,
+            });
+          });
+          continue;
+        }
         if (present.length === 1) {
           const c = present[0];
+          const rawSeries = withXAxis(seriesByName[c]);
+          const { series, compares } = alignEventCompares(rawSeries, buildLaneCompares([c], rawSeries));
           result.push({
             key: item.id,
             label: item.name,
-            series: withXAxis(seriesByName[c]),
+            series,
             columnStyles: [{ label: c, color: nextColor(c) }],
-            compare: compareByName[c] ?? null,
+            compares,
           });
         } else {
           // withXAxis first: compare data is already aligned to each member's own
@@ -801,9 +1172,35 @@ export default function TelemetryViewer() {
             label: item.name,
             series: combined,
             columnStyles: present.map((c) => ({ label: c, color: nextColor(c) })),
-            compare: buildCombinedCompare(present, compareByName, seriesByName, combined.t),
+            compares: buildLaneCompares(present, combined),
           });
         }
+      } else if (item.name === DELTA_CHANNEL_NAME) {
+        // Synthetic, entirely client-side: one column per compared lap (no
+        // separate "reference" line — a lap's delta-to-itself is trivially 0),
+        // sharing distRef's own time grid so it flows through withXAxis exactly
+        // like any real channel for both time and distance display modes.
+        if (selectedLap === 'full' || comparedLaps.length === 0 || !distRef) continue;
+        const values: Record<string, (number | null)[]> = {};
+        comparedLaps.forEach((cl) => {
+          values[cl.id] = deltaByLapId[cl.id] ?? distRef.t.map(() => null);
+        });
+        const deltaSeries: ChannelSeries = {
+          name: DELTA_CHANNEL_NAME,
+          kind: 'continuous',
+          unit: 's',
+          valueColumns: comparedLaps.map((cl) => cl.id),
+          t: distRef.t,
+          values,
+        };
+        result.push({
+          key: DELTA_CHANNEL_NAME,
+          label: t('tv.deltaChannelLabel'),
+          series: withXAxis(deltaSeries),
+          columnStyles: comparedLaps.map((cl, index) => ({ label: comparedLapLabel(cl), color: comparedLapColorAt(index) })),
+          compares: [],
+          centerYOnZero: true,
+        });
       } else {
         const series = seriesByName[item.name];
         if (!series) continue;
@@ -811,21 +1208,101 @@ export default function TelemetryViewer() {
         const columnStyles = isMulti
           ? CORNER_STYLE.slice(0, series.valueColumns.length)
           : [{ label: item.name, color: nextColor(item.name) }];
+        const withAxis = withXAxis(series);
+        // 4-wheel channels (isMulti) keep their fixed corner color+dash styling
+        // regardless of compare — overlaying per-lap colors on top of that would
+        // lose the FL/FR/RL/RR identity without gaining a clear lap identity.
+        const { series: finalSeries, compares } = isMulti
+          ? { series: withAxis, compares: [] as LaneCompare[] }
+          : alignEventCompares(withAxis, buildLaneCompares([item.name], withAxis));
         result.push({
           key: item.name,
           label: item.name,
-          series: withXAxis(series),
+          series: finalSeries,
           columnStyles,
-          compare: isMulti ? null : (compareByName[item.name] ?? null),
+          compares,
         });
       }
     }
 
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout, seriesByName, compareByName, effectiveXAxisMode, distRef]);
+  }, [
+    layout,
+    seriesByName,
+    comparesByLapId,
+    deltaByLapId,
+    comparedLaps,
+    selectedLap,
+    colorMode,
+    preferredReferenceLapColor,
+    preferredComparedLapColors,
+    externalSources,
+    effectiveXAxisMode,
+    distRef,
+  ]);
 
   const gpsX = gps ? (effectiveXAxisMode === 'distance' ? toDistanceX(gps.t, distRef) : gps.t) : [];
+  // Global column order for the legend table — a lane missing data for one of
+  // these (e.g. a channel absent from an external source) just shows a dash,
+  // rather than each lane inventing its own column order.
+  const comparedLapColumns = comparedLaps.map((cl, index) => ({
+    id: cl.id,
+    label: comparedLapLabel(cl),
+    color: comparedLapColorAt(index),
+  }));
+
+  function channelPlotFor(lane: Lane, flatIndex: number) {
+    return (
+      <ChannelPlot
+        key={lane.key}
+        lane={lane}
+        syncKey="telemetry"
+        showXAxis={flatIndex === lanes.length - 1}
+        xAxisMode={effectiveXAxisMode}
+        weight={laneWeights[lane.key] ?? LANE_SIZE.medium}
+        xDomain={xDomain}
+        viewRange={viewRange}
+        cursorT={cursorT}
+        cursorLocked={cursorLocked}
+        onWeightChange={setLaneWeight}
+        onCursorMove={setCursorT}
+        onCursorClick={handleGraphClick}
+        onViewRangeChange={setViewRange}
+      />
+    );
+  }
+
+  // Consecutive lanes sharing a boxId (see the `lanes` builder's "ungrouped but
+  // boxed" case) render as separate graphs enclosed in one labeled container,
+  // instead of scattering into the general flat list.
+  const laneElements: ReactNode[] = [];
+  {
+    let i = 0;
+    while (i < lanes.length) {
+      const lane = lanes[i];
+      if (lane.boxId) {
+        const boxId = lane.boxId;
+        const boxLabel = lane.boxLabel ?? lane.label;
+        const startIndex = i;
+        const members: Lane[] = [];
+        while (i < lanes.length && lanes[i].boxId === boxId) {
+          members.push(lanes[i]);
+          i++;
+        }
+        const boxWeight = members.reduce((sum, l) => sum + (laneWeights[l.key] ?? LANE_SIZE.medium), 0);
+        laneElements.push(
+          <div key={boxId} className="lane-box" style={{ flexGrow: boxWeight }}>
+            <div className="lane-box-label">{boxLabel}</div>
+            <div className="lane-box-lanes">{members.map((l, k) => channelPlotFor(l, startIndex + k))}</div>
+          </div>,
+        );
+      } else {
+        laneElements.push(channelPlotFor(lane, i));
+        i++;
+      }
+    }
+  }
 
   return (
     <div className="app" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
@@ -840,9 +1317,10 @@ export default function TelemetryViewer() {
             disabled={!!guestFile}
             onChange={(e) => {
               setGuestFile(null);
-              setSelectedFile(e.target.value);
+              setSelectedFile(e.target.value || null);
             }}
           >
+            <option value="">{t('tv.chooseSessionPlaceholder')}</option>
             {sessions.map((s) => (
               <option key={s.file} value={s.file}>
                 {s.track ?? s.file} — {s.sessionType} ({s.recordingTime})
@@ -1009,54 +1487,164 @@ export default function TelemetryViewer() {
           {selectedLap === 'full' && <span className="field-hint">{t('tv.xAxisDistanceHint')}</span>}
         </label>
 
+        <div className="field">
+          {t('tv.lapsTableLabel')}
+          {selectedLap === 'full' && <span className="field-hint">{t('tv.selectReferenceLapHint')}</span>}
+          <table className="lap-select-table">
+            <thead>
+              <tr>
+                <th />
+                <th title={t('tv.referenceColumnHeader')}>{t('tv.referenceColumnHeader')}</th>
+                <th title={t('tv.comparedColumnHeader')}>{t('tv.comparedColumnHeader')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{t('tv.fullSession')}</td>
+                <td>
+                  <input
+                    type="checkbox"
+                    checked={selectedLap === 'full'}
+                    onChange={() => {
+                      setSelectedLap('full');
+                      setXAxisMode('time');
+                    }}
+                  />
+                </td>
+                <td />
+              </tr>
+              {laps.map((l) => {
+                const lt = displayLapTime(l);
+                const isReference = selectedLap === l.lap;
+                return (
+                  <tr key={l.lap}>
+                    <td>
+                      {t('lap.number', { n: l.lap })} — {lt.seconds.toFixed(3)}s{lt.official ? '' : t('lap.invalidSuffix')}
+                      {l.lap === fastestLapOf(laps)?.lap ? t('lap.fastestSuffix') : ''}
+                    </td>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={isReference}
+                        onChange={() => {
+                          setSelectedLap(l.lap);
+                          // The new reference lap can't also be a compared lap from this same session.
+                          setComparedLaps((prev) => prev.filter((cl) => !(cl.sourceId === 'primary' && cl.lapNumber === l.lap)));
+                        }}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="checkbox"
+                        disabled={selectedLap === 'full' || isReference}
+                        checked={isLapCompared('primary', l.lap)}
+                        onChange={() => toggleComparedLap('primary', l.lap)}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
         <label className="field">
-          {t('tv.lapLabel')}
-          <select
-            value={selectedLap}
-            onChange={(e) => {
-              const value = e.target.value === 'full' ? 'full' : Number(e.target.value);
-              setSelectedLap(value);
-              if (value === 'full') setXAxisMode('time');
-            }}
-          >
-            <option value="full">{t('tv.fullSession')}</option>
-            {laps.map((l) => {
-              const lt = displayLapTime(l);
-              return (
-                <option key={l.lap} value={l.lap}>
-                  {t('lap.number', { n: l.lap })} — {lt.seconds.toFixed(3)}s{lt.official ? '' : t('lap.invalidSuffix')}
-                  {l.lap === fastestLap?.lap ? t('lap.fastestSuffix') : ''}
-                </option>
-              );
-            })}
-          </select>
+          {t('tv.colorModeLabel')}
+          <div className="segmented">
+            <button className={colorMode === 'byChannel' ? 'active' : ''} onClick={() => setColorModeAndSave('byChannel')}>
+              {t('tv.colorModeByChannel')}
+            </button>
+            <button className={colorMode === 'byLap' ? 'active' : ''} onClick={() => setColorModeAndSave('byLap')}>
+              {t('tv.colorModeByLap')}
+            </button>
+            {/* Compared-lap colors apply in both modes (only the reference-lap
+                coloring is byLap-specific), so this isn't gated on colorMode. */}
+            <button
+              className={colorPrefsOpen ? 'active' : ''}
+              onClick={() => setColorPrefsOpen((o) => !o)}
+              title={t('tv.colorPrefsToggle')}
+            >
+              ⚙
+            </button>
+          </div>
         </label>
 
+        {colorPrefsOpen && (
+          <div className="field color-prefs">
+            {colorMode === 'byLap' && (
+              <label className="color-pref-row">
+                <input
+                  type="color"
+                  value={preferredReferenceLapColor ?? REFERENCE_UNIFORM_COLOR}
+                  onChange={(e) => setPreference('referenceLapColor', e.target.value)}
+                />
+                {t('tv.referenceLapColorLabel')}
+              </label>
+            )}
+            {Array.from({ length: COMPARED_LAP_COLOR_SLOTS }, (_, i) => (
+              <label key={i} className="color-pref-row">
+                <input
+                  type="color"
+                  value={preferredComparedLapColors?.[i] ?? comparedLapColor(i)}
+                  onChange={(e) => {
+                    const next = [...(preferredComparedLapColors ?? [])];
+                    next[i] = e.target.value;
+                    setPreference('comparedLapColors', next);
+                  }}
+                />
+                {t('tv.comparedLapColorLabel', { n: i + 1 })}
+              </label>
+            ))}
+            {!user && <span className="field-hint">{t('tv.colorPrefsGuestHint')}</span>}
+          </div>
+        )}
+
         <div className="field">
-          {t('tv.compareWith')}
+          {t('tv.additionalSessionsLabel')}
 
-          <label className="compare-source-toggle">
-            <input
-              type="checkbox"
-              checked={!compareSameFile}
-              disabled={selectedLap === 'full'}
-              onChange={(e) => {
-                setCompareSameFile(!e.target.checked);
-                setCompareSelectedFile(null);
-                setCompareGuestFile(null);
-              }}
-            />
-            {t('tv.compareWithOtherFile')}
-          </label>
+          {externalSources.map((source) => {
+            const sourceFastest = fastestLapOf(source.laps);
+            return (
+              <div key={source.id} className="compare-external-source">
+                <div className="compare-external-source-header">
+                  <strong>{source.label}</strong>
+                  <button onClick={() => removeExternalSource(source.id)} title={t('tv.removeSource')}>
+                    ✕
+                  </button>
+                </div>
+                {trackMismatchFor(source.metadata) && (
+                  <div className="field-hint compare-warning">
+                    {t('tv.trackMismatch', { track1: metadata?.info.TrackName, track2: source.metadata?.info.TrackName })}
+                  </div>
+                )}
+                <div className="compared-laps-list">
+                  {source.laps.map((l) => {
+                    const lt = displayLapTime(l);
+                    return (
+                      <label key={l.lap} className="channel-checkbox">
+                        <input
+                          type="checkbox"
+                          disabled={selectedLap === 'full'}
+                          checked={isLapCompared(source.id, l.lap)}
+                          onChange={() => toggleComparedLap(source.id, l.lap)}
+                        />
+                        {t('lap.number', { n: l.lap })} — {lt.seconds.toFixed(3)}s{lt.official ? '' : t('lap.invalidSuffix')}
+                        {l.lap === sourceFastest?.lap ? t('lap.fastestSuffix') : ''}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
 
-          {!compareSameFile && (
+          {addSourceOpen ? (
             <div className="compare-file-picker">
               <select
-                value={compareGuestFile ? '' : compareSelectedFile ?? ''}
-                disabled={!!compareGuestFile}
+                value=""
+                disabled={addSourceState.busy}
                 onChange={(e) => {
-                  setCompareGuestFile(null);
-                  setCompareSelectedFile(e.target.value || null);
+                  if (e.target.value) addExternalSource(e.target.value);
                 }}
               >
                 <option value="">{t('tv.chooseSessionPlaceholder')}</option>
@@ -1070,64 +1658,68 @@ export default function TelemetryViewer() {
               </select>
               <button
                 className="upload-btn"
-                disabled={compareGuestState.busy}
-                onClick={() => compareGuestFileInputRef.current?.click()}
+                disabled={addSourceState.busy}
+                onClick={() => addSourceGuestFileInputRef.current?.click()}
               >
-                {compareGuestState.busy
-                  ? t('tv.guestLoading')
-                  : compareGuestFile
-                    ? compareGuestFile.name
-                    : t('tv.orOpenLocalFile')}
+                {addSourceState.busy ? t('tv.guestLoading') : t('tv.orOpenLocalFile')}
               </button>
               <input
-                ref={compareGuestFileInputRef}
+                ref={addSourceGuestFileInputRef}
                 type="file"
                 accept=".duckdb"
                 style={{ display: 'none' }}
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) {
-                    setCompareSelectedFile(null);
-                    setCompareGuestFile(file);
-                  }
+                  if (file) addExternalSource(file);
                   e.target.value = '';
                 }}
               />
-              {compareGuestState.error && <div className="upload-error">{compareGuestState.error}</div>}
-              {trackMismatch && (
-                <div className="field-hint compare-warning">
-                  {t('tv.trackMismatch', { track1: metadata?.info.TrackName, track2: compareMetadata?.info.TrackName })}
-                </div>
-              )}
+              <button onClick={() => setAddSourceOpen(false)}>{t('common.cancel')}</button>
+              {addSourceState.error && <div className="upload-error">{addSourceState.error}</div>}
             </div>
+          ) : (
+            <button className="upload-btn" onClick={() => setAddSourceOpen(true)}>
+              {t('tv.addAnotherSession')}
+            </button>
           )}
-
-          <select
-            value={compareLap}
-            disabled={selectedLap === 'full' || (!compareSameFile && !compareDataSource)}
-            onChange={(e) => setCompareLap(e.target.value === 'none' ? 'none' : Number(e.target.value))}
-          >
-            <option value="none">{t('tv.noComparison')}</option>
-            {compareLaps
-              .filter((l) => (compareSameFile ? l.lap !== selectedLap : true))
-              .map((l) => {
-                const lt = displayLapTime(l);
-                return (
-                  <option key={l.lap} value={l.lap}>
-                    {t('lap.number', { n: l.lap })} — {lt.seconds.toFixed(3)}s{lt.official ? '' : t('lap.invalidSuffix')}
-                    {l.lap === compareFastestLap?.lap ? t('lap.fastestSuffix') : ''}
-                  </option>
-                );
-              })}
-          </select>
         </div>
+
+        <label className="channel-checkbox">
+          <input
+            type="checkbox"
+            disabled={selectedLap === 'full' || comparedLaps.length === 0}
+            checked={layout.some((it) => it.type === 'channel' && it.name === DELTA_CHANNEL_NAME)}
+            onChange={toggleDeltaChannel}
+            title={selectedLap === 'full' || comparedLaps.length === 0 ? t('tv.deltaChannelHint') : undefined}
+          />
+          {t('tv.deltaChannelToggle')}
+        </label>
 
         {layout.length > 0 && (
           <div className="field">
             {t('tv.channelsShown')}
             <div className="selected-list">
               {layout.map((item, i) => (
-                <div className={`selected-item${item.type === 'group' ? ' is-group' : ''}`} key={item.type === 'group' ? item.id : item.name}>
+                <div
+                  className={`selected-item${item.type === 'group' ? ' is-group' : ''}${dragIndex === i ? ' dragging' : ''}`}
+                  key={item.type === 'group' ? item.id : item.name}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (dragIndex !== null && dragIndex !== i) {
+                      moveItemTo(dragIndex, i);
+                      setDragIndex(i);
+                    }
+                  }}
+                >
+                  <span
+                    className="drag-handle"
+                    draggable
+                    onDragStart={() => setDragIndex(i)}
+                    onDragEnd={() => setDragIndex(null)}
+                    title={t('tv.dragToReorder')}
+                  >
+                    ⠿
+                  </span>
                   {item.type === 'channel' ? (
                     <>
                       <input
@@ -1148,12 +1740,24 @@ export default function TelemetryViewer() {
                       <span className="group-members">{item.channels.join(' + ')}</span>
                     </>
                   )}
-                  <button disabled={i === 0} onClick={() => moveItem(i, -1)} title={t('tv.moveUp')}>
-                    ↑
-                  </button>
-                  <button disabled={i === layout.length - 1} onClick={() => moveItem(i, 1)} title={t('tv.moveDown')}>
-                    ↓
-                  </button>
+                  {item.type === 'group' && item.special === 'pedals' && (
+                    <>
+                      <button
+                        className={item.channels.includes(CLUTCH_CHANNEL) ? 'active' : ''}
+                        onClick={() => togglePedalsClutch(i)}
+                        title={t('tv.pedalsToggleClutch')}
+                      >
+                        C
+                      </button>
+                      <button
+                        className={item.grouped === false ? 'active' : ''}
+                        onClick={() => togglePedalsGrouped(i)}
+                        title={t('tv.pedalsToggleGrouped')}
+                      >
+                        {item.grouped === false ? '▦' : '▣'}
+                      </button>
+                    </>
+                  )}
                   {item.type === 'group' && (
                     <button onClick={() => dissolveGroup(i)} title={t('tv.ungroup')}>
                       ⊟
@@ -1207,7 +1811,12 @@ export default function TelemetryViewer() {
         <div className="content-row">
           <div className="map-column">
             {gps && <TrackMap lat={gps.lat} lon={gps.lon} t={gpsX} cursorT={cursorT} viewRange={viewRange} height={340} />}
-            <TelemetryLegend lanes={lanes} cursorT={cursorT} />
+            {cursorLocked && (
+              <button className="cursor-lock-hint" onClick={() => setCursorLocked(false)}>
+                {t('tv.cursorLockedHint')}
+              </button>
+            )}
+            <TelemetryLegend lanes={lanes} cursorT={cursorT} comparedLapColumns={comparedLapColumns} />
           </div>
 
           <div className="graphs-column">
@@ -1218,19 +1827,7 @@ export default function TelemetryViewer() {
                   {t('tv.loadingData')}
                 </div>
               )}
-              {lanes.map((lane, i) => (
-                <ChannelPlot
-                  key={lane.key}
-                  lane={lane}
-                  syncKey="telemetry"
-                  showXAxis={i === lanes.length - 1}
-                  xAxisMode={effectiveXAxisMode}
-                  weight={laneWeights[lane.key] ?? LANE_SIZE.medium}
-                  onWeightChange={setLaneWeight}
-                  onCursorMove={setCursorT}
-                  onViewRangeChange={setViewRange}
-                />
-              ))}
+              {laneElements}
             </div>
           </div>
         </div>

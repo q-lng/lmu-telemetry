@@ -904,6 +904,114 @@ body {
   color: var(--danger);
 }
 
+.color-prefs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.color-pref-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--secondary-ink);
+}
+
+.color-pref-row input[type='color'] {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+}
+
+.compared-laps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 160px;
+  overflow-y: auto;
+  margin: 4px 0;
+}
+
+.lap-select-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 4px;
+  display: block;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.lap-select-table thead,
+.lap-select-table tbody,
+.lap-select-table tr {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.lap-select-table thead {
+  color: var(--muted-ink);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.lap-select-table td,
+.lap-select-table th {
+  padding: 3px 4px;
+  text-align: left;
+}
+
+.lap-select-table th:first-child,
+.lap-select-table td:first-child {
+  width: auto;
+}
+
+.lap-select-table th:not(:first-child),
+.lap-select-table td:not(:first-child) {
+  width: 56px;
+  text-align: center;
+}
+
+.lap-select-table tbody tr:hover {
+  background: var(--surface-2);
+}
+
+.compare-external-source {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  margin: 6px 0;
+}
+
+.compare-external-source-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--secondary-ink);
+}
+
+.compare-external-source-header button {
+  background: none;
+  border: none;
+  color: var(--muted-ink);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+}
+
+.compare-external-source-header button:hover {
+  color: var(--danger);
+}
+
 .preset-row {
   display: flex;
   gap: 4px;
@@ -970,6 +1078,21 @@ body {
   padding: 4px 6px;
   border-radius: var(--radius-sm);
   background: var(--surface-2);
+}
+
+.selected-item.dragging {
+  opacity: 0.4;
+}
+
+.drag-handle {
+  cursor: grab;
+  color: var(--muted-ink);
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
 }
 
 .selected-item .selected-name {
@@ -1050,6 +1173,12 @@ body {
 .selected-item button:disabled {
   opacity: 0.3;
   cursor: default;
+}
+
+.selected-item button.active {
+  color: #ffffff;
+  border-color: var(--accent);
+  background: var(--accent);
 }
 
 .channel-list {
@@ -1139,10 +1268,8 @@ body {
   border-radius: var(--radius-md);
   padding: 8px 10px;
   max-height: 220px;
+  overflow-x: hidden;
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
 }
 
 .legend-empty {
@@ -1151,16 +1278,52 @@ body {
   padding: 8px 0;
 }
 
-.legend-row {
+.legend-overflow-hint {
+  color: var(--muted-ink);
+  font-size: 10px;
+  padding-top: 4px;
+}
+
+.telemetry-legend-table {
+  table-layout: fixed;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.telemetry-legend-table th,
+.telemetry-legend-table td {
+  padding: 2px 6px 2px 0;
+  text-align: left;
+  overflow: hidden;
+}
+
+.telemetry-legend-table thead th {
+  color: var(--secondary-ink);
+  font-weight: 500;
+  font-size: 10px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+.legend-channel-cell {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  padding: 2px 0;
+  gap: 6px;
+  color: var(--secondary-ink);
+}
+
+.legend-channel-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .legend-swatch {
-  width: 16px;
+  width: 12px;
   height: 0;
   border-top: 2px solid;
   flex-shrink: 0;
@@ -1170,24 +1333,32 @@ body {
   border-top-style: dashed;
 }
 
-.legend-label {
-  color: var(--secondary-ink);
-  flex: 1;
+/* Single fixed-height line, truncated with ellipsis rather than wrapped —
+   wrapping wasted horizontal space and, worse, changed row height depending
+   on the exact numbers at that instant, making the whole table visibly jump
+   vertically while scrubbing the cursor. Value and delta stay on the same
+   line (not stacked) so every row is always exactly one line tall, never
+   forcing the box to scroll. */
+.legend-value-cell {
+  color: var(--primary-ink);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.legend-value {
-  color: var(--primary-ink);
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-}
-
 .legend-unit {
   color: var(--muted-ink);
   font-weight: 400;
-  font-size: 11px;
+  font-size: 10px;
+}
+
+.legend-delta {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  color: var(--secondary-ink);
 }
 
 /* One unified bordered block containing every stacked lane, MoTeC-style: a single
@@ -1245,15 +1416,77 @@ body {
   border-bottom: none;
 }
 
+/* A group displayed "split" (see the Pedals group/ungroup toggle) — each member
+   is its own separate .lane, but visually enclosed together under one label
+   instead of scattering into the flat lane list. */
+.lane-box {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin: 4px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.lane-box-label {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--secondary-ink);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.lane-box-lanes {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .lane-canvas {
   flex: 1;
   min-height: 0;
+  cursor: crosshair;
+}
+
+/* uPlot's default hover crosshair (uPlot.min.css: 1px dashed #607D8B) is too
+   subtle against the dark theme — brighter and slightly thicker here. */
+.lane-canvas .u-cursor-x {
+  border-right: 1.5px dashed var(--primary-ink) !important;
+  opacity: 0.7;
+}
+
+.lane-canvas .u-cursor-y {
+  border-bottom: 1.5px dashed var(--primary-ink) !important;
+  opacity: 0.5;
+}
+
+.cursor-lock-hint {
+  display: block;
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  color: var(--primary-ink);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  margin-bottom: 8px;
+  font-size: 11px;
+  cursor: pointer;
+  text-align: left;
 }
 
 .lane-label {
   position: absolute;
   top: 2px;
   left: 44px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
   font-size: 10px;
   color: var(--secondary-ink);
   background: rgba(26, 26, 25, 0.75);
@@ -1261,6 +1494,28 @@ body {
   border-radius: 3px;
   pointer-events: none;
   z-index: 2;
+}
+
+.lane-label-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.lane-label-column {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.lane-label-column-name {
+  font-weight: 500;
+}
+
+.lane-label-delta {
+  font-weight: 600;
 }
 
 .lane-resize-handle {

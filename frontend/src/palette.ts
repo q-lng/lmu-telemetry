@@ -32,10 +32,58 @@ export const CORNER_STYLE: { label: string; color: string; dash?: number[] }[] =
   { label: 'ARD', color: CATEGORICAL_DARK[1], dash: DASH_DASHED },
 ];
 
-/** Fixed neutral hue for the comparison-lap overlay — distinct from every
- * categorical/known channel color, so it stays visible even where the two
- * traces overlap (a faded version of the same hue disappears into it). */
-export const COMPARE_COLOR = '#c3c2b7';
+/** "By lap" color mode: every reference-lap channel shares this one neutral
+ * color, so distinct compared-lap colors are what the eye follows instead of
+ * per-channel hues. Distinct from every compared-lap color below. */
+export const REFERENCE_UNIFORM_COLOR = '#9aa0a6';
+
+/**
+ * Colors assigned to compared laps in the order they're added (not by channel)
+ * — stable per lap even if another compared lap is later removed. First is a
+ * light grey "ghost" trace (the common case: one reference vs one compared
+ * lap) — more legible than pure white — solid rather than dashed so
+ * hue/brightness alone carries the identity.
+ */
+const COMPARED_LAP_COLORS = [
+  '#c0c0c0',
+  '#f2b705',
+  '#ff5fae',
+  '#5ecbf2',
+  '#8f6fe0',
+  '#7ee08f',
+  '#ff8a3d',
+  '#3cd9c5',
+  '#c9d94a',
+];
+
+/** Mixes `hex` toward white (amount > 0) or black (amount < 0), clamped to
+ * [-1, 1] — used to derive extra shades once the base palette runs out. */
+function adjustLightness(hex: string, amount: number): string {
+  const clamped = Math.max(-1, Math.min(1, amount));
+  const num = parseInt(hex.slice(1), 16);
+  const channel = (shift: number) => {
+    const c = (num >> shift) & 0xff;
+    const mixed = clamped >= 0 ? c + (255 - c) * clamped : c * (1 + clamped);
+    return Math.min(255, Math.max(0, Math.round(mixed)));
+  };
+  return `#${[channel(16), channel(8), channel(0)].map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+}
+
+/**
+ * Beyond the base palette (rare — 9+ compared laps at once), colors would
+ * otherwise repeat exactly and become indistinguishable. Each extra full
+ * cycle through the palette alternates darker/lighter shades of the same
+ * base hues instead — not infinitely distinguishable, but better than a
+ * flat repeat.
+ */
+export function comparedLapColor(index: number): string {
+  const base = COMPARED_LAP_COLORS[index % COMPARED_LAP_COLORS.length];
+  const cycle = Math.floor(index / COMPARED_LAP_COLORS.length);
+  if (cycle === 0) return base;
+  const step = Math.ceil(cycle / 2) * 0.25;
+  const amount = cycle % 2 === 1 ? -step : step;
+  return adjustLightness(base, amount);
+}
 
 export const CHART_CHROME = {
   surface: '#1a1a19',
@@ -44,4 +92,7 @@ export const CHART_CHROME = {
   mutedInk: '#898781',
   gridline: '#2c2c2a',
   axis: '#383835',
+  // Matches --accent — the persistent marker for a click-locked cursor
+  // position, deliberately distinct from the live hover crosshair.
+  lockedCursor: '#e5484d',
 };

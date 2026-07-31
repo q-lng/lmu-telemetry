@@ -21,7 +21,16 @@ export function SharedLap() {
   const [seriesByName, setSeriesByName] = useState<Record<string, ChannelSeries>>({});
   const [gps, setGps] = useState<{ t: number[]; lat: number[]; lon: number[] } | null>(null);
   const [cursorT, setCursorT] = useState<number | null>(null);
+  const [cursorLocked, setCursorLocked] = useState(false);
   const [viewRange, setViewRange] = useState<{ min: number; max: number } | null>(null);
+
+  function handleGraphClick(value: number) {
+    setCursorLocked((prevLocked) => {
+      if (prevLocked) return false;
+      setCursorT(value);
+      return true;
+    });
+  }
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -78,10 +87,10 @@ export function SharedLap() {
   const lanes: Lane[] = useMemo(() => {
     const result: Lane[] = [];
     const speed = seriesByName['Ground Speed'];
-    if (speed) result.push({ key: 'speed', label: 'Ground Speed', series: speed, columnStyles: [{ label: 'Ground Speed', color: channelColor(0) }] });
+    if (speed) result.push({ key: 'speed', label: 'Ground Speed', series: speed, columnStyles: [{ label: 'Ground Speed', color: channelColor(0) }], compares: [] });
 
     const gear = seriesByName['Gear'];
-    if (gear) result.push({ key: 'gear', label: 'Gear', series: gear, columnStyles: [{ label: 'Gear', color: channelColor(1) }] });
+    if (gear) result.push({ key: 'gear', label: 'Gear', series: gear, columnStyles: [{ label: 'Gear', color: channelColor(1) }], compares: [] });
 
     const throttle = seriesByName['Throttle Pos Unfiltered'];
     const brake = seriesByName['Brake Pos Unfiltered'];
@@ -101,16 +110,27 @@ export function SharedLap() {
           { label: 'Throttle Pos Unfiltered', color: '#008300' },
           { label: 'Brake Pos Unfiltered', color: '#e66767' },
         ],
+        compares: [],
       });
     } else if (throttle) {
-      result.push({ key: 'throttle', label: 'Throttle Pos Unfiltered', series: throttle, columnStyles: [{ label: 'Throttle Pos Unfiltered', color: '#008300' }] });
+      result.push({ key: 'throttle', label: 'Throttle Pos Unfiltered', series: throttle, columnStyles: [{ label: 'Throttle Pos Unfiltered', color: '#008300' }], compares: [] });
     }
 
     const steering = seriesByName['Steering Pos'];
-    if (steering) result.push({ key: 'steering', label: 'Steering Pos', series: steering, columnStyles: [{ label: 'Steering Pos', color: channelColor(2) }] });
+    if (steering) result.push({ key: 'steering', label: 'Steering Pos', series: steering, columnStyles: [{ label: 'Steering Pos', color: channelColor(2) }], compares: [] });
 
     return result;
   }, [seriesByName]);
+
+  // Shared X domain from GPS (dense, always fetched) — without this, Gear's own
+  // sparse timestamps (which don't span the full lap) would give it a narrower
+  // default range than the other lanes, throwing off cursor.sync until a zoom
+  // forces every lane back to the identical [min,max]. See TelemetryViewer's
+  // xDomain for the full explanation.
+  const xDomain = useMemo<[number, number] | null>(() => {
+    if (!gps || gps.t.length === 0) return null;
+    return [gps.t[0], gps.t[gps.t.length - 1]];
+  }, [gps]);
 
   if (loading) {
     return (
@@ -144,7 +164,13 @@ export function SharedLap() {
 
       {gps && <TrackMap lat={gps.lat} lon={gps.lon} t={gps.t} cursorT={cursorT} viewRange={viewRange} height={260} />}
 
-      <TelemetryLegend lanes={lanes} cursorT={cursorT} />
+      {cursorLocked && (
+        <button className="cursor-lock-hint" onClick={() => setCursorLocked(false)}>
+          {t('tv.cursorLockedHint')}
+        </button>
+      )}
+
+      <TelemetryLegend lanes={lanes} cursorT={cursorT} comparedLapColumns={[]} />
 
       <div className="telemetry-block shared-lap-graphs">
         {lanes.map((lane, i) => (
@@ -155,7 +181,12 @@ export function SharedLap() {
             showXAxis={i === lanes.length - 1}
             xAxisMode="time"
             weight={1}
+            xDomain={xDomain}
+            viewRange={viewRange}
+            cursorT={cursorT}
+            cursorLocked={cursorLocked}
             onCursorMove={setCursorT}
+            onCursorClick={handleGraphClick}
             onViewRangeChange={setViewRange}
           />
         ))}

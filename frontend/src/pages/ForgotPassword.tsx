@@ -43,7 +43,7 @@ export function ForgotPassword() {
               {submitting ? t('forgotPassword.sending') : t('forgotPassword.submit')}
             </button>
 
-            <a href="/connexion" className="auth-forgot-link">
+            <a href="/login" className="auth-forgot-link">
               {t('forgotPassword.backToLogin')}
             </a>
           </form>

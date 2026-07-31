@@ -36,9 +36,9 @@ export function Connexion() {
   const [submitting, setSubmitting] = useState(false);
 
   // Full page navigation (not a client-side redirect) — the fresh load of
-  // /telemetrie re-fetches auth state itself, no need to carry it over via context.
+  // /telemetry re-fetches auth state itself, no need to carry it over via context.
   useEffect(() => {
-    if (user) window.location.replace('/telemetrie');
+    if (user) window.location.replace('/telemetry');
   }, [user]);
 
   if (user) return null;
@@ -49,7 +49,7 @@ export function Connexion() {
     setSubmitting(true);
     try {
       mode === 'login' ? await login({ email, password }) : await signup({ email, pseudo, nom, prenom, password });
-      window.location.href = '/telemetrie';
+      window.location.href = '/telemetry';
     } catch (err) {
       setError((err as Error).message);
       setSubmitting(false);

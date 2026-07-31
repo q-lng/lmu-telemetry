@@ -23,18 +23,18 @@ export function Navbar() {
         <a href="/" aria-current={path === '/' ? 'page' : undefined}>
           {t('nav.home')}
         </a>
-        <a href="/telemetrie" aria-current={path === '/telemetrie' ? 'page' : undefined}>
+        <a href="/telemetry" aria-current={path === '/telemetry' ? 'page' : undefined}>
           {t('nav.app')}
         </a>
-        <a href="/parcourir" aria-current={path === '/parcourir' ? 'page' : undefined}>
+        <a href="/browse" aria-current={path === '/browse' ? 'page' : undefined}>
           {t('nav.browse')}
         </a>
         {user && (
           <>
-            <a href="/amis" aria-current={path === '/amis' ? 'page' : undefined}>
+            <a href="/friends" aria-current={path === '/friends' ? 'page' : undefined}>
               {t('nav.friends')}
             </a>
-            <a href="/mes-sessions" aria-current={path === '/mes-sessions' ? 'page' : undefined}>
+            <a href="/my-sessions" aria-current={path === '/my-sessions' ? 'page' : undefined}>
               {t('nav.mySessions')}
             </a>
           </>
@@ -52,7 +52,7 @@ export function Navbar() {
             </button>
           </div>
         ) : (
-          <a href="/connexion" className="navbar-login" aria-current={path === '/connexion' ? 'page' : undefined}>
+          <a href="/login" className="navbar-login" aria-current={path === '/login' ? 'page' : undefined}>
             {t('nav.login')}
           </a>
         )
