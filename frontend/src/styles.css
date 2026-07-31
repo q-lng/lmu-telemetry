@@ -453,6 +453,19 @@ body {
   border-top-color: #ffffff;
 }
 
+.auth-forgot-link {
+  display: block;
+  text-align: center;
+  margin-top: 4px;
+  color: var(--muted-ink);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.auth-forgot-link:hover {
+  color: var(--primary-ink);
+}
+
 /* ---- Social (recherche / amis / demandes / abonnements / profil) ---- */
 
 .social-page {

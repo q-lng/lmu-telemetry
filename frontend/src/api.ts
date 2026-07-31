@@ -30,6 +30,9 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
     const parsed = await res.json().catch(() => ({}));
     throw new Error((parsed as { error?: string }).error ?? `${url} -> HTTP ${res.status}`);
   }
+  // 204 No Content has no body — calling .json() on it throws. Every caller
+  // expecting a real payload gets 200/201 with an actual body, so this is safe.
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
@@ -60,6 +63,14 @@ export async function fetchMe(): Promise<PublicUser | null> {
   if (!res.ok) throw new Error(`/api/auth/me -> HTTP ${res.status}`);
   const body = (await res.json()) as { user: PublicUser };
   return body.user;
+}
+
+export function requestPasswordReset(email: string): Promise<void> {
+  return postJson('/api/auth/forgot-password', { email });
+}
+
+export function resetPassword(token: string, password: string): Promise<void> {
+  return postJson('/api/auth/reset-password', { token, password });
 }
 
 export function fetchSessions(

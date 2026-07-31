@@ -126,6 +126,12 @@ export function Connexion() {
             {submitting && <span className="spinner" />}
             {submitting ? 'Patiente…' : mode === 'login' ? 'Se connecter' : 'Créer mon compte'}
           </button>
+
+          {mode === 'login' && (
+            <a href="/mot-de-passe-oublie" className="auth-forgot-link">
+              Mot de passe oublié ?
+            </a>
+          )}
         </form>
       </div>
     </div>

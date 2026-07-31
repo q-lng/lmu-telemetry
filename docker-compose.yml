@@ -27,6 +27,13 @@ services:
       DATABASE_URL: postgresql://lmu:${POSTGRES_PASSWORD}@postgres:5432/lmu
       COOKIE_SECRET: ${COOKIE_SECRET}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_SECURE: ${MAIL_SECURE:-false}
+      MAIL_USER: ${MAIL_USER}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MAIL_FROM: ${MAIL_FROM}
     depends_on:
       postgres:
         condition: service_healthy

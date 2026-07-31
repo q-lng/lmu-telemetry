@@ -14,6 +14,8 @@ const Profile = lazy(() => import('./pages/Profile').then((m) => ({ default: m.P
 const MesSessions = lazy(() => import('./pages/MesSessions').then((m) => ({ default: m.MesSessions })));
 const Browse = lazy(() => import('./pages/Browse').then((m) => ({ default: m.Browse })));
 const SharedLap = lazy(() => import('./pages/SharedLap').then((m) => ({ default: m.SharedLap })));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword').then((m) => ({ default: m.ForgotPassword })));
+const ResetPassword = lazy(() => import('./pages/ResetPassword').then((m) => ({ default: m.ResetPassword })));
 
 function NotFoundRedirect() {
   // Full page navigation, not a client-side redirect — consistent with the rest
@@ -31,6 +33,8 @@ export default function App() {
         <Route index element={<LandingPage />} />
         <Route path="telemetrie" element={<TelemetryViewer />} />
         <Route path="connexion" element={<Connexion />} />
+        <Route path="mot-de-passe-oublie" element={<ForgotPassword />} />
+        <Route path="reinitialiser-mot-de-passe" element={<ResetPassword />} />
         <Route path="parcourir" element={<Browse />} />
         <Route path="partage/:file/:lap" element={<SharedLap />} />
         <Route
