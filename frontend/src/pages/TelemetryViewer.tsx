@@ -1186,30 +1186,66 @@ export default function TelemetryViewer() {
           {selectedLap === 'full' && <span className="field-hint">{t('tv.xAxisDistanceHint')}</span>}
         </label>
 
-        <label className="field">
-          {t('tv.lapLabel')}
-          <select
-            value={selectedLap}
-            onChange={(e) => {
-              const value = e.target.value === 'full' ? 'full' : Number(e.target.value);
-              setSelectedLap(value);
-              if (value === 'full') setXAxisMode('time');
-              // The new reference lap can't also be a compared lap from this same session.
-              setComparedLaps((prev) => prev.filter((cl) => !(cl.sourceId === 'primary' && cl.lapNumber === value)));
-            }}
-          >
-            <option value="full">{t('tv.fullSession')}</option>
-            {laps.map((l) => {
-              const lt = displayLapTime(l);
-              return (
-                <option key={l.lap} value={l.lap}>
-                  {t('lap.number', { n: l.lap })} — {lt.seconds.toFixed(3)}s{lt.official ? '' : t('lap.invalidSuffix')}
-                  {l.lap === fastestLapOf(laps)?.lap ? t('lap.fastestSuffix') : ''}
-                </option>
-              );
-            })}
-          </select>
-        </label>
+        <div className="field">
+          {t('tv.lapsTableLabel')}
+          {selectedLap === 'full' && <span className="field-hint">{t('tv.selectReferenceLapHint')}</span>}
+          <table className="lap-select-table">
+            <thead>
+              <tr>
+                <th />
+                <th title={t('tv.referenceColumnHeader')}>{t('tv.referenceColumnHeader')}</th>
+                <th title={t('tv.comparedColumnHeader')}>{t('tv.comparedColumnHeader')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{t('tv.fullSession')}</td>
+                <td>
+                  <input
+                    type="checkbox"
+                    checked={selectedLap === 'full'}
+                    onChange={() => {
+                      setSelectedLap('full');
+                      setXAxisMode('time');
+                    }}
+                  />
+                </td>
+                <td />
+              </tr>
+              {laps.map((l) => {
+                const lt = displayLapTime(l);
+                const isReference = selectedLap === l.lap;
+                return (
+                  <tr key={l.lap}>
+                    <td>
+                      {t('lap.number', { n: l.lap })} — {lt.seconds.toFixed(3)}s{lt.official ? '' : t('lap.invalidSuffix')}
+                      {l.lap === fastestLapOf(laps)?.lap ? t('lap.fastestSuffix') : ''}
+                    </td>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={isReference}
+                        onChange={() => {
+                          setSelectedLap(l.lap);
+                          // The new reference lap can't also be a compared lap from this same session.
+                          setComparedLaps((prev) => prev.filter((cl) => !(cl.sourceId === 'primary' && cl.lapNumber === l.lap)));
+                        }}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="checkbox"
+                        disabled={selectedLap === 'full' || isReference}
+                        checked={isLapCompared('primary', l.lap)}
+                        onChange={() => toggleComparedLap('primary', l.lap)}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
 
         <label className="field">
           {t('tv.colorModeLabel')}
@@ -1263,28 +1299,7 @@ export default function TelemetryViewer() {
         )}
 
         <div className="field">
-          {t('tv.comparedLapsLabel')}
-          {selectedLap === 'full' && <span className="field-hint">{t('tv.selectReferenceLapHint')}</span>}
-
-          <div className="compared-laps-list">
-            {laps
-              .filter((l) => l.lap !== selectedLap)
-              .map((l) => {
-                const lt = displayLapTime(l);
-                return (
-                  <label key={l.lap} className="channel-checkbox">
-                    <input
-                      type="checkbox"
-                      disabled={selectedLap === 'full'}
-                      checked={isLapCompared('primary', l.lap)}
-                      onChange={() => toggleComparedLap('primary', l.lap)}
-                    />
-                    {t('lap.number', { n: l.lap })} — {lt.seconds.toFixed(3)}s{lt.official ? '' : t('lap.invalidSuffix')}
-                    {l.lap === fastestLapOf(laps)?.lap ? t('lap.fastestSuffix') : ''}
-                  </label>
-                );
-              })}
-          </div>
+          {t('tv.additionalSessionsLabel')}
 
           {externalSources.map((source) => {
             const sourceFastest = fastestLapOf(source.laps);

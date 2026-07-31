@@ -937,6 +937,51 @@ body {
   margin: 4px 0;
 }
 
+.lap-select-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 4px;
+  display: block;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.lap-select-table thead,
+.lap-select-table tbody,
+.lap-select-table tr {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.lap-select-table thead {
+  color: var(--muted-ink);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.lap-select-table td,
+.lap-select-table th {
+  padding: 3px 4px;
+  text-align: left;
+}
+
+.lap-select-table th:first-child,
+.lap-select-table td:first-child {
+  width: auto;
+}
+
+.lap-select-table th:not(:first-child),
+.lap-select-table td:not(:first-child) {
+  width: 56px;
+  text-align: center;
+}
+
+.lap-select-table tbody tr:hover {
+  background: var(--surface-2);
+}
+
 .compare-external-source {
   background: var(--surface-2);
   border: 1px solid var(--border);
