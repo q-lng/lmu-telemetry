@@ -1337,8 +1337,17 @@ body {
   color: var(--primary-ink);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  white-space: normal;
-  word-break: break-word;
+}
+
+/* Fixed single-line height, truncated with ellipsis rather than wrapped —
+   letting long values wrap wasted horizontal space and, worse, changed row
+   height depending on the exact numbers at that instant, making the whole
+   table visibly jump vertically while scrubbing the cursor. */
+.legend-value-line {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .legend-unit {
@@ -1349,6 +1358,9 @@ body {
 
 .legend-delta {
   display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   font-size: 10px;

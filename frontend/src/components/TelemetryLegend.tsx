@@ -110,20 +110,19 @@ export function TelemetryLegend({ lanes, cursorT, comparedLapColumns }: Props) {
                 <span className="legend-channel-name">{r.label}</span>
               </td>
               <td className="legend-value-cell">
-                {formatValue(r.referenceValue)} <span className="legend-unit">{r.unit}</span>
+                <span className="legend-value-line">
+                  {formatValue(r.referenceValue)} <span className="legend-unit">{r.unit}</span>
+                </span>
               </td>
               {shownColumns.map((col) => {
                 const entry = r.compares[col.id];
                 return (
                   <td key={col.id} className="legend-value-cell">
-                    {entry ? (
-                      <>
-                        {formatValue(entry.value)}
-                        {entry.delta && <span className="legend-delta">Δ {entry.delta}</span>}
-                      </>
-                    ) : (
-                      '–'
-                    )}
+                    <span className="legend-value-line">{entry ? formatValue(entry.value) : '–'}</span>
+                    {/* Always rendered (even blank) so a row's height never changes as
+                        delta becomes computable/not while scrubbing the cursor — a
+                        conditionally-rendered line was making the whole table jump. */}
+                    <span className="legend-delta">{entry?.delta ? `Δ ${entry.delta}` : ' '}</span>
                   </td>
                 );
               })}
