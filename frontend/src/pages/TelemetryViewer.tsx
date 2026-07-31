@@ -264,11 +264,20 @@ function invertTimeAtDistance(
   distanceValues: (number | null)[],
   queryDistances: (number | null)[],
 ): (number | null)[] {
+  // resampleContinuous walks its source array assuming it's sorted ascending —
+  // Lap Dist is *mostly* monotonic within one isolated lap, but any local
+  // blip (off-track excursion, GPS noise) breaks that assumption right there,
+  // producing one wildly wrong interpolated time at that distance. Since this
+  // feeds a "find the largest |delta|" axis-scaling step downstream, a single
+  // such point is enough to blow out the whole chart's Y range — drop
+  // anything that doesn't strictly increase over the last kept sample instead
+  // of feeding it to the resampler.
   const cleanDist: number[] = [];
   const cleanTime: number[] = [];
   for (let i = 0; i < t.length; i++) {
     const d = distanceValues[i];
     if (d == null) continue;
+    if (cleanDist.length > 0 && d <= cleanDist[cleanDist.length - 1]) continue;
     cleanDist.push(d);
     cleanTime.push(t[i]);
   }
