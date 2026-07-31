@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { resetPassword } from '../api';
+import { t } from '../i18n';
 
 export function ResetPassword() {
   const token = new URLSearchParams(window.location.search).get('token') ?? '';
@@ -13,7 +14,7 @@ export function ResetPassword() {
     e.preventDefault();
     setError(null);
     if (password !== confirm) {
-      setError('Les deux mots de passe ne correspondent pas');
+      setError(t('resetPassword.mismatch'));
       return;
     }
     setSubmitting(true);
@@ -30,7 +31,7 @@ export function ResetPassword() {
     return (
       <div className="auth-page">
         <div className="auth-card">
-          <div className="social-empty">Lien invalide — vérifie que tu as bien copié l'adresse complète du mail.</div>
+          <div className="social-empty">{t('resetPassword.invalidLink')}</div>
         </div>
       </div>
     );
@@ -40,13 +41,13 @@ export function ResetPassword() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-heading">
-          <h1>Nouveau mot de passe</h1>
-          <p>Choisis un nouveau mot de passe pour ton compte.</p>
+          <h1>{t('resetPassword.title')}</h1>
+          <p>{t('resetPassword.subtitle')}</p>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <label className="auth-field">
-            <span>Nouveau mot de passe</span>
+            <span>{t('resetPassword.newPasswordLabel')}</span>
             <input
               type="password"
               value={password}
@@ -59,7 +60,7 @@ export function ResetPassword() {
           </label>
 
           <label className="auth-field">
-            <span>Confirmer le mot de passe</span>
+            <span>{t('resetPassword.confirmLabel')}</span>
             <input
               type="password"
               value={confirm}
@@ -75,7 +76,7 @@ export function ResetPassword() {
 
           <button className="auth-submit" type="submit" disabled={submitting}>
             {submitting && <span className="spinner" />}
-            {submitting ? 'Patiente…' : 'Réinitialiser le mot de passe'}
+            {submitting ? t('common.patience') : t('resetPassword.submit')}
           </button>
         </form>
       </div>

@@ -8,6 +8,7 @@ import {
   unfollowUser,
 } from '../api';
 import type { ProfileSummary } from '../types';
+import { t } from '../i18n';
 
 interface Props {
   profile: ProfileSummary;
@@ -38,29 +39,29 @@ export function RelationActions({ profile, onChange }: Props) {
       <div className="relation-actions-row">
         {profile.isFriend ? (
           <button disabled={busy} onClick={() => run(() => removeFriend(profile.id))}>
-            Ami · Retirer
+            {t('friends.friendRemove')}
           </button>
         ) : profile.requestState === 'sent' ? (
           <button disabled={busy} onClick={() => run(() => declineFriendRequest(profile.friendRequestId!))}>
-            Demande envoyée · Annuler
+            {t('friends.requestSentCancel')}
           </button>
         ) : profile.requestState === 'received' ? (
           <>
             <button className="relation-accept" disabled={busy} onClick={() => run(() => acceptFriendRequest(profile.friendRequestId!))}>
-              Accepter
+              {t('friends.accept')}
             </button>
             <button disabled={busy} onClick={() => run(() => declineFriendRequest(profile.friendRequestId!))}>
-              Refuser
+              {t('friends.decline')}
             </button>
           </>
         ) : (
           <button disabled={busy} onClick={() => run(() => sendFriendRequest(profile.pseudo))}>
-            Ajouter en ami
+            {t('friends.add')}
           </button>
         )}
 
         <button disabled={busy} onClick={() => run(() => (profile.isFollowing ? unfollowUser(profile.pseudo) : followUser(profile.pseudo)))}>
-          {profile.isFollowing ? 'Ne plus suivre' : 'Suivre'}
+          {profile.isFollowing ? t('follows.unfollow') : t('follows.follow')}
         </button>
       </div>
       {error && <div className="auth-error">{error}</div>}

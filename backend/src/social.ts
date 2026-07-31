@@ -58,7 +58,7 @@ export async function registerSocial(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const target = await findUserByPseudo(req.params.pseudo);
       if (!target) {
-        reply.code(404).send({ error: 'Utilisateur introuvable' });
+        reply.code(404).send({ error: 'USER_NOT_FOUND' });
         return;
       }
       const profile = await toProfileSummary(toPublicUser(target), req.userId!);
@@ -73,11 +73,11 @@ export async function registerSocial(app: FastifyInstance): Promise<void> {
       const pseudo = (req.body?.pseudo ?? '').trim();
       const target = await findUserByPseudo(pseudo);
       if (!target) {
-        reply.code(404).send({ error: 'Utilisateur introuvable' });
+        reply.code(404).send({ error: 'USER_NOT_FOUND' });
         return;
       }
       if (target.id === req.userId) {
-        reply.code(400).send({ error: 'Impossible de s’ajouter soi-même' });
+        reply.code(400).send({ error: 'CANNOT_ADD_SELF' });
         return;
       }
       const status = await sendFriendRequest(req.userId!, target.id);
@@ -99,7 +99,7 @@ export async function registerSocial(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const ok = await acceptFriendRequest(Number(req.params.id), req.userId!);
       if (!ok) {
-        reply.code(404).send({ error: 'Demande introuvable' });
+        reply.code(404).send({ error: 'REQUEST_NOT_FOUND' });
         return;
       }
       reply.code(204).send();
@@ -112,7 +112,7 @@ export async function registerSocial(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const ok = await deleteFriendRequest(Number(req.params.id), req.userId!);
       if (!ok) {
-        reply.code(404).send({ error: 'Demande introuvable' });
+        reply.code(404).send({ error: 'REQUEST_NOT_FOUND' });
         return;
       }
       reply.code(204).send();
@@ -138,11 +138,11 @@ export async function registerSocial(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const target = await findUserByPseudo(req.params.pseudo);
       if (!target) {
-        reply.code(404).send({ error: 'Utilisateur introuvable' });
+        reply.code(404).send({ error: 'USER_NOT_FOUND' });
         return;
       }
       if (target.id === req.userId) {
-        reply.code(400).send({ error: 'Impossible de se suivre soi-même' });
+        reply.code(400).send({ error: 'CANNOT_FOLLOW_SELF' });
         return;
       }
       await follow(req.userId!, target.id);
@@ -156,7 +156,7 @@ export async function registerSocial(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const target = await findUserByPseudo(req.params.pseudo);
       if (!target) {
-        reply.code(404).send({ error: 'Utilisateur introuvable' });
+        reply.code(404).send({ error: 'USER_NOT_FOUND' });
         return;
       }
       await unfollow(req.userId!, target.id);

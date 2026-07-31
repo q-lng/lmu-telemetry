@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { login, signup } from '../api';
 import { useAuth } from '../AuthContext';
+import { t } from '../i18n';
 
 function EyeIcon({ off }: { off: boolean }) {
   return (
@@ -60,37 +61,37 @@ export function Connexion() {
       <div className="auth-card">
         <div className="pill-tabs">
           <button type="button" className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')}>
-            Connexion
+            {t('auth.tabLogin')}
           </button>
           <button type="button" className={mode === 'signup' ? 'active' : ''} onClick={() => setMode('signup')}>
-            Créer un compte
+            {t('auth.tabSignup')}
           </button>
         </div>
 
         <div className="auth-heading">
-          <h1>{mode === 'login' ? 'Content de te revoir' : 'Bienvenue'}</h1>
-          <p>{mode === 'login' ? 'Connecte-toi pour retrouver tes sessions.' : 'Crée ton compte pour sauvegarder tes sessions.'}</p>
+          <h1>{mode === 'login' ? t('auth.loginTitle') : t('auth.signupTitle')}</h1>
+          <p>{mode === 'login' ? t('auth.loginSubtitle') : t('auth.signupSubtitle')}</p>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit} key={mode}>
           <label className="auth-field">
-            <span>Email</span>
+            <span>{t('auth.email')}</span>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
           </label>
 
           {mode === 'signup' && (
             <>
               <label className="auth-field">
-                <span>Pseudo</span>
+                <span>{t('auth.pseudo')}</span>
                 <input value={pseudo} onChange={(e) => setPseudo(e.target.value)} required minLength={3} maxLength={32} />
               </label>
               <div className="auth-field-row">
                 <label className="auth-field">
-                  <span>Prénom</span>
+                  <span>{t('auth.firstName')}</span>
                   <input value={prenom} onChange={(e) => setPrenom(e.target.value)} required />
                 </label>
                 <label className="auth-field">
-                  <span>Nom</span>
+                  <span>{t('auth.lastName')}</span>
                   <input value={nom} onChange={(e) => setNom(e.target.value)} required />
                 </label>
               </div>
@@ -98,7 +99,7 @@ export function Connexion() {
           )}
 
           <label className="auth-field">
-            <span>Mot de passe</span>
+            <span>{t('auth.password')}</span>
             <div className="auth-password-wrap">
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -113,7 +114,7 @@ export function Connexion() {
                 type="button"
                 className="auth-password-toggle"
                 onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
               >
                 <EyeIcon off={showPassword} />
               </button>
@@ -124,12 +125,12 @@ export function Connexion() {
 
           <button className="auth-submit" type="submit" disabled={submitting}>
             {submitting && <span className="spinner" />}
-            {submitting ? 'Patiente…' : mode === 'login' ? 'Se connecter' : 'Créer mon compte'}
+            {submitting ? t('common.patience') : mode === 'login' ? t('auth.submitLogin') : t('auth.submitSignup')}
           </button>
 
           {mode === 'login' && (
             <a href="/forgot-password" className="auth-forgot-link">
-              Mot de passe oublié ?
+              {t('auth.forgotPassword')}
             </a>
           )}
         </form>

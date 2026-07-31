@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchLapShares, fetchLaps, fetchMyFiles, setFileVisibility, setLapVisibility } from '../api';
 import type { FileRecord, LapInfo, LapVisibility, Visibility } from '../types';
+import { t } from '../i18n';
 
 export function MesSessions() {
   const [files, setFiles] = useState<FileRecord[]>([]);
@@ -49,12 +50,12 @@ export function MesSessions() {
     <div className="social-page">
       <div className="social-card">
         <div className="auth-heading">
-          <h1>Mes sessions</h1>
-          <p>Gère la visibilité de tes fichiers déposés, et de tours précis.</p>
+          <h1>{t('mesSessions.title')}</h1>
+          <p>{t('mesSessions.subtitle')}</p>
         </div>
 
-        {loading && <div className="social-empty">Chargement…</div>}
-        {!loading && files.length === 0 && <div className="social-empty">Aucun fichier déposé pour l'instant.</div>}
+        {loading && <div className="social-empty">{t('mesSessions.loading')}</div>}
+        {!loading && files.length === 0 && <div className="social-empty">{t('mesSessions.noFiles')}</div>}
 
         <div className="user-list">
           {files.map((f) => (
@@ -68,26 +69,26 @@ export function MesSessions() {
                   value={f.visibility}
                   onChange={(e) => handleVisibilityChange(f.filename, e.target.value as Visibility)}
                 >
-                  <option value="private">Privé</option>
-                  <option value="friends">Amis</option>
-                  <option value="public">Public</option>
+                  <option value="private">{t('visibility.private')}</option>
+                  <option value="friends">{t('visibility.friends')}</option>
+                  <option value="public">{t('visibility.public')}</option>
                 </select>
               </div>
 
               {expanded === f.filename && (
                 <div className="mes-sessions-laps">
-                  {lapsLoading && <div className="social-empty">Chargement des tours…</div>}
+                  {lapsLoading && <div className="social-empty">{t('mesSessions.loadingLaps')}</div>}
                   {!lapsLoading &&
                     laps.map((l) => (
                       <div key={l.lap} className="mes-sessions-lap-row">
-                        <span>Tour {l.lap}</span>
+                        <span>{t('lap.number', { n: l.lap })}</span>
                         <select
                           value={lapShares[l.lap] ?? 'file'}
                           onChange={(e) => handleLapVisibilityChange(f.filename, l.lap, e.target.value)}
                         >
-                          <option value="file">Suit le fichier</option>
-                          <option value="friends">Amis</option>
-                          <option value="public">Public</option>
+                          <option value="file">{t('mesSessions.followsFile')}</option>
+                          <option value="friends">{t('visibility.friends')}</option>
+                          <option value="public">{t('visibility.public')}</option>
                         </select>
                       </div>
                     ))}

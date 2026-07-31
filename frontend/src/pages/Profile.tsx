@@ -4,6 +4,7 @@ import { fetchProfile } from '../api';
 import type { ProfileSummary } from '../types';
 import { useAuth } from '../AuthContext';
 import { RelationActions } from '../components/RelationActions';
+import { t } from '../i18n';
 
 export function Profile() {
   const { pseudo = '' } = useParams<{ pseudo: string }>();
@@ -24,7 +25,7 @@ export function Profile() {
     return (
       <div className="social-page">
         <div className="social-card">
-          <div className="social-empty">Utilisateur introuvable.</div>
+          <div className="social-empty">{t('profile.notFound')}</div>
         </div>
       </div>
     );
@@ -44,7 +45,7 @@ export function Profile() {
           </p>
         </div>
         {isSelf ? (
-          <div className="social-empty">C'est ton profil.</div>
+          <div className="social-empty">{t('profile.isSelf')}</div>
         ) : (
           <RelationActions profile={profile} onChange={() => setRefreshKey((k) => k + 1)} />
         )}

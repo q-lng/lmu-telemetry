@@ -6,6 +6,7 @@ import { ChannelPlot } from '../components/ChannelPlot';
 import { TrackMap } from '../components/TrackMap';
 import { TelemetryLegend } from '../components/TelemetryLegend';
 import { channelColor } from '../palette';
+import { t } from '../i18n';
 
 // Fixed default channel set — this is a minimal read-only view for a single shared
 // lap, not the full customizable TelemetryViewer (no channel picker/presets/compare).
@@ -32,7 +33,7 @@ export function SharedLap() {
     async function run() {
       const laps = await dataSource.fetchLaps();
       const lapInfo = laps[0];
-      if (!lapInfo) throw new Error('Tour introuvable ou non accessible');
+      if (!lapInfo) throw new Error(t('sharedLap.notFound'));
       const offset = lapInfo.startTs;
 
       const [meta, ...rest] = await Promise.all([
@@ -87,7 +88,7 @@ export function SharedLap() {
     if (throttle && brake) {
       result.push({
         key: 'pedals',
-        label: 'Pédales',
+        label: t('tv.defaultGroupPedals'),
         series: {
           ...throttle,
           valueColumns: ['Throttle Pos Unfiltered', 'Brake Pos Unfiltered'],
@@ -133,7 +134,7 @@ export function SharedLap() {
     <div className="shared-lap-page">
       <div className="shared-lap-header">
         <h1>
-          {metadata?.info.TrackName ?? file} — Tour {lapNumber}
+          {metadata?.info.TrackName ?? file} — {t('lap.number', { n: lapNumber })}
         </h1>
         <p>
           {metadata?.info.CarName}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { requestPasswordReset } from '../api';
+import { t } from '../i18n';
 
 export function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -24,28 +25,26 @@ export function ForgotPassword() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-heading">
-          <h1>Mot de passe oublié</h1>
-          <p>Indique ton email, on t'envoie un lien pour en choisir un nouveau.</p>
+          <h1>{t('forgotPassword.title')}</h1>
+          <p>{t('forgotPassword.subtitle')}</p>
         </div>
 
         {done ? (
-          <div className="field-hint">
-            Si un compte existe avec cet email, un lien de réinitialisation vient d'être envoyé.
-          </div>
+          <div className="field-hint">{t('forgotPassword.done')}</div>
         ) : (
           <form className="auth-form" onSubmit={handleSubmit}>
             <label className="auth-field">
-              <span>Email</span>
+              <span>{t('auth.email')}</span>
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
             </label>
 
             <button className="auth-submit" type="submit" disabled={submitting}>
               {submitting && <span className="spinner" />}
-              {submitting ? 'Envoi…' : 'Envoyer le lien'}
+              {submitting ? t('forgotPassword.sending') : t('forgotPassword.submit')}
             </button>
 
             <a href="/connexion" className="auth-forgot-link">
-              Retour à la connexion
+              {t('forgotPassword.backToLogin')}
             </a>
           </form>
         )}
