@@ -1199,6 +1199,7 @@ export default function TelemetryViewer() {
           series: withXAxis(deltaSeries),
           columnStyles: comparedLaps.map((cl, index) => ({ label: comparedLapLabel(cl), color: comparedLapColorAt(index) })),
           compares: [],
+          centerYOnZero: true,
         });
       } else {
         const series = seriesByName[item.name];

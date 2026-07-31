@@ -126,4 +126,7 @@ export interface Lane {
   // still boxed together" display (e.g. Pedals split into separate graphs).
   boxId?: string;
   boxLabel?: string;
+  // Forces the Y-axis range to be symmetric around 0 (e.g. the delta-time
+  // channel) instead of the usual tight fit around the actual data span.
+  centerYOnZero?: boolean;
 }

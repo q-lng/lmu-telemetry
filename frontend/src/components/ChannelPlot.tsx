@@ -60,6 +60,24 @@ function computeFixedYRange(data: (number | null)[][]): [number, number] {
   return [min - pad, max + pad];
 }
 
+/** Same idea, but symmetric around 0 — [-M, M] instead of a tight fit around
+ * the actual data span — for lanes like delta-time where 0 (dead even with
+ * the reference lap) needs to sit at the vertical center of the graph rather
+ * than wherever the data happens to average out. */
+function computeZeroCenteredYRange(data: (number | null)[][]): [number, number] {
+  let magnitude = 0;
+  for (let i = 1; i < data.length; i++) {
+    for (const v of data[i]) {
+      if (v == null) continue;
+      const abs = Math.abs(v);
+      if (abs > magnitude) magnitude = abs;
+    }
+  }
+  if (magnitude === 0) magnitude = 1;
+  const padded = magnitude * 1.05;
+  return [-padded, padded];
+}
+
 const ZOOM_FACTOR = 0.85;
 // Below this much horizontal movement, a mousedown+mouseup counts as a click
 // (freeze the cursor there) rather than a pan drag.
@@ -297,7 +315,10 @@ export function ChannelPlot({
       padding: [4, 8, showXAxis ? 4 : 0, 0],
       cursor: { drag: { x: false, y: false }, sync: { key: syncKey, scales: ['x', null] } },
       legend: { show: false },
-      scales: { x: { time: false }, y: { range: computeFixedYRange(data) } },
+      scales: {
+        x: { time: false },
+        y: { range: lane.centerYOnZero ? computeZeroCenteredYRange(data) : computeFixedYRange(data) },
+      },
       axes: [
         {
           show: true,
