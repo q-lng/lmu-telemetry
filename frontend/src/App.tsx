@@ -1,8 +1,13 @@
+import { lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
-import { LandingPage } from './pages/LandingPage';
-import { Connexion } from './pages/Connexion';
-import TelemetryViewer from './pages/TelemetryViewer';
+
+// Route-level code splitting: each page is a separate chunk fetched on demand
+// instead of every page (including the heavy TelemetryViewer, which pulls in
+// uPlot + DuckDB-WASM) loading up front just to render the landing page.
+const LandingPage = lazy(() => import('./pages/LandingPage').then((m) => ({ default: m.LandingPage })));
+const Connexion = lazy(() => import('./pages/Connexion').then((m) => ({ default: m.Connexion })));
+const TelemetryViewer = lazy(() => import('./pages/TelemetryViewer'));
 
 export default function App() {
   return (
