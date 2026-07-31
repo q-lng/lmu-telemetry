@@ -62,7 +62,7 @@ export function Browse() {
               {sessions.length === 0 && <div className="social-empty">{t('browse.noSessionsFound')}</div>}
               {sessions.map((s) => (
                 <div className="user-row" key={s.file}>
-                  <a href={`/telemetrie?file=${encodeURIComponent(s.file)}`} className="user-row-name">
+                  <a href={`/telemetry?file=${encodeURIComponent(s.file)}`} className="user-row-name">
                     {s.track ?? s.file}
                     <span className="user-row-fullname">
                       {s.carName} {s.driverName ? `· ${s.driverName}` : ''}
@@ -77,7 +77,7 @@ export function Browse() {
               {laps.length === 0 && <div className="social-empty">{t('browse.noSharedLapsFound')}</div>}
               {laps.map((l) => (
                 <div className="user-row" key={`${l.filename}-${l.lapNumber}`}>
-                  <a href={`/partage/${encodeURIComponent(l.filename)}/${l.lapNumber}`} className="user-row-name">
+                  <a href={`/shared/${encodeURIComponent(l.filename)}/${l.lapNumber}`} className="user-row-name">
                     {l.track ?? l.filename} — {t('lap.number', { n: l.lapNumber })}
                     <span className="user-row-fullname">{l.car}</span>
                   </a>

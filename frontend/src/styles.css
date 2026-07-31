@@ -1223,7 +1223,8 @@ body {
   border-radius: var(--radius-md);
   padding: 8px 10px;
   max-height: 220px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .legend-empty {
@@ -1233,21 +1234,25 @@ body {
 }
 
 .telemetry-legend-table {
+  table-layout: fixed;
+  width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
-  white-space: nowrap;
+  font-size: 11px;
 }
 
 .telemetry-legend-table th,
 .telemetry-legend-table td {
-  padding: 2px 10px 2px 0;
+  padding: 2px 6px 2px 0;
   text-align: left;
+  overflow: hidden;
 }
 
 .telemetry-legend-table thead th {
   color: var(--secondary-ink);
   font-weight: 500;
-  font-size: 11px;
+  font-size: 10px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   border-bottom: 1px solid var(--border);
   padding-bottom: 4px;
 }
@@ -1255,12 +1260,19 @@ body {
 .legend-channel-cell {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   color: var(--secondary-ink);
 }
 
+.legend-channel-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
 .legend-swatch {
-  width: 16px;
+  width: 12px;
   height: 0;
   border-top: 2px solid;
   flex-shrink: 0;
@@ -1274,17 +1286,22 @@ body {
   color: var(--primary-ink);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .legend-unit {
   color: var(--muted-ink);
   font-weight: 400;
-  font-size: 11px;
+  font-size: 10px;
 }
 
-.legend-delta-cell {
+.legend-delta {
+  display: block;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  color: var(--secondary-ink);
 }
 
 /* One unified bordered block containing every stacked lane, MoTeC-style: a single
@@ -1381,9 +1398,11 @@ body {
   position: absolute;
   top: 2px;
   left: 44px;
+  right: 8px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 4px 8px;
   font-size: 10px;
   color: var(--secondary-ink);
   background: rgba(26, 26, 25, 0.75);
@@ -1393,14 +1412,26 @@ body {
   z-index: 2;
 }
 
-.lane-label-deltas {
+.lane-label-values {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.lane-label-column {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.lane-label-column-name {
+  font-weight: 500;
 }
 
 .lane-label-delta {
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
 }
 
 .lane-resize-handle {

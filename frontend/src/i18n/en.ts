@@ -164,6 +164,7 @@ export const en = {
   'tv.colorModeLabel': 'Color mode',
   'tv.colorModeByChannel': 'By channel',
   'tv.colorModeByLap': 'By lap',
+  'tv.colorPrefsToggle': 'Customize colors',
   'tv.referenceLapColorLabel': 'Reference lap color',
   'tv.comparedLapColorLabel': (p: { n: number }) => `Compared lap ${p.n} color`,
   'tv.colorPrefsGuestHint': ' (log in to save these colors)',

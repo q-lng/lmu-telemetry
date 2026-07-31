@@ -24,9 +24,19 @@ function formatDelta(v: number): string {
   return `${sign}${Number.isInteger(abs) ? String(abs) : abs.toFixed(2)}`;
 }
 
+function formatValue(v: number | boolean | null): string {
+  if (v === null || v === undefined) return '–';
+  if (typeof v === 'boolean') return v ? t('telemetryLegend.on') : t('telemetryLegend.off');
+  return Number.isInteger(v) ? String(v) : v.toFixed(2);
+}
+
 function numeric(values: (number | boolean | null)[]): (number | null)[] {
   return values.map((v) => (typeof v === 'boolean' ? (v ? 1 : 0) : v));
 }
+
+// Reference and compared-lap traces are the same thickness — color is what
+// tells them apart now, not weight.
+const LINE_WIDTH = 2;
 
 /** Fixed Y range computed once from the lane's full data — uPlot's default "auto"
  * y-scale rescales to whatever is currently visible on X, so the vertical scale
@@ -206,8 +216,7 @@ export function ChannelPlot({
       ...series.valueColumns.map((col, i) => ({
         label: columnStyles[i].label,
         stroke: columnStyles[i].color,
-        // slightly thicker when compared laps overlay it, so the reference trace stays the clear focal line
-        width: compares.length > 0 ? 2 : 1.5,
+        width: LINE_WIDTH,
         dash: columnStyles[i].dash,
         paths: stepPaths,
         points: { show: false },
@@ -217,7 +226,8 @@ export function ChannelPlot({
     // Each compared lap gets its own solid color (no more dashing — the color
     // itself is what tells laps apart now), applied to every value column of
     // this lane for that lap (a grouped lane's members aren't distinguished
-    // from one another within a single compared lap's overlay).
+    // from one another within a single compared lap's overlay). Same width as
+    // the reference trace — color alone is what tells them apart now.
     compares.forEach((cmp) => {
       series.valueColumns.forEach((col, i) => {
         const compareValues = cmp.series.values[col];
@@ -226,7 +236,7 @@ export function ChannelPlot({
         seriesOpts.push({
           label: `${columnStyles[i].label}${t('channelPlot.comparedSuffix')} — ${cmp.label}`,
           stroke: cmp.color,
-          width: 2.5,
+          width: LINE_WIDTH,
           paths: stepPaths,
           points: { show: false },
         });
@@ -334,19 +344,33 @@ export function ChannelPlot({
     <div className="lane" style={{ flexGrow: weight }}>
       <div className="lane-label">
         {lane.label}
-        {/* A grouped lane's members already need distinct colors from each other
-            (e.g. throttle vs brake) — cramming per-lap deltas in there too would
-            be unreadable, so this stays to the single-column case. */}
-        {cursorT != null && lane.series.valueColumns.length === 1 && lane.compares.length > 0 && (
-          <span className="lane-label-deltas">
-            {lane.compares.map((cmp) => {
-              const col = lane.series.valueColumns[0];
-              const compareValue = nearestValue(cmp.series.t, cmp.series.values[col], cursorT);
+        {cursorT != null && lane.compares.length > 0 && (
+          <span className="lane-label-values">
+            {lane.series.valueColumns.map((col, i) => {
               const referenceValue = nearestValue(lane.series.t, lane.series.values[col], cursorT);
-              if (typeof compareValue !== 'number' || typeof referenceValue !== 'number') return null;
               return (
-                <span key={cmp.id} className="lane-label-delta" style={{ color: cmp.color }}>
-                  Δ {formatDelta(compareValue - referenceValue)}
+                <span key={col} className="lane-label-column">
+                  {lane.series.valueColumns.length > 1 && (
+                    <span className="lane-label-column-name" style={{ color: lane.columnStyles[i].color }}>
+                      {lane.columnStyles[i].label}
+                    </span>
+                  )}
+                  <span style={{ color: lane.columnStyles[i].color }}>{formatValue(referenceValue)}</span>
+                  {lane.compares.map((cmp) => {
+                    const compareValues = cmp.series.values[col];
+                    if (!compareValues) return null;
+                    const compareValue = nearestValue(cmp.series.t, compareValues, cursorT);
+                    const delta =
+                      typeof compareValue === 'number' && typeof referenceValue === 'number'
+                        ? formatDelta(compareValue - referenceValue)
+                        : null;
+                    return (
+                      <span key={cmp.id} className="lane-label-delta" style={{ color: cmp.color }}>
+                        {formatValue(compareValue)}
+                        {delta && ` (Δ ${delta})`}
+                      </span>
+                    );
+                  })}
                 </span>
               );
             })}

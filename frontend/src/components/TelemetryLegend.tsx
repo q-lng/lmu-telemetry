@@ -1,4 +1,3 @@
-import { Fragment } from 'react';
 import type { Lane } from '../types';
 import { nearestValue } from '../nearest';
 import { t } from '../i18n';
@@ -73,15 +72,24 @@ export function TelemetryLegend({ lanes, cursorT, comparedLapColumns }: Props) {
     );
   }
 
+  const otherColumnWidth = 68 / (1 + comparedLapColumns.length);
+
   return (
     <div className="telemetry-legend">
       <table className="telemetry-legend-table">
+        <colgroup>
+          <col style={{ width: '32%' }} />
+          <col style={{ width: `${otherColumnWidth}%` }} />
+          {comparedLapColumns.map((col) => (
+            <col key={col.id} style={{ width: `${otherColumnWidth}%` }} />
+          ))}
+        </colgroup>
         <thead>
           <tr>
             <th>{t('telemetryLegend.channel')}</th>
             <th>{t('telemetryLegend.reference')}</th>
             {comparedLapColumns.map((col) => (
-              <th key={col.id} colSpan={2} style={{ color: col.color }}>
+              <th key={col.id} style={{ color: col.color }}>
                 {col.label}
               </th>
             ))}
@@ -90,9 +98,9 @@ export function TelemetryLegend({ lanes, cursorT, comparedLapColumns }: Props) {
         <tbody>
           {rows.map((r) => (
             <tr key={r.key}>
-              <td className="legend-channel-cell">
+              <td className="legend-channel-cell" title={r.label}>
                 <span className={`legend-swatch${r.dashed ? ' dashed' : ''}`} style={{ borderColor: r.color }} />
-                {r.label}
+                <span className="legend-channel-name">{r.label}</span>
               </td>
               <td className="legend-value-cell">
                 {formatValue(r.referenceValue)} <span className="legend-unit">{r.unit}</span>
@@ -100,20 +108,16 @@ export function TelemetryLegend({ lanes, cursorT, comparedLapColumns }: Props) {
               {comparedLapColumns.map((col) => {
                 const entry = r.compares[col.id];
                 return (
-                  <Fragment key={col.id}>
-                    <td className="legend-value-cell">
-                      {entry ? (
-                        <>
-                          {formatValue(entry.value)} <span className="legend-unit">{r.unit}</span>
-                        </>
-                      ) : (
-                        '–'
-                      )}
-                    </td>
-                    <td className="legend-delta-cell" style={{ color: col.color }}>
-                      {entry?.delta ?? '–'}
-                    </td>
-                  </Fragment>
+                  <td key={col.id} className="legend-value-cell">
+                    {entry ? (
+                      <>
+                        {formatValue(entry.value)}
+                        {entry.delta && <span className="legend-delta">Δ {entry.delta}</span>}
+                      </>
+                    ) : (
+                      '–'
+                    )}
+                  </td>
                 );
               })}
             </tr>

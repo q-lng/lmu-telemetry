@@ -325,6 +325,7 @@ export default function TelemetryViewer() {
   // comparing your own two laps, plus a friend's fastest lap from another file.
   const [comparedLaps, setComparedLaps] = useState<ComparedLap[]>([]);
   const [colorMode, setColorMode] = useState<ColorMode>('byChannel');
+  const [colorPrefsOpen, setColorPrefsOpen] = useState(false);
 
   const [externalSources, setExternalSources] = useState<ExternalSource[]>([]);
   const [addSourceOpen, setAddSourceOpen] = useState(false);
@@ -1219,10 +1220,19 @@ export default function TelemetryViewer() {
             <button className={colorMode === 'byLap' ? 'active' : ''} onClick={() => setColorMode('byLap')}>
               {t('tv.colorModeByLap')}
             </button>
+            {colorMode === 'byLap' && (
+              <button
+                className={colorPrefsOpen ? 'active' : ''}
+                onClick={() => setColorPrefsOpen((o) => !o)}
+                title={t('tv.colorPrefsToggle')}
+              >
+                ⚙
+              </button>
+            )}
           </div>
         </label>
 
-        {colorMode === 'byLap' && (
+        {colorMode === 'byLap' && colorPrefsOpen && (
           <div className="field color-prefs">
             <label className="color-pref-row">
               <input
