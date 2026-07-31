@@ -453,11 +453,12 @@ export default function TelemetryViewer() {
   function reloadSessions(selectFile?: string) {
     fetchSessions().then((s) => {
       setSessions(s);
+      // Only ever select a session explicitly (a deep link's ?file=, or the
+      // file just uploaded) — never auto-pick one just because the list is
+      // non-empty; the user chooses from the dropdown themselves otherwise.
       if (selectFile) {
         setGuestFile(null);
         setSelectedFile(selectFile);
-      } else if (!selectedFile && !guestFile && s.length > 0) {
-        setSelectedFile(s[0].file);
       }
     });
   }
@@ -1077,9 +1078,10 @@ export default function TelemetryViewer() {
             disabled={!!guestFile}
             onChange={(e) => {
               setGuestFile(null);
-              setSelectedFile(e.target.value);
+              setSelectedFile(e.target.value || null);
             }}
           >
+            <option value="">{t('tv.chooseSessionPlaceholder')}</option>
             {sessions.map((s) => (
               <option key={s.file} value={s.file}>
                 {s.track ?? s.file} — {s.sessionType} ({s.recordingTime})
