@@ -1,10 +1,11 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
-import { initAuthSchema, initSocialSchema, initFilesSchema, initMailSchema } from './pg.js';
+import { initAuthSchema, initSocialSchema, initFilesSchema, initMailSchema, initPreferencesSchema } from './pg.js';
 import { registerAuth } from './auth.js';
 import { registerSocial } from './social.js';
 import { registerFiles } from './files.js';
+import { registerPreferences } from './preferences.js';
 
 const app = Fastify({ logger: true });
 await app.register(cors, { origin: true });
@@ -14,9 +15,11 @@ await initAuthSchema();
 await initSocialSchema();
 await initFilesSchema();
 await initMailSchema();
+await initPreferencesSchema();
 await registerAuth(app);
 await registerSocial(app);
 await registerFiles(app);
+await registerPreferences(app);
 
 app.get('/api/health', async () => ({ ok: true }));
 

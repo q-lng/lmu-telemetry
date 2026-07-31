@@ -3,6 +3,7 @@ import type { MouseEvent as ReactMouseEvent } from 'react';
 import uPlot from 'uplot';
 import type { Lane } from '../types';
 import { CHART_CHROME } from '../palette';
+import { nearestValue } from '../nearest';
 import { t } from '../i18n';
 
 function formatTime(s: number): string {
@@ -15,6 +16,12 @@ function formatTime(s: number): string {
 
 function formatDistance(m: number): string {
   return Math.abs(m) >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${Math.round(m)}m`;
+}
+
+function formatDelta(v: number): string {
+  const sign = v >= 0 ? '+' : '-';
+  const abs = Math.abs(v);
+  return `${sign}${Number.isInteger(abs) ? String(abs) : abs.toFixed(2)}`;
 }
 
 function numeric(values: (number | boolean | null)[]): (number | null)[] {
@@ -164,6 +171,10 @@ interface Props {
    * always fills exactly the available vertical space, so lanes are sized purely
    * by their weight relative to each other, never by an absolute pixel height. */
   weight: number;
+  /** Cursor position, only used to show a live per-compared-lap delta next to the
+   * label — deliberately NOT in the uPlot-rebuild effect's dependency array below,
+   * so a mousemove re-renders just this label text, never tears down the chart. */
+  cursorT?: number | null;
   onWeightChange?: (key: string, weight: number) => void;
   onCursorMove?: (t: number | null) => void;
   onViewRangeChange?: (range: { min: number; max: number }) => void;
@@ -175,6 +186,7 @@ export function ChannelPlot({
   showXAxis,
   xAxisMode,
   weight,
+  cursorT,
   onWeightChange,
   onCursorMove,
   onViewRangeChange,
@@ -320,7 +332,27 @@ export function ChannelPlot({
 
   return (
     <div className="lane" style={{ flexGrow: weight }}>
-      <div className="lane-label">{lane.label}</div>
+      <div className="lane-label">
+        {lane.label}
+        {/* A grouped lane's members already need distinct colors from each other
+            (e.g. throttle vs brake) — cramming per-lap deltas in there too would
+            be unreadable, so this stays to the single-column case. */}
+        {cursorT != null && lane.series.valueColumns.length === 1 && lane.compares.length > 0 && (
+          <span className="lane-label-deltas">
+            {lane.compares.map((cmp) => {
+              const col = lane.series.valueColumns[0];
+              const compareValue = nearestValue(cmp.series.t, cmp.series.values[col], cursorT);
+              const referenceValue = nearestValue(lane.series.t, lane.series.values[col], cursorT);
+              if (typeof compareValue !== 'number' || typeof referenceValue !== 'number') return null;
+              return (
+                <span key={cmp.id} className="lane-label-delta" style={{ color: cmp.color }}>
+                  Δ {formatDelta(compareValue - referenceValue)}
+                </span>
+              );
+            })}
+          </span>
+        )}
+      </div>
       <div ref={containerRef} className="lane-canvas" />
       <div className="lane-resize-handle" onMouseDown={handleResizeStart} title={t('channelPlot.resize')} />
     </div>

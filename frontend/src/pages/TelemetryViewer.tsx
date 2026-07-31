@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { TouchEvent as ReactTouchEvent } from 'react';
+import type { ReactNode, TouchEvent as ReactTouchEvent } from 'react';
 import { fetchSessions, setFileVisibility, setLapVisibility, uploadSession } from '../api';
 import type {
   ChannelDescriptor,
@@ -20,7 +20,10 @@ import { TelemetryLegend } from '../components/TelemetryLegend';
 import { channelColor, comparedLapColor, CORNER_STYLE, REFERENCE_UNIFORM_COLOR } from '../palette';
 import { resampleContinuous, resampleStep } from '../resample';
 import { useAuth } from '../AuthContext';
+import { usePreferences } from '../PreferencesContext';
 import { t } from '../i18n';
+
+const COMPARED_LAP_COLOR_SLOTS = 9;
 
 // A second session opened just to borrow laps from it for comparison — has its
 // own DataSource/laps/metadata, independent of the primary session's. Page-local
@@ -44,6 +47,16 @@ interface GroupLayoutItem {
   id: string;
   name: string;
   channels: string[];
+  // false = each member gets its own separate graph, still enclosed together in
+  // a labeled box (see the `lanes` builder's boxId/boxLabel) — absent/true means
+  // today's single combined-overlay lane. Only ever toggled via the UI for the
+  // built-in Pedals group (see `special`); a user-made group (grouped via the
+  // sidebar's "Group" button) is always fully combined, and fully dissolved
+  // (not toggled) to go back to loose standalone channels.
+  grouped?: boolean;
+  // Marks the built-in Pedals group so the sidebar can show its extra
+  // clutch/group-display toggles — not set on user-made groups.
+  special?: 'pedals';
 }
 type LayoutItem = ChannelLayoutItem | GroupLayoutItem;
 
@@ -58,10 +71,18 @@ const KNOWN_COLORS: Record<string, string> = {
   'Clutch Pos Unfiltered': '#3987e5',
 };
 
+const CLUTCH_CHANNEL = 'Clutch Pos Unfiltered';
+
 const INITIAL_LAYOUT: LayoutItem[] = [
   { type: 'channel', name: 'Ground Speed' },
   { type: 'channel', name: 'Gear' },
-  { type: 'group', id: 'default-pedals', name: t('tv.defaultGroupPedals'), channels: ['Throttle Pos Unfiltered', 'Brake Pos Unfiltered'] },
+  {
+    type: 'group',
+    id: 'default-pedals',
+    name: t('tv.defaultGroupPedals'),
+    channels: ['Throttle Pos Unfiltered', 'Brake Pos Unfiltered'],
+    special: 'pedals',
+  },
   { type: 'channel', name: 'Steering Pos' },
   { type: 'group', id: 'default-pits', name: 'In Pits / Speed Limiter', channels: ['In Pits', 'Speed Limiter'] },
 ];
@@ -237,6 +258,9 @@ function savePresets(presets: Record<string, DisplayPreset>) {
 
 export default function TelemetryViewer() {
   const { user } = useAuth();
+  const { preferences, setPreference } = usePreferences();
+  const preferredReferenceLapColor = preferences.referenceLapColor as string | undefined;
+  const preferredComparedLapColors = preferences.comparedLapColors as string[] | undefined;
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   // Guest mode: a .duckdb file opened straight in the browser via DuckDB-WASM —
@@ -261,6 +285,7 @@ export default function TelemetryViewer() {
   const [selectedLap, setSelectedLap] = useState<number | 'full'>('full');
   const [xAxisMode, setXAxisMode] = useState<'time' | 'distance'>('time');
   const [layout, setLayout] = useState<LayoutItem[]>(INITIAL_LAYOUT);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [groupSelection, setGroupSelection] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState('');
   const [seriesByName, setSeriesByName] = useState<Record<string, ChannelSeries>>({});
@@ -308,7 +333,8 @@ export default function TelemetryViewer() {
   const addSourceGuestFileInputRef = useRef<HTMLInputElement>(null);
 
   function nextComparedLapColor(): string {
-    return comparedLapColor(comparedLapColorCounter.current++);
+    const index = comparedLapColorCounter.current++;
+    return preferredComparedLapColors?.[index] ?? comparedLapColor(index);
   }
 
   function isLapCompared(sourceId: string, lapNumber: number): boolean {
@@ -657,12 +683,12 @@ export default function TelemetryViewer() {
     });
   }
 
-  function moveItem(index: number, dir: -1 | 1) {
+  function moveItemTo(from: number, to: number) {
     setLayout((prev) => {
-      const swap = index + dir;
-      if (swap < 0 || swap >= prev.length) return prev;
+      if (from === to || from < 0 || to < 0 || from >= prev.length || to >= prev.length) return prev;
       const next = [...prev];
-      [next[index], next[swap]] = [next[swap], next[index]];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
       return next;
     });
   }
@@ -688,6 +714,28 @@ export default function TelemetryViewer() {
       if (item.type !== 'group') return prev;
       const next = [...prev];
       next[index] = { ...item, name };
+      return next;
+    });
+  }
+
+  function togglePedalsClutch(index: number) {
+    setLayout((prev) => {
+      const item = prev[index];
+      if (item.type !== 'group') return prev;
+      const has = item.channels.includes(CLUTCH_CHANNEL);
+      const channels = has ? item.channels.filter((c) => c !== CLUTCH_CHANNEL) : [...item.channels, CLUTCH_CHANNEL];
+      const next = [...prev];
+      next[index] = { ...item, channels };
+      return next;
+    });
+  }
+
+  function togglePedalsGrouped(index: number) {
+    setLayout((prev) => {
+      const item = prev[index];
+      if (item.type !== 'group') return prev;
+      const next = [...prev];
+      next[index] = { ...item, grouped: item.grouped === false ? true : false };
       return next;
     });
   }
@@ -782,7 +830,7 @@ export default function TelemetryViewer() {
       // "By lap" mode: every reference channel shares one neutral color, so the
       // eye follows compared-lap colors instead of per-channel hues — including
       // ignoring the throttle/brake/clutch conventional-color overrides below.
-      if (colorMode === 'byLap') return REFERENCE_UNIFORM_COLOR;
+      if (colorMode === 'byLap') return preferredReferenceLapColor ?? REFERENCE_UNIFORM_COLOR;
       return KNOWN_COLORS[name] ?? channelColor(colorIdx++);
     }
 
@@ -809,6 +857,25 @@ export default function TelemetryViewer() {
       if (item.type === 'group') {
         const present = item.channels.filter((c) => seriesByName[c]);
         if (present.length === 0) continue;
+        if (item.grouped === false) {
+          // Ungrouped-but-boxed: each member is its own separate lane/graph, but
+          // tagged with the same boxId so the render layer keeps them visually
+          // enclosed together under the group's name instead of scattering them
+          // into the general layout.
+          present.forEach((c) => {
+            const series = withXAxis(seriesByName[c]);
+            result.push({
+              key: `${item.id}__${c}`,
+              label: c,
+              series,
+              columnStyles: [{ label: c, color: nextColor(c) }],
+              compares: buildLaneCompares([c], series),
+              boxId: item.id,
+              boxLabel: item.name,
+            });
+          });
+          continue;
+        }
         if (present.length === 1) {
           const c = present[0];
           const series = withXAxis(seriesByName[c]);
@@ -856,9 +923,61 @@ export default function TelemetryViewer() {
 
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout, seriesByName, comparesByLapId, comparedLaps, colorMode, effectiveXAxisMode, distRef]);
+  }, [layout, seriesByName, comparesByLapId, comparedLaps, colorMode, preferredReferenceLapColor, effectiveXAxisMode, distRef]);
 
   const gpsX = gps ? (effectiveXAxisMode === 'distance' ? toDistanceX(gps.t, distRef) : gps.t) : [];
+  // Global column order for the legend table — a lane missing data for one of
+  // these (e.g. a channel absent from an external source) just shows a dash,
+  // rather than each lane inventing its own column order.
+  const comparedLapColumns = comparedLaps.map((cl) => ({ id: cl.id, label: comparedLapLabel(cl), color: cl.color }));
+
+  function channelPlotFor(lane: Lane, flatIndex: number) {
+    return (
+      <ChannelPlot
+        key={lane.key}
+        lane={lane}
+        syncKey="telemetry"
+        showXAxis={flatIndex === lanes.length - 1}
+        xAxisMode={effectiveXAxisMode}
+        weight={laneWeights[lane.key] ?? LANE_SIZE.medium}
+        cursorT={cursorT}
+        onWeightChange={setLaneWeight}
+        onCursorMove={setCursorT}
+        onViewRangeChange={setViewRange}
+      />
+    );
+  }
+
+  // Consecutive lanes sharing a boxId (see the `lanes` builder's "ungrouped but
+  // boxed" case) render as separate graphs enclosed in one labeled container,
+  // instead of scattering into the general flat list.
+  const laneElements: ReactNode[] = [];
+  {
+    let i = 0;
+    while (i < lanes.length) {
+      const lane = lanes[i];
+      if (lane.boxId) {
+        const boxId = lane.boxId;
+        const boxLabel = lane.boxLabel ?? lane.label;
+        const startIndex = i;
+        const members: Lane[] = [];
+        while (i < lanes.length && lanes[i].boxId === boxId) {
+          members.push(lanes[i]);
+          i++;
+        }
+        const boxWeight = members.reduce((sum, l) => sum + (laneWeights[l.key] ?? LANE_SIZE.medium), 0);
+        laneElements.push(
+          <div key={boxId} className="lane-box" style={{ flexGrow: boxWeight }}>
+            <div className="lane-box-label">{boxLabel}</div>
+            <div className="lane-box-lanes">{members.map((l, k) => channelPlotFor(l, startIndex + k))}</div>
+          </div>,
+        );
+      } else {
+        laneElements.push(channelPlotFor(lane, i));
+        i++;
+      }
+    }
+  }
 
   return (
     <div className="app" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
@@ -1079,6 +1198,34 @@ export default function TelemetryViewer() {
           </div>
         </label>
 
+        {colorMode === 'byLap' && (
+          <div className="field color-prefs">
+            <label className="color-pref-row">
+              <input
+                type="color"
+                value={preferredReferenceLapColor ?? REFERENCE_UNIFORM_COLOR}
+                onChange={(e) => setPreference('referenceLapColor', e.target.value)}
+              />
+              {t('tv.referenceLapColorLabel')}
+            </label>
+            {Array.from({ length: COMPARED_LAP_COLOR_SLOTS }, (_, i) => (
+              <label key={i} className="color-pref-row">
+                <input
+                  type="color"
+                  value={preferredComparedLapColors?.[i] ?? comparedLapColor(i)}
+                  onChange={(e) => {
+                    const next = [...(preferredComparedLapColors ?? [])];
+                    next[i] = e.target.value;
+                    setPreference('comparedLapColors', next);
+                  }}
+                />
+                {t('tv.comparedLapColorLabel', { n: i + 1 })}
+              </label>
+            ))}
+            {!user && <span className="field-hint">{t('tv.colorPrefsGuestHint')}</span>}
+          </div>
+        )}
+
         <div className="field">
           {t('tv.comparedLapsLabel')}
           {selectedLap === 'full' && <span className="field-hint">{t('tv.selectReferenceLapHint')}</span>}
@@ -1190,7 +1337,26 @@ export default function TelemetryViewer() {
             {t('tv.channelsShown')}
             <div className="selected-list">
               {layout.map((item, i) => (
-                <div className={`selected-item${item.type === 'group' ? ' is-group' : ''}`} key={item.type === 'group' ? item.id : item.name}>
+                <div
+                  className={`selected-item${item.type === 'group' ? ' is-group' : ''}${dragIndex === i ? ' dragging' : ''}`}
+                  key={item.type === 'group' ? item.id : item.name}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (dragIndex !== null && dragIndex !== i) {
+                      moveItemTo(dragIndex, i);
+                      setDragIndex(i);
+                    }
+                  }}
+                >
+                  <span
+                    className="drag-handle"
+                    draggable
+                    onDragStart={() => setDragIndex(i)}
+                    onDragEnd={() => setDragIndex(null)}
+                    title={t('tv.dragToReorder')}
+                  >
+                    ⠿
+                  </span>
                   {item.type === 'channel' ? (
                     <>
                       <input
@@ -1211,12 +1377,24 @@ export default function TelemetryViewer() {
                       <span className="group-members">{item.channels.join(' + ')}</span>
                     </>
                   )}
-                  <button disabled={i === 0} onClick={() => moveItem(i, -1)} title={t('tv.moveUp')}>
-                    ↑
-                  </button>
-                  <button disabled={i === layout.length - 1} onClick={() => moveItem(i, 1)} title={t('tv.moveDown')}>
-                    ↓
-                  </button>
+                  {item.type === 'group' && item.special === 'pedals' && (
+                    <>
+                      <button
+                        className={`pedals-toggle-btn${item.channels.includes(CLUTCH_CHANNEL) ? ' active' : ''}`}
+                        onClick={() => togglePedalsClutch(i)}
+                        title={t('tv.pedalsToggleClutch')}
+                      >
+                        {t('tv.clutchAbbrev')}
+                      </button>
+                      <button
+                        className={`pedals-toggle-btn${item.grouped === false ? ' active' : ''}`}
+                        onClick={() => togglePedalsGrouped(i)}
+                        title={t('tv.pedalsToggleGrouped')}
+                      >
+                        {item.grouped === false ? t('tv.ungroupedShort') : t('tv.groupedShort')}
+                      </button>
+                    </>
+                  )}
                   {item.type === 'group' && (
                     <button onClick={() => dissolveGroup(i)} title={t('tv.ungroup')}>
                       ⊟
@@ -1270,7 +1448,7 @@ export default function TelemetryViewer() {
         <div className="content-row">
           <div className="map-column">
             {gps && <TrackMap lat={gps.lat} lon={gps.lon} t={gpsX} cursorT={cursorT} viewRange={viewRange} height={340} />}
-            <TelemetryLegend lanes={lanes} cursorT={cursorT} />
+            <TelemetryLegend lanes={lanes} cursorT={cursorT} comparedLapColumns={comparedLapColumns} />
           </div>
 
           <div className="graphs-column">
@@ -1281,19 +1459,7 @@ export default function TelemetryViewer() {
                   {t('tv.loadingData')}
                 </div>
               )}
-              {lanes.map((lane, i) => (
-                <ChannelPlot
-                  key={lane.key}
-                  lane={lane}
-                  syncKey="telemetry"
-                  showXAxis={i === lanes.length - 1}
-                  xAxisMode={effectiveXAxisMode}
-                  weight={laneWeights[lane.key] ?? LANE_SIZE.medium}
-                  onWeightChange={setLaneWeight}
-                  onCursorMove={setCursorT}
-                  onViewRangeChange={setViewRange}
-                />
-              ))}
+              {laneElements}
             </div>
           </div>
         </div>

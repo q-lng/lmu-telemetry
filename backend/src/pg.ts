@@ -39,6 +39,11 @@ export async function initMailSchema(): Promise<void> {
   await runSchemaFile('mailSchema.sql');
 }
 
+/** Runs the idempotent user-preferences schema DDL at startup. */
+export async function initPreferencesSchema(): Promise<void> {
+  await runSchemaFile('preferencesSchema.sql');
+}
+
 /** Runs `fn` inside a single client transaction, committing on success and rolling
  * back on any thrown error — needed for multi-statement mutations (e.g. accepting a
  * friend request: delete the request row + insert the friendship row atomically). */

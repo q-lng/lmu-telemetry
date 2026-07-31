@@ -145,7 +145,7 @@ export function SharedLap() {
 
       {gps && <TrackMap lat={gps.lat} lon={gps.lon} t={gps.t} cursorT={cursorT} viewRange={viewRange} height={260} />}
 
-      <TelemetryLegend lanes={lanes} cursorT={cursorT} />
+      <TelemetryLegend lanes={lanes} cursorT={cursorT} comparedLapColumns={[]} />
 
       <div className="telemetry-block shared-lap-graphs">
         {lanes.map((lane, i) => (

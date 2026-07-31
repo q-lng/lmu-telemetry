@@ -119,4 +119,10 @@ export interface Lane {
   series: ChannelSeries;
   columnStyles: ColumnStyle[]; // same order/length as series.valueColumns
   compares: LaneCompare[]; // one entry per compared lap that has data for this lane, empty when none
+  // When set, this lane renders as its own separate graph but stays visually
+  // enclosed with every other lane sharing the same boxId (consecutive in the
+  // lane list), under a header showing boxLabel — used for "ungrouped but
+  // still boxed together" display (e.g. Pedals split into separate graphs).
+  boxId?: string;
+  boxLabel?: string;
 }

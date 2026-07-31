@@ -5,12 +5,15 @@ import 'uplot/dist/uPlot.min.css';
 import './styles.css';
 import App from './App';
 import { AuthProvider } from './AuthContext';
+import { PreferencesProvider } from './PreferencesContext';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App />
+        <PreferencesProvider>
+          <App />
+        </PreferencesProvider>
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>,
