@@ -6,14 +6,19 @@ export const DATA_DIR = process.env.DATA_DIR ?? '/data';
 
 const openDbs = new Map<string, duckdb.Database>();
 
+/** Distinguishes "the thing genuinely doesn't exist" (→ 404) from any other
+ * unexpected failure (→ 500) at the route layer, instead of string-matching
+ * error messages. */
+export class NotFoundError extends Error {}
+
 /** Resolves a session filename to an absolute path, rejecting any path traversal. */
 export function resolveSessionPath(file: string): string {
   const resolved = path.resolve(DATA_DIR, file);
   if (!resolved.startsWith(path.resolve(DATA_DIR) + path.sep)) {
-    throw new Error('Invalid session file');
+    throw new NotFoundError('Invalid session file');
   }
   if (!resolved.endsWith('.duckdb') || !fs.existsSync(resolved)) {
-    throw new Error('Session file not found');
+    throw new NotFoundError('Session file not found');
   }
   return resolved;
 }

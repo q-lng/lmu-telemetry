@@ -13,10 +13,19 @@ import type {
   SharedLapResult,
   Visibility,
 } from './types';
+import { tError } from './i18n';
+
+// Every helper below translates the backend's error CODE (or a missing/
+// unparseable body) into English text right here, once — so every call site
+// that does `setError((err as Error).message)` already shows translated text
+// with no changes needed there.
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`${url} -> HTTP ${res.status}`);
+  if (!res.ok) {
+    const parsed = await res.json().catch(() => ({}));
+    throw new Error(tError((parsed as { error?: string }).error));
+  }
   return res.json() as Promise<T>;
 }
 
@@ -28,8 +37,11 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   });
   if (!res.ok) {
     const parsed = await res.json().catch(() => ({}));
-    throw new Error((parsed as { error?: string }).error ?? `${url} -> HTTP ${res.status}`);
+    throw new Error(tError((parsed as { error?: string }).error));
   }
+  // 204 No Content has no body — calling .json() on it throws. Every caller
+  // expecting a real payload gets 200/201 with an actual body, so this is safe.
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
@@ -38,7 +50,7 @@ async function apiCall(url: string, method: 'POST' | 'DELETE'): Promise<void> {
   const res = await fetch(url, { method });
   if (!res.ok) {
     const parsed = await res.json().catch(() => ({}));
-    throw new Error((parsed as { error?: string }).error ?? `${url} -> HTTP ${res.status}`);
+    throw new Error(tError((parsed as { error?: string }).error));
   }
 }
 
@@ -55,11 +67,25 @@ export async function logout(): Promise<void> {
 }
 
 export async function fetchMe(): Promise<PublicUser | null> {
+  // 401 here just means "not logged in" — the only caller (AuthContext) treats
+  // it as `user: null` and never surfaces an error message, so no translation
+  // is needed on that path; any other failure still gets translated below.
   const res = await fetch('/api/auth/me');
   if (res.status === 401) return null;
-  if (!res.ok) throw new Error(`/api/auth/me -> HTTP ${res.status}`);
+  if (!res.ok) {
+    const parsed = await res.json().catch(() => ({}));
+    throw new Error(tError((parsed as { error?: string }).error));
+  }
   const body = (await res.json()) as { user: PublicUser };
   return body.user;
+}
+
+export function requestPasswordReset(email: string): Promise<void> {
+  return postJson('/api/auth/forgot-password', { email });
+}
+
+export function resetPassword(token: string, password: string): Promise<void> {
+  return postJson('/api/auth/reset-password', { token, password });
 }
 
 export function fetchSessions(
@@ -91,7 +117,7 @@ export async function uploadSession(file: File): Promise<{ file: string }> {
   const res = await fetch('/api/sessions/upload', { method: 'POST', body: form });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error((body as { error?: string }).error ?? `Upload failed: HTTP ${res.status}`);
+    throw new Error(tError((body as { error?: string }).error));
   }
   return res.json();
 }

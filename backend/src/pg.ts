@@ -34,6 +34,11 @@ export async function initFilesSchema(): Promise<void> {
   await runSchemaFile('filesSchema.sql');
 }
 
+/** Runs the idempotent mail schema DDL (password_reset_tokens) at startup. */
+export async function initMailSchema(): Promise<void> {
+  await runSchemaFile('mailSchema.sql');
+}
+
 /** Runs `fn` inside a single client transaction, committing on success and rolling
  * back on any thrown error — needed for multi-statement mutations (e.g. accepting a
  * friend request: delete the request row + insert the friendship row atomically). */

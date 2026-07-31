@@ -1,4 +1,4 @@
-import { query, quoteIdent } from './db.js';
+import { query, quoteIdent, NotFoundError } from './db.js';
 
 export type ChannelKind = 'continuous' | 'event';
 
@@ -65,7 +65,7 @@ export async function listChannels(file: string): Promise<ChannelDescriptor[]> {
 export async function getChannelDescriptor(file: string, name: string): Promise<ChannelDescriptor> {
   const channels = await listChannels(file);
   const found = channels.find((c) => c.name === name);
-  if (!found) throw new Error(`Unknown channel: ${name}`);
+  if (!found) throw new NotFoundError(`Unknown channel: ${name}`);
   return found;
 }
 

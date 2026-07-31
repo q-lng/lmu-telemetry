@@ -75,6 +75,10 @@ export async function findUserById(id: number): Promise<User | null> {
   return rows[0] ? fromRow(rows[0]) : null;
 }
 
+export async function updatePasswordHash(userId: number, passwordHash: string): Promise<void> {
+  await pgQuery(`UPDATE users SET password_hash = $2 WHERE id = $1`, [userId, passwordHash]);
+}
+
 /** Prefix search on pseudo, case-insensitive, excluding the searching user themselves. */
 export async function searchUsersByPseudo(query: string, excludeUserId: number, limit = 20): Promise<User[]> {
   const rows = await pgQuery<UserRow>(

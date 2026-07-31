@@ -18,6 +18,7 @@ import { TelemetryLegend } from '../components/TelemetryLegend';
 import { channelColor, CORNER_STYLE } from '../palette';
 import { resampleContinuous, resampleStep } from '../resample';
 import { useAuth } from '../AuthContext';
+import { t } from '../i18n';
 
 interface ChannelLayoutItem {
   type: 'channel';
@@ -45,7 +46,7 @@ const KNOWN_COLORS: Record<string, string> = {
 const INITIAL_LAYOUT: LayoutItem[] = [
   { type: 'channel', name: 'Ground Speed' },
   { type: 'channel', name: 'Gear' },
-  { type: 'group', id: 'default-pedals', name: 'Pédales', channels: ['Throttle Pos Unfiltered', 'Brake Pos Unfiltered'] },
+  { type: 'group', id: 'default-pedals', name: t('tv.defaultGroupPedals'), channels: ['Throttle Pos Unfiltered', 'Brake Pos Unfiltered'] },
   { type: 'channel', name: 'Steering Pos' },
   { type: 'group', id: 'default-pits', name: 'In Pits / Speed Limiter', channels: ['In Pits', 'Speed Limiter'] },
 ];
@@ -830,10 +831,10 @@ export default function TelemetryViewer() {
     <div className="app" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       <aside className={`sidebar${sidebarOpen ? '' : ' collapsed'}`}>
         <div className="sidebar-inner">
-        <h1>LMU Telemetry</h1>
+        <h1>{t('tv.sidebarTitle')}</h1>
 
         <label className="field">
-          Session
+          {t('tv.session')}
           <select
             value={guestFile ? '' : selectedFile ?? ''}
             disabled={!!guestFile}
@@ -852,7 +853,7 @@ export default function TelemetryViewer() {
 
         <div className="field">
           <button className="upload-btn" disabled={uploadState.busy} onClick={() => fileInputRef.current?.click()}>
-            {uploadState.busy ? 'Import en cours…' : '+ Importer un fichier .duckdb'}
+            {uploadState.busy ? t('tv.importing') : t('tv.importFile')}
           </button>
           <input
             ref={fileInputRef}
@@ -871,10 +872,11 @@ export default function TelemetryViewer() {
           {guestFile ? (
             <>
               <div className="guest-active">
-                Mode invité : <strong>{guestFile.name}</strong>
+                {t('tv.guestModePrefix')}
+                <strong>{guestFile.name}</strong>
               </div>
               <button className="upload-btn" onClick={() => setGuestFile(null)}>
-                Fermer et revenir aux sessions serveur
+                {t('tv.closeGuestMode')}
               </button>
             </>
           ) : (
@@ -882,9 +884,9 @@ export default function TelemetryViewer() {
               className="upload-btn"
               disabled={guestState.busy}
               onClick={() => guestFileInputRef.current?.click()}
-              title="Ouvre le fichier directement dans le navigateur, sans passer par le serveur — plus rapide, rien n'est envoyé nulle part"
+              title={t('tv.openGuestTooltip')}
             >
-              {guestState.busy ? 'Chargement…' : 'Ouvrir en local (invité, rapide)'}
+              {guestState.busy ? t('tv.guestLoading') : t('tv.openGuestFile')}
             </button>
           )}
           <input
@@ -903,7 +905,7 @@ export default function TelemetryViewer() {
 
         {guestFile && user && (
           <div className="field">
-            Publier cette session
+            {t('tv.publishSession')}
             <label className="compare-source-toggle">
               <input
                 type="checkbox"
@@ -911,33 +913,33 @@ export default function TelemetryViewer() {
                 disabled={selectedLap === 'full'}
                 onChange={(e) => setPublishScope(e.target.checked ? 'lap' : 'file')}
               />
-              Seulement le tour sélectionné
-              {selectedLap === 'full' && ' (sélectionne un tour)'}
+              {t('tv.publishSelectedLapOnly')}
+              {selectedLap === 'full' && t('tv.publishSelectLapHint')}
             </label>
             <div className="segmented">
               <button
                 className={publishVisibility === 'friends' ? 'active' : ''}
                 onClick={() => setPublishVisibility('friends')}
               >
-                Amis
+                {t('visibility.friends')}
               </button>
               <button
                 className={publishVisibility === 'public' ? 'active' : ''}
                 onClick={() => setPublishVisibility('public')}
               >
-                Public
+                {t('visibility.public')}
               </button>
             </div>
             <button className="upload-btn" disabled={publishState.busy} onClick={handlePublish}>
-              {publishState.busy ? 'Publication…' : 'Publier'}
+              {publishState.busy ? t('tv.publishing') : t('tv.publish')}
             </button>
             {publishState.error && <div className="upload-error">{publishState.error}</div>}
-            {publishState.done && <div className="field-hint">Publié — retrouve-le dans "Mes sessions".</div>}
+            {publishState.done && <div className="field-hint">{t('tv.publishDone')}</div>}
           </div>
         )}
 
         <div className="field">
-          Preset d'affichage
+          {t('tv.presetLabel')}
           <div className="preset-row">
             <select
               value={selectedPreset}
@@ -946,25 +948,25 @@ export default function TelemetryViewer() {
                 if (e.target.value) applyPreset(e.target.value);
               }}
             >
-              <option value="">— Charger —</option>
+              <option value="">{t('tv.presetLoadPlaceholder')}</option>
               {Object.keys(presets).map((name) => (
                 <option key={name} value={name}>
                   {name}
                 </option>
               ))}
             </select>
-            <button disabled={!selectedPreset} onClick={() => deletePreset(selectedPreset)} title="Supprimer ce preset">
+            <button disabled={!selectedPreset} onClick={() => deletePreset(selectedPreset)} title={t('tv.presetDelete')}>
               ✕
             </button>
           </div>
           <div className="preset-row">
             <input
-              placeholder="Nom du preset"
+              placeholder={t('tv.presetNamePlaceholder')}
               value={presetName}
               onChange={(e) => setPresetName(e.target.value)}
             />
             <button disabled={!presetName.trim()} onClick={saveCurrentAsPreset}>
-              Enregistrer
+              {t('tv.presetSave')}
             </button>
           </div>
         </div>
@@ -972,48 +974,43 @@ export default function TelemetryViewer() {
         {metadata && (
           <div className="info-panel">
             <div>
-              <strong>Pilote:</strong> {metadata.info.DriverName}
+              <strong>{t('tv.infoDriver')}</strong> {metadata.info.DriverName}
             </div>
             <div>
-              <strong>Circuit:</strong> {metadata.info.TrackName}
+              <strong>{t('tv.infoTrack')}</strong> {metadata.info.TrackName}
             </div>
             <div>
-              <strong>Voiture:</strong> {metadata.info.CarName} ({metadata.info.CarClass})
+              <strong>{t('tv.infoCar')}</strong> {metadata.info.CarName} ({metadata.info.CarClass})
             </div>
             <div>
-              <strong>Météo:</strong> {metadata.info.WeatherConditions}
+              <strong>{t('tv.infoWeather')}</strong> {metadata.info.WeatherConditions}
             </div>
             <div>
-              <strong>Session:</strong> {metadata.info.SessionType} @ {metadata.info.SessionTime}
+              <strong>{t('tv.infoSession')}</strong> {metadata.info.SessionType} @ {metadata.info.SessionTime}
             </div>
           </div>
         )}
 
         <label className="field">
-          Axe horizontal
+          {t('tv.xAxisLabel')}
           <div className="segmented">
             <button className={xAxisMode === 'time' ? 'active' : ''} onClick={() => setXAxisMode('time')}>
-              Temps
+              {t('tv.xAxisTime')}
             </button>
             <button
               className={xAxisMode === 'distance' ? 'active' : ''}
               disabled={selectedLap === 'full'}
-              title={selectedLap === 'full' ? 'Sélectionne un tour pour afficher en distance' : undefined}
+              title={selectedLap === 'full' ? t('tv.xAxisDistanceDisabledTooltip') : undefined}
               onClick={() => setXAxisMode('distance')}
             >
-              Distance
+              {t('tv.xAxisDistance')}
             </button>
           </div>
-          {selectedLap === 'full' && (
-            <span className="field-hint">
-              Distance indisponible en session complète (la distance repart à 0 à chaque tour — pas de sens sur
-              plusieurs tours à la fois). Sélectionne un tour.
-            </span>
-          )}
+          {selectedLap === 'full' && <span className="field-hint">{t('tv.xAxisDistanceHint')}</span>}
         </label>
 
         <label className="field">
-          Tour
+          {t('tv.lapLabel')}
           <select
             value={selectedLap}
             onChange={(e) => {
@@ -1022,13 +1019,13 @@ export default function TelemetryViewer() {
               if (value === 'full') setXAxisMode('time');
             }}
           >
-            <option value="full">Session complète</option>
+            <option value="full">{t('tv.fullSession')}</option>
             {laps.map((l) => {
-              const t = displayLapTime(l);
+              const lt = displayLapTime(l);
               return (
                 <option key={l.lap} value={l.lap}>
-                  Tour {l.lap} — {t.seconds.toFixed(3)}s{t.official ? '' : ' (invalide)'}
-                  {l.lap === fastestLap?.lap ? ' (meilleur tour)' : ''}
+                  {t('lap.number', { n: l.lap })} — {lt.seconds.toFixed(3)}s{lt.official ? '' : t('lap.invalidSuffix')}
+                  {l.lap === fastestLap?.lap ? t('lap.fastestSuffix') : ''}
                 </option>
               );
             })}
@@ -1036,7 +1033,7 @@ export default function TelemetryViewer() {
         </label>
 
         <div className="field">
-          Comparer avec
+          {t('tv.compareWith')}
 
           <label className="compare-source-toggle">
             <input
@@ -1049,7 +1046,7 @@ export default function TelemetryViewer() {
                 setCompareGuestFile(null);
               }}
             />
-            Comparer avec un autre fichier
+            {t('tv.compareWithOtherFile')}
           </label>
 
           {!compareSameFile && (
@@ -1062,7 +1059,7 @@ export default function TelemetryViewer() {
                   setCompareSelectedFile(e.target.value || null);
                 }}
               >
-                <option value="">— Choisir une session —</option>
+                <option value="">{t('tv.chooseSessionPlaceholder')}</option>
                 {sessions
                   .filter((s) => s.file !== selectedFile)
                   .map((s) => (
@@ -1077,10 +1074,10 @@ export default function TelemetryViewer() {
                 onClick={() => compareGuestFileInputRef.current?.click()}
               >
                 {compareGuestState.busy
-                  ? 'Chargement…'
+                  ? t('tv.guestLoading')
                   : compareGuestFile
                     ? compareGuestFile.name
-                    : 'Ou ouvrir un fichier local…'}
+                    : t('tv.orOpenLocalFile')}
               </button>
               <input
                 ref={compareGuestFileInputRef}
@@ -1099,8 +1096,7 @@ export default function TelemetryViewer() {
               {compareGuestState.error && <div className="upload-error">{compareGuestState.error}</div>}
               {trackMismatch && (
                 <div className="field-hint compare-warning">
-                  Circuits différents ({metadata?.info.TrackName} vs {compareMetadata?.info.TrackName}) — la
-                  comparaison peut ne pas être pertinente.
+                  {t('tv.trackMismatch', { track1: metadata?.info.TrackName, track2: compareMetadata?.info.TrackName })}
                 </div>
               )}
             </div>
@@ -1111,15 +1107,15 @@ export default function TelemetryViewer() {
             disabled={selectedLap === 'full' || (!compareSameFile && !compareDataSource)}
             onChange={(e) => setCompareLap(e.target.value === 'none' ? 'none' : Number(e.target.value))}
           >
-            <option value="none">Aucune comparaison</option>
+            <option value="none">{t('tv.noComparison')}</option>
             {compareLaps
               .filter((l) => (compareSameFile ? l.lap !== selectedLap : true))
               .map((l) => {
-                const t = displayLapTime(l);
+                const lt = displayLapTime(l);
                 return (
                   <option key={l.lap} value={l.lap}>
-                    Tour {l.lap} — {t.seconds.toFixed(3)}s{t.official ? '' : ' (invalide)'}
-                    {l.lap === compareFastestLap?.lap ? ' (meilleur tour)' : ''}
+                    {t('lap.number', { n: l.lap })} — {lt.seconds.toFixed(3)}s{lt.official ? '' : t('lap.invalidSuffix')}
+                    {l.lap === compareFastestLap?.lap ? t('lap.fastestSuffix') : ''}
                   </option>
                 );
               })}
@@ -1128,7 +1124,7 @@ export default function TelemetryViewer() {
 
         {layout.length > 0 && (
           <div className="field">
-            Canaux affichés (ordre des graphes)
+            {t('tv.channelsShown')}
             <div className="selected-list">
               {layout.map((item, i) => (
                 <div className={`selected-item${item.type === 'group' ? ' is-group' : ''}`} key={item.type === 'group' ? item.id : item.name}>
@@ -1138,7 +1134,7 @@ export default function TelemetryViewer() {
                         type="checkbox"
                         checked={validGroupSelection.has(item.name)}
                         onChange={() => toggleGroupSelection(item.name)}
-                        title="Sélectionner pour grouper"
+                        title={t('tv.selectToGroupTooltip')}
                       />
                       <span className="selected-name">{item.name}</span>
                     </>
@@ -1152,20 +1148,20 @@ export default function TelemetryViewer() {
                       <span className="group-members">{item.channels.join(' + ')}</span>
                     </>
                   )}
-                  <button disabled={i === 0} onClick={() => moveItem(i, -1)} title="Monter">
+                  <button disabled={i === 0} onClick={() => moveItem(i, -1)} title={t('tv.moveUp')}>
                     ↑
                   </button>
-                  <button disabled={i === layout.length - 1} onClick={() => moveItem(i, 1)} title="Descendre">
+                  <button disabled={i === layout.length - 1} onClick={() => moveItem(i, 1)} title={t('tv.moveDown')}>
                     ↓
                   </button>
                   {item.type === 'group' && (
-                    <button onClick={() => dissolveGroup(i)} title="Dégrouper">
+                    <button onClick={() => dissolveGroup(i)} title={t('tv.ungroup')}>
                       ⊟
                     </button>
                   )}
                   <button
                     onClick={() => (item.type === 'group' ? removeItem(i) : toggleChannel(item.name))}
-                    title="Retirer"
+                    title={t('tv.remove')}
                   >
                     ✕
                   </button>
@@ -1174,15 +1170,15 @@ export default function TelemetryViewer() {
             </div>
             {validGroupSelection.size >= 2 && (
               <button className="group-btn" onClick={groupSelected}>
-                Grouper ({validGroupSelection.size}) en un seul graphe
+                {t('tv.groupButton', { count: validGroupSelection.size })}
               </button>
             )}
           </div>
         )}
 
         <label className="field">
-          Ajouter un canal
-          <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="ex: tyre, brake..." />
+          {t('tv.addChannel')}
+          <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t('tv.addChannelPlaceholder')} />
         </label>
 
         <div className="channel-list">
@@ -1202,7 +1198,7 @@ export default function TelemetryViewer() {
       <button
         className="sidebar-toggle"
         onClick={() => setSidebarOpen((o) => !o)}
-        title={sidebarOpen ? 'Réduire le panneau' : 'Afficher le panneau'}
+        title={sidebarOpen ? t('tv.collapsePanel') : t('tv.showPanel')}
       >
         {sidebarOpen ? '‹' : '›'}
       </button>
@@ -1219,7 +1215,7 @@ export default function TelemetryViewer() {
               {seriesLoading && (
                 <div className="loading-overlay">
                   <span className="spinner" />
-                  Chargement des données…
+                  {t('tv.loadingData')}
                 </div>
               )}
               {lanes.map((lane, i) => (

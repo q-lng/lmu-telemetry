@@ -1,5 +1,6 @@
 import { useAuth } from '../AuthContext';
 import { logout } from '../api';
+import { t } from '../i18n';
 
 // Plain <a> tags everywhere in this navbar, deliberately — every navigation is a
 // real full-page load (like a normal website), not a client-side SPA transition
@@ -16,25 +17,25 @@ export function Navbar() {
   return (
     <nav className="navbar">
       <a href="/" className="navbar-brand">
-        LMU Telemetry
+        {t('brand')}
       </a>
       <div className="navbar-links">
         <a href="/" aria-current={path === '/' ? 'page' : undefined}>
-          Accueil
+          {t('nav.home')}
         </a>
         <a href="/telemetrie" aria-current={path === '/telemetrie' ? 'page' : undefined}>
-          Application
+          {t('nav.app')}
         </a>
         <a href="/parcourir" aria-current={path === '/parcourir' ? 'page' : undefined}>
-          Parcourir
+          {t('nav.browse')}
         </a>
         {user && (
           <>
             <a href="/amis" aria-current={path === '/amis' ? 'page' : undefined}>
-              Amis
+              {t('nav.friends')}
             </a>
             <a href="/mes-sessions" aria-current={path === '/mes-sessions' ? 'page' : undefined}>
-              Mes sessions
+              {t('nav.mySessions')}
             </a>
           </>
         )}
@@ -47,12 +48,12 @@ export function Navbar() {
               {user.pseudo}
             </a>
             <button className="navbar-logout" onClick={handleLogout}>
-              Déconnexion
+              {t('nav.logout')}
             </button>
           </div>
         ) : (
           <a href="/connexion" className="navbar-login" aria-current={path === '/connexion' ? 'page' : undefined}>
-            Connexion
+            {t('nav.login')}
           </a>
         )
       )}

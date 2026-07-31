@@ -34,3 +34,9 @@ export async function findUserIdBySessionToken(token: string): Promise<number | 
 export async function destroySession(token: string): Promise<void> {
   await pgQuery(`DELETE FROM auth_sessions WHERE token_hash = $1`, [hashToken(token)]);
 }
+
+/** Invalidates every session for a user — used after a password reset, so a
+ * previously stolen/leaked session cookie doesn't survive it. */
+export async function destroyAllSessionsForUser(userId: number): Promise<void> {
+  await pgQuery(`DELETE FROM auth_sessions WHERE user_id = $1`, [userId]);
+}

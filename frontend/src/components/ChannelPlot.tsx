@@ -3,6 +3,7 @@ import type { MouseEvent as ReactMouseEvent } from 'react';
 import uPlot from 'uplot';
 import type { Lane } from '../types';
 import { CHART_CHROME, COMPARE_COLOR } from '../palette';
+import { t } from '../i18n';
 
 function formatTime(s: number): string {
   const sign = s < 0 ? '-' : '';
@@ -208,7 +209,7 @@ export function ChannelPlot({
         if (!compareValues) return;
         data.push(compareValues);
         seriesOpts.push({
-          label: `${columnStyles[i].label} (tour comparé)`,
+          label: `${columnStyles[i].label}${t('channelPlot.comparedSuffix')}`,
           // a single-channel lane uses a fixed neutral hue so the ghost trace never
           // disappears into the primary; a grouped lane already has one color per
           // member, so reuse that instead — a second neutral trace couldn't be told
@@ -323,7 +324,7 @@ export function ChannelPlot({
     <div className="lane" style={{ flexGrow: weight }}>
       <div className="lane-label">{lane.label}</div>
       <div ref={containerRef} className="lane-canvas" />
-      <div className="lane-resize-handle" onMouseDown={handleResizeStart} title="Redimensionner" />
+      <div className="lane-resize-handle" onMouseDown={handleResizeStart} title={t('channelPlot.resize')} />
     </div>
   );
 }

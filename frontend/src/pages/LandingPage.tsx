@@ -1,37 +1,27 @@
-const FEATURES = [
-  {
-    title: 'Canaux synchronisés',
-    text: 'Tous les canaux de télémétrie superposés sur un curseur temporel commun, façon MoTeC i2.',
-  },
-  {
-    title: 'Carte du circuit',
-    text: 'Position GPS en direct, avec la portion de piste actuellement affichée dans les graphes mise en évidence.',
-  },
-  {
-    title: 'Comparaison de tours',
-    text: 'Superposez deux tours, ou deux fichiers de session, pour comparer vos lignes et vos réglages.',
-  },
-  {
-    title: 'Mode invité sans upload',
-    text: "Chargez un fichier .duckdb directement dans le navigateur — rien n'est envoyé au serveur.",
-  },
-];
+import { t } from '../i18n';
+
+const FEATURE_KEYS = [
+  { title: 'landing.features.0.title', text: 'landing.features.0.text' },
+  { title: 'landing.features.1.title', text: 'landing.features.1.text' },
+  { title: 'landing.features.2.title', text: 'landing.features.2.text' },
+  { title: 'landing.features.3.title', text: 'landing.features.3.text' },
+] as const;
 
 export function LandingPage() {
   return (
     <div className="landing">
       <section className="landing-hero">
-        <h1>Télémétrie Le Mans Ultimate, façon MoTeC i2</h1>
-        <p>Ouvrez vos sessions .duckdb, visualisez tous les canaux, comparez vos tours.</p>
+        <h1>{t('landing.heroTitle')}</h1>
+        <p>{t('landing.heroSubtitle')}</p>
         <a href="/telemetrie" className="landing-cta">
-          Ouvrir l'application
+          {t('landing.cta')}
         </a>
       </section>
       <section className="landing-features">
-        {FEATURES.map((f) => (
+        {FEATURE_KEYS.map((f) => (
           <article key={f.title} className="landing-feature-card">
-            <h3>{f.title}</h3>
-            <p>{f.text}</p>
+            <h3>{t(f.title)}</h3>
+            <p>{t(f.text)}</p>
           </article>
         ))}
       </section>
