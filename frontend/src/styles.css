@@ -1333,18 +1333,16 @@ body {
   border-top-style: dashed;
 }
 
+/* Single fixed-height line, truncated with ellipsis rather than wrapped —
+   wrapping wasted horizontal space and, worse, changed row height depending
+   on the exact numbers at that instant, making the whole table visibly jump
+   vertically while scrubbing the cursor. Value and delta stay on the same
+   line (not stacked) so every row is always exactly one line tall, never
+   forcing the box to scroll. */
 .legend-value-cell {
   color: var(--primary-ink);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-}
-
-/* Fixed single-line height, truncated with ellipsis rather than wrapped —
-   letting long values wrap wasted horizontal space and, worse, changed row
-   height depending on the exact numbers at that instant, making the whole
-   table visibly jump vertically while scrubbing the cursor. */
-.legend-value-line {
-  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1357,10 +1355,6 @@ body {
 }
 
 .legend-delta {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   font-size: 10px;
