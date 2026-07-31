@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Navigate } from 'react-router-dom';
 import { login, signup } from '../api';
 import { useAuth } from '../AuthContext';
 
@@ -24,7 +23,7 @@ function EyeIcon({ off }: { off: boolean }) {
 }
 
 export function Connexion() {
-  const { user, setUser } = useAuth();
+  const { user } = useAuth();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,18 +34,23 @@ export function Connexion() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  if (user) return <Navigate to="/app" replace />;
+  // Full page navigation (not a client-side redirect) — the fresh load of
+  // /telemetrie re-fetches auth state itself, no need to carry it over via context.
+  useEffect(() => {
+    if (user) window.location.replace('/telemetrie');
+  }, [user]);
+
+  if (user) return null;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
     try {
-      const u = mode === 'login' ? await login({ email, password }) : await signup({ email, pseudo, nom, prenom, password });
-      setUser(u);
+      mode === 'login' ? await login({ email, password }) : await signup({ email, pseudo, nom, prenom, password });
+      window.location.href = '/telemetrie';
     } catch (err) {
       setError((err as Error).message);
-    } finally {
       setSubmitting(false);
     }
   }

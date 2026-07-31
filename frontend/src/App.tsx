@@ -1,5 +1,5 @@
-import { lazy } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { lazy, useEffect } from 'react';
+import { Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { RequireAuth } from './components/RequireAuth';
 
@@ -12,12 +12,21 @@ const TelemetryViewer = lazy(() => import('./pages/TelemetryViewer'));
 const Social = lazy(() => import('./pages/Social').then((m) => ({ default: m.Social })));
 const Profile = lazy(() => import('./pages/Profile').then((m) => ({ default: m.Profile })));
 
+function NotFoundRedirect() {
+  // Full page navigation, not a client-side redirect — consistent with the rest
+  // of the app's real-website-style navigation.
+  useEffect(() => {
+    window.location.replace('/');
+  }, []);
+  return null;
+}
+
 export default function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<LandingPage />} />
-        <Route path="app" element={<TelemetryViewer />} />
+        <Route path="telemetrie" element={<TelemetryViewer />} />
         <Route path="connexion" element={<Connexion />} />
         <Route
           path="amis"
@@ -35,7 +44,7 @@ export default function App() {
             </RequireAuth>
           }
         />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFoundRedirect />} />
       </Route>
     </Routes>
   );

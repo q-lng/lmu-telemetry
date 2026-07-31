@@ -1,5 +1,3 @@
-import { Link } from 'react-router-dom';
-
 const FEATURES = [
   {
     title: 'Canaux synchronisés',
@@ -25,9 +23,9 @@ export function LandingPage() {
       <section className="landing-hero">
         <h1>Télémétrie Le Mans Ultimate, façon MoTeC i2</h1>
         <p>Ouvrez vos sessions .duckdb, visualisez tous les canaux, comparez vos tours.</p>
-        <Link to="/app" className="landing-cta">
+        <a href="/telemetrie" className="landing-cta">
           Ouvrir l'application
-        </Link>
+        </a>
       </section>
       <section className="landing-features">
         {FEATURES.map((f) => (

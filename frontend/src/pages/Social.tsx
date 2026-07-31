@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
   acceptFriendRequest,
   declineFriendRequest,
@@ -107,9 +106,9 @@ export function Social() {
               )}
               {results.map((r) => (
                 <div className="user-row" key={r.id}>
-                  <Link to={`/u/${encodeURIComponent(r.pseudo)}`} className="user-row-name">
+                  <a href={`/u/${encodeURIComponent(r.pseudo)}`} className="user-row-name">
                     {r.pseudo} <span className="user-row-fullname">{r.prenom} {r.nom}</span>
-                  </Link>
+                  </a>
                   <RelationActions profile={r} onChange={bump} />
                 </div>
               ))}
@@ -123,9 +122,9 @@ export function Social() {
               {friends.length === 0 && <div className="social-empty">Pas encore d'amis.</div>}
               {friends.map((u) => (
                 <div className="user-row" key={u.id}>
-                  <Link to={`/u/${encodeURIComponent(u.pseudo)}`} className="user-row-name">
+                  <a href={`/u/${encodeURIComponent(u.pseudo)}`} className="user-row-name">
                     {u.pseudo} <span className="user-row-fullname">{u.prenom} {u.nom}</span>
-                  </Link>
+                  </a>
                   <div className="user-row-actions">
                     <button onClick={() => removeFriend(u.id).then(bump)}>Retirer</button>
                   </div>
@@ -142,9 +141,9 @@ export function Social() {
               {requests.incoming.length === 0 && <div className="social-empty">Aucune demande reçue.</div>}
               {requests.incoming.map((r) => (
                 <div className="user-row" key={r.id}>
-                  <Link to={`/u/${encodeURIComponent(r.user.pseudo)}`} className="user-row-name">
+                  <a href={`/u/${encodeURIComponent(r.user.pseudo)}`} className="user-row-name">
                     {r.user.pseudo}
-                  </Link>
+                  </a>
                   <div className="user-row-actions">
                     <button className="relation-accept" onClick={() => acceptFriendRequest(r.id).then(bump)}>
                       Accepter
@@ -160,9 +159,9 @@ export function Social() {
               {requests.outgoing.length === 0 && <div className="social-empty">Aucune demande envoyée.</div>}
               {requests.outgoing.map((r) => (
                 <div className="user-row" key={r.id}>
-                  <Link to={`/u/${encodeURIComponent(r.user.pseudo)}`} className="user-row-name">
+                  <a href={`/u/${encodeURIComponent(r.user.pseudo)}`} className="user-row-name">
                     {r.user.pseudo}
-                  </Link>
+                  </a>
                   <div className="user-row-actions">
                     <button onClick={() => declineFriendRequest(r.id).then(bump)}>Annuler</button>
                   </div>
@@ -179,9 +178,9 @@ export function Social() {
               {following.length === 0 && <div className="social-empty">Tu ne suis personne.</div>}
               {following.map((u) => (
                 <div className="user-row" key={u.id}>
-                  <Link to={`/u/${encodeURIComponent(u.pseudo)}`} className="user-row-name">
+                  <a href={`/u/${encodeURIComponent(u.pseudo)}`} className="user-row-name">
                     {u.pseudo}
-                  </Link>
+                  </a>
                   <div className="user-row-actions">
                     <button onClick={() => unfollowUser(u.pseudo).then(bump)}>Ne plus suivre</button>
                   </div>
@@ -194,9 +193,9 @@ export function Social() {
               {followers.length === 0 && <div className="social-empty">Personne ne te suit encore.</div>}
               {followers.map((u) => (
                 <div className="user-row" key={u.id}>
-                  <Link to={`/u/${encodeURIComponent(u.pseudo)}`} className="user-row-name">
+                  <a href={`/u/${encodeURIComponent(u.pseudo)}`} className="user-row-name">
                     {u.pseudo}
-                  </Link>
+                  </a>
                   {!followingIds.has(u.id) && (
                     <div className="user-row-actions">
                       <button onClick={() => followUser(u.pseudo).then(bump)}>Suivre en retour</button>

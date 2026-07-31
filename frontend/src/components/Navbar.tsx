@@ -1,44 +1,51 @@
-import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { logout } from '../api';
 import { useAuth } from '../AuthContext';
+import { logout } from '../api';
 
+// Plain <a> tags everywhere in this navbar, deliberately — every navigation is a
+// real full-page load (like a normal website), not a client-side SPA transition
+// that keeps the whole app instance and its state alive across pages.
 export function Navbar() {
-  const { user, loading, setUser } = useAuth();
-  const navigate = useNavigate();
+  const { user, loading } = useAuth();
+  const path = window.location.pathname;
 
   async function handleLogout() {
     await logout();
-    setUser(null);
-    navigate('/');
+    window.location.href = '/';
   }
 
   return (
     <nav className="navbar">
-      <Link to="/" className="navbar-brand">
+      <a href="/" className="navbar-brand">
         LMU Telemetry
-      </Link>
+      </a>
       <div className="navbar-links">
-        <NavLink to="/" end>
+        <a href="/" aria-current={path === '/' ? 'page' : undefined}>
           Accueil
-        </NavLink>
-        <NavLink to="/app">Application</NavLink>
-        {user && <NavLink to="/amis">Amis</NavLink>}
+        </a>
+        <a href="/telemetrie" aria-current={path === '/telemetrie' ? 'page' : undefined}>
+          Application
+        </a>
+        {user && (
+          <a href="/amis" aria-current={path === '/amis' ? 'page' : undefined}>
+            Amis
+          </a>
+        )}
       </div>
       <div className="navbar-spacer" />
       {!loading && (
         user ? (
           <div className="navbar-account">
-            <Link to={`/u/${encodeURIComponent(user.pseudo)}`} className="navbar-user">
+            <a href={`/u/${encodeURIComponent(user.pseudo)}`} className="navbar-user">
               {user.pseudo}
-            </Link>
+            </a>
             <button className="navbar-logout" onClick={handleLogout}>
               Déconnexion
             </button>
           </div>
         ) : (
-          <NavLink to="/connexion" className="navbar-login">
+          <a href="/connexion" className="navbar-login" aria-current={path === '/connexion' ? 'page' : undefined}>
             Connexion
-          </NavLink>
+          </a>
         )
       )}
     </nav>
