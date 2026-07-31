@@ -14,6 +14,7 @@ import {
 import type { FriendRequestSummary, ProfileSummary, PublicUser } from '../types';
 import { RelationActions } from '../components/RelationActions';
 import { t } from '../i18n';
+import { useAuth } from '../AuthContext';
 
 type Tab = 'search' | 'friends' | 'requests' | 'follows';
 
@@ -25,9 +26,14 @@ const TABS: { key: Tab; labelKey: 'social.tabSearch' | 'social.tabFriends' | 'so
 ];
 
 export function Social() {
+  const { refreshFriendRequests } = useAuth();
   const [tab, setTab] = useState<Tab>('search');
   const [refreshKey, setRefreshKey] = useState(0);
   const bump = () => setRefreshKey((k) => k + 1);
+  const bumpAndRefreshRequests = () => {
+    bump();
+    refreshFriendRequests();
+  };
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ProfileSummary[]>([]);
@@ -146,10 +152,10 @@ export function Social() {
                     {r.user.pseudo}
                   </a>
                   <div className="user-row-actions">
-                    <button className="relation-accept" onClick={() => acceptFriendRequest(r.id).then(bump)}>
+                    <button className="relation-accept" onClick={() => acceptFriendRequest(r.id).then(bumpAndRefreshRequests)}>
                       {t('friends.accept')}
                     </button>
-                    <button onClick={() => declineFriendRequest(r.id).then(bump)}>{t('friends.decline')}</button>
+                    <button onClick={() => declineFriendRequest(r.id).then(bumpAndRefreshRequests)}>{t('friends.decline')}</button>
                   </div>
                 </div>
               ))}

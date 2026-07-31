@@ -9,6 +9,7 @@ import {
 } from '../api';
 import type { ProfileSummary } from '../types';
 import { t } from '../i18n';
+import { useAuth } from '../AuthContext';
 
 interface Props {
   profile: ProfileSummary;
@@ -20,6 +21,7 @@ interface Props {
 export function RelationActions({ profile, onChange }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { refreshFriendRequests } = useAuth();
 
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
@@ -27,6 +29,7 @@ export function RelationActions({ profile, onChange }: Props) {
     try {
       await action();
       onChange();
+      refreshFriendRequests();
     } catch (err) {
       setError((err as Error).message);
     } finally {

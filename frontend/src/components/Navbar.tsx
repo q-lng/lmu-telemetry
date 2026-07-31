@@ -6,7 +6,7 @@ import { t } from '../i18n';
 // real full-page load (like a normal website), not a client-side SPA transition
 // that keeps the whole app instance and its state alive across pages.
 export function Navbar() {
-  const { user, loading } = useAuth();
+  const { user, loading, pendingFriendRequests } = useAuth();
   const path = window.location.pathname;
 
   async function handleLogout() {
@@ -31,8 +31,9 @@ export function Navbar() {
         </a>
         {user && (
           <>
-            <a href="/amis" aria-current={path === '/amis' ? 'page' : undefined}>
+            <a href="/amis" aria-current={path === '/amis' ? 'page' : undefined} className="navbar-link-with-badge">
               {t('nav.friends')}
+              {pendingFriendRequests > 0 && <span className="navbar-badge">{pendingFriendRequests}</span>}
             </a>
             <a href="/mes-sessions" aria-current={path === '/mes-sessions' ? 'page' : undefined}>
               {t('nav.mySessions')}
