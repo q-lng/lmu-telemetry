@@ -21,7 +21,16 @@ export function SharedLap() {
   const [seriesByName, setSeriesByName] = useState<Record<string, ChannelSeries>>({});
   const [gps, setGps] = useState<{ t: number[]; lat: number[]; lon: number[] } | null>(null);
   const [cursorT, setCursorT] = useState<number | null>(null);
+  const [cursorLocked, setCursorLocked] = useState(false);
   const [viewRange, setViewRange] = useState<{ min: number; max: number } | null>(null);
+
+  function handleGraphClick(value: number) {
+    setCursorLocked((prevLocked) => {
+      if (prevLocked) return false;
+      setCursorT(value);
+      return true;
+    });
+  }
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -145,6 +154,12 @@ export function SharedLap() {
 
       {gps && <TrackMap lat={gps.lat} lon={gps.lon} t={gps.t} cursorT={cursorT} viewRange={viewRange} height={260} />}
 
+      {cursorLocked && (
+        <button className="cursor-lock-hint" onClick={() => setCursorLocked(false)}>
+          {t('tv.cursorLockedHint')}
+        </button>
+      )}
+
       <TelemetryLegend lanes={lanes} cursorT={cursorT} comparedLapColumns={[]} />
 
       <div className="telemetry-block shared-lap-graphs">
@@ -156,7 +171,10 @@ export function SharedLap() {
             showXAxis={i === lanes.length - 1}
             xAxisMode="time"
             weight={1}
+            cursorT={cursorT}
+            cursorLocked={cursorLocked}
             onCursorMove={setCursorT}
+            onCursorClick={handleGraphClick}
             onViewRangeChange={setViewRange}
           />
         ))}

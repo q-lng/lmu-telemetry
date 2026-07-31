@@ -1443,6 +1443,21 @@ body {
 .lane-canvas {
   flex: 1;
   min-height: 0;
+  cursor: crosshair;
+}
+
+.cursor-lock-hint {
+  display: block;
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  color: var(--primary-ink);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  margin-bottom: 8px;
+  font-size: 11px;
+  cursor: pointer;
+  text-align: left;
 }
 
 .lane-label {

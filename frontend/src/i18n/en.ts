@@ -193,6 +193,7 @@ export const en = {
   'tv.collapsePanel': 'Collapse the panel',
   'tv.showPanel': 'Show the panel',
   'tv.loadingData': 'Loading data…',
+  'tv.cursorLockedHint': 'Cursor locked — click a graph or here to release',
   'tv.defaultGroupPedals': 'Pedals',
 
   'errors.INVALID_REQUEST': 'Invalid request',

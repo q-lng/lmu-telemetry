@@ -297,6 +297,19 @@ export default function TelemetryViewer() {
   const [distRef, setDistRef] = useState<ChannelSeries | null>(null);
   const [gps, setGps] = useState<{ t: number[]; lat: number[]; lon: number[] } | null>(null);
   const [cursorT, setCursorT] = useState<number | null>(null);
+  // Click-to-freeze: a click on any graph pins the cursor there so the legend/
+  // in-graph values/track map keep showing that point after the mouse moves
+  // away; clicking again anywhere unlocks. Uses the updater form of setState so
+  // this stays correct even called from a stale closure captured by ChannelPlot's
+  // uPlot-rebuild effect (see cursorLockRef there).
+  const [cursorLocked, setCursorLocked] = useState(false);
+  function handleGraphClick(value: number) {
+    setCursorLocked((prevLocked) => {
+      if (prevLocked) return false;
+      setCursorT(value);
+      return true;
+    });
+  }
   const [viewRange, setViewRange] = useState<{ min: number; max: number } | null>(null);
   const [uploadState, setUploadState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
   const [laneWeights, setLaneWeights] = useState<Record<string, number>>(INITIAL_LANE_WEIGHTS);
@@ -966,8 +979,10 @@ export default function TelemetryViewer() {
         xAxisMode={effectiveXAxisMode}
         weight={laneWeights[lane.key] ?? LANE_SIZE.medium}
         cursorT={cursorT}
+        cursorLocked={cursorLocked}
         onWeightChange={setLaneWeight}
         onCursorMove={setCursorT}
+        onCursorClick={handleGraphClick}
         onViewRangeChange={setViewRange}
       />
     );
@@ -1499,6 +1514,11 @@ export default function TelemetryViewer() {
         <div className="content-row">
           <div className="map-column">
             {gps && <TrackMap lat={gps.lat} lon={gps.lon} t={gpsX} cursorT={cursorT} viewRange={viewRange} height={340} />}
+            {cursorLocked && (
+              <button className="cursor-lock-hint" onClick={() => setCursorLocked(false)}>
+                {t('tv.cursorLockedHint')}
+              </button>
+            )}
             <TelemetryLegend lanes={lanes} cursorT={cursorT} comparedLapColumns={comparedLapColumns} />
           </div>
 

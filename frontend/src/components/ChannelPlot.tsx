@@ -61,14 +61,18 @@ function computeFixedYRange(data: (number | null)[][]): [number, number] {
 }
 
 const ZOOM_FACTOR = 0.85;
+// Below this much horizontal movement, a mousedown+mouseup counts as a click
+// (freeze the cursor there) rather than a pan drag.
+const CLICK_MOVE_THRESHOLD = 4;
 
 /** Wheel-to-zoom (centered on cursor) + click-drag-to-pan on the x scale, applied
  * to every lane sharing `syncKey` — `cursor.sync.scales` only syncs uPlot's own
  * native cursor/drag interactions, not externally-invoked `setScale()` calls, so
  * the resulting range is pushed by hand to every plot in `uPlot.sync(syncKey)`.
  * Bounds are taken from the actual x data (not `u.scales.x`, which reflects the
- * current — possibly already zoomed — view and can lag right after construction). */
-function attachZoomPan(u: uPlot, syncKey: string): () => void {
+ * current — possibly already zoomed — view and can lag right after construction).
+ * `onClickAt` fires instead of a pan when the mouse barely moved between down/up. */
+function attachZoomPan(u: uPlot, syncKey: string, onClickAt?: (value: number) => void): () => void {
   const over = u.over;
   const xs = u.data[0] as number[];
   const fullMin = xs[0];
@@ -143,6 +147,9 @@ function attachZoomPan(u: uPlot, syncKey: string): () => void {
         const v1 = u.posToVal(x1, 'x');
         applyScale(Math.min(v0, v1), Math.max(v0, v1));
       }
+    } else if (dragMode === 'pan' && onClickAt && Math.abs(e.clientX - dragStartX) < CLICK_MOVE_THRESHOLD) {
+      const rect = over.getBoundingClientRect();
+      onClickAt(u.posToVal(e.clientX - rect.left, 'x'));
     }
     dragMode = null;
   }
@@ -185,8 +192,13 @@ interface Props {
    * label — deliberately NOT in the uPlot-rebuild effect's dependency array below,
    * so a mousemove re-renders just this label text, never tears down the chart. */
   cursorT?: number | null;
+  /** When true, the cursor is pinned at `cursorT` (click-to-freeze) — the crosshair
+   * is forced back there on every mousemove instead of following the mouse. */
+  cursorLocked?: boolean;
   onWeightChange?: (key: string, weight: number) => void;
   onCursorMove?: (t: number | null) => void;
+  /** Fires on a genuine click (not a pan drag) with the clicked x-value. */
+  onCursorClick?: (t: number) => void;
   onViewRangeChange?: (range: { min: number; max: number }) => void;
 }
 
@@ -197,12 +209,21 @@ export function ChannelPlot({
   xAxisMode,
   weight,
   cursorT,
+  cursorLocked,
   onWeightChange,
   onCursorMove,
+  onCursorClick,
   onViewRangeChange,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const plotRef = useRef<uPlot | null>(null);
+  // Read fresh inside the setCursor hook below (which is only rebuilt when `lane`
+  // changes, not on every cursor tick) — a plain closure over cursorT/cursorLocked
+  // would go stale the moment the user moves the mouse after locking.
+  const cursorLockRef = useRef<{ locked: boolean; value: number | null }>({ locked: false, value: null });
+  useEffect(() => {
+    cursorLockRef.current = { locked: !!cursorLocked, value: cursorT ?? null };
+  }, [cursorLocked, cursorT]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -269,6 +290,16 @@ export function ChannelPlot({
       hooks: {
         setCursor: [
           (u) => {
+            const lock = cursorLockRef.current;
+            if (lock.locked && lock.value != null) {
+              // Recomputed from the locked data value every time (not a fixed pixel)
+              // so it stays correctly placed across pan/zoom while locked.
+              const lockedLeft = u.valToPos(lock.value, 'x');
+              if (Math.abs((u.cursor.left ?? -1000) - lockedLeft) > 0.5) {
+                u.setCursor({ left: lockedLeft, top: u.cursor.top ?? 0 });
+                return; // this setCursor call re-enters the hook with the corrected position
+              }
+            }
             if (!onCursorMove) return;
             const idx = u.cursor.idx;
             onCursorMove(idx == null ? null : (u.data[0][idx] as number));
@@ -289,7 +320,7 @@ export function ChannelPlot({
 
     const plot = new uPlot(opts, data as uPlot.AlignedData, containerRef.current);
     plotRef.current = plot;
-    const detachZoomPan = attachZoomPan(plot, syncKey);
+    const detachZoomPan = attachZoomPan(plot, syncKey, onCursorClick);
 
     if (showXAxis && onViewRangeChange && plot.scales.x.min != null && plot.scales.x.max != null) {
       onViewRangeChange({ min: plot.scales.x.min, max: plot.scales.x.max });
