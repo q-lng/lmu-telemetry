@@ -92,4 +92,7 @@ export const CHART_CHROME = {
   mutedInk: '#898781',
   gridline: '#2c2c2a',
   axis: '#383835',
+  // Matches --accent — the persistent marker for a click-locked cursor
+  // position, deliberately distinct from the live hover crosshair.
+  lockedCursor: '#e5484d',
 };

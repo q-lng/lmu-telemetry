@@ -1446,6 +1446,18 @@ body {
   cursor: crosshair;
 }
 
+/* uPlot's default hover crosshair (uPlot.min.css: 1px dashed #607D8B) is too
+   subtle against the dark theme — brighter and slightly thicker here. */
+.lane-canvas .u-cursor-x {
+  border-right: 1.5px dashed var(--primary-ink) !important;
+  opacity: 0.7;
+}
+
+.lane-canvas .u-cursor-y {
+  border-bottom: 1.5px dashed var(--primary-ink) !important;
+  opacity: 0.5;
+}
+
 .cursor-lock-hint {
   display: block;
   width: 100%;

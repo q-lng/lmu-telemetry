@@ -217,12 +217,23 @@ export function ChannelPlot({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const plotRef = useRef<uPlot | null>(null);
-  // Read fresh inside the setCursor hook below (which is only rebuilt when `lane`
-  // changes, not on every cursor tick) — a plain closure over cursorT/cursorLocked
-  // would go stale the moment the user moves the mouse after locking.
+  // Read fresh inside the setCursor/draw hooks below (which are only rebuilt when
+  // `lane` changes, not on every cursor tick) — a plain closure over cursorT/
+  // cursorLocked would go stale the moment the user moves the mouse after locking.
   const cursorLockRef = useRef<{ locked: boolean; value: number | null }>({ locked: false, value: null });
+  // uPlot's own crosshair keeps following the mouse while locked (see the
+  // setCursor hook below) — only actual chart redraws repaint the canvas, so
+  // locking/unlocking needs to explicitly trigger one to show/hide our own
+  // persistent line for the locked position. Tracked separately from the ref
+  // update above so a plain hover (cursorT changing while NOT locked) never
+  // forces a full redraw — only an actual lock/unlock transition does.
+  const wasLockedRef = useRef(false);
   useEffect(() => {
     cursorLockRef.current = { locked: !!cursorLocked, value: cursorT ?? null };
+    if (wasLockedRef.current !== !!cursorLocked) {
+      wasLockedRef.current = !!cursorLocked;
+      plotRef.current?.redraw();
+    }
   }, [cursorLocked, cursorT]);
 
   useEffect(() => {
@@ -312,6 +323,30 @@ export function ChannelPlot({
             if (!showXAxis || key !== 'x' || !onViewRangeChange) return;
             const { min, max } = u.scales.x;
             if (min != null && max != null) onViewRangeChange({ min, max });
+          },
+        ],
+        // uPlot's native crosshair (a DOM overlay) keeps following the mouse even
+        // while locked — this paints our own persistent marker for the locked
+        // position directly on the canvas instead, distinct in color/width from
+        // the live hover crosshair. `draw` only fires on actual chart redraws
+        // (data/scale/size changes, or our own explicit redraw() call above), not
+        // on every mousemove, so this never runs at hover frequency.
+        draw: [
+          (u) => {
+            const lock = cursorLockRef.current;
+            if (!lock.locked || lock.value == null) return;
+            const x = u.valToPos(lock.value, 'x', true);
+            if (x < u.bbox.left || x > u.bbox.left + u.bbox.width) return;
+            const ctx = u.ctx;
+            ctx.save();
+            ctx.strokeStyle = CHART_CHROME.lockedCursor;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 4]);
+            ctx.beginPath();
+            ctx.moveTo(x, u.bbox.top);
+            ctx.lineTo(x, u.bbox.top + u.bbox.height);
+            ctx.stroke();
+            ctx.restore();
           },
         ],
       },
