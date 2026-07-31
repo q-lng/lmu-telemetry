@@ -519,6 +519,57 @@ body {
   padding: 8px 0;
 }
 
+.user-row select,
+.mes-sessions-lap-row select {
+  background: var(--surface-1);
+  color: var(--primary-ink);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.mes-sessions-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mes-sessions-name {
+  background: none;
+  border: none;
+  color: var(--primary-ink);
+  font-weight: 600;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+
+.mes-sessions-name:hover {
+  text-decoration: underline;
+}
+
+.mes-sessions-laps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 12px;
+  margin: 0 0 4px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+
+.mes-sessions-lap-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+  color: var(--secondary-ink);
+  padding: 3px 0;
+}
+
 .social-search-form {
   display: flex;
   gap: 8px;
@@ -1231,4 +1282,34 @@ body {
   background: var(--accent-ring) !important;
   border-left: 1px solid var(--accent);
   border-right: 1px solid var(--accent);
+}
+
+/* ---- Shared lap (minimal read-only view) ---- */
+
+.shared-lap-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 24px;
+}
+
+.shared-lap-header {
+  margin-bottom: 16px;
+}
+
+.shared-lap-header h1 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--primary-ink);
+  margin: 0 0 4px;
+}
+
+.shared-lap-header p {
+  color: var(--secondary-ink);
+  font-size: 13px;
+  margin: 0;
+}
+
+.shared-lap-graphs {
+  height: 420px;
+  margin-top: 12px;
 }

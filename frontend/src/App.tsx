@@ -11,6 +11,9 @@ const Connexion = lazy(() => import('./pages/Connexion').then((m) => ({ default:
 const TelemetryViewer = lazy(() => import('./pages/TelemetryViewer'));
 const Social = lazy(() => import('./pages/Social').then((m) => ({ default: m.Social })));
 const Profile = lazy(() => import('./pages/Profile').then((m) => ({ default: m.Profile })));
+const MesSessions = lazy(() => import('./pages/MesSessions').then((m) => ({ default: m.MesSessions })));
+const Browse = lazy(() => import('./pages/Browse').then((m) => ({ default: m.Browse })));
+const SharedLap = lazy(() => import('./pages/SharedLap').then((m) => ({ default: m.SharedLap })));
 
 function NotFoundRedirect() {
   // Full page navigation, not a client-side redirect — consistent with the rest
@@ -28,6 +31,8 @@ export default function App() {
         <Route index element={<LandingPage />} />
         <Route path="telemetrie" element={<TelemetryViewer />} />
         <Route path="connexion" element={<Connexion />} />
+        <Route path="parcourir" element={<Browse />} />
+        <Route path="partage/:file/:lap" element={<SharedLap />} />
         <Route
           path="amis"
           element={
@@ -41,6 +46,14 @@ export default function App() {
           element={
             <RequireAuth>
               <Profile />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="mes-sessions"
+          element={
+            <RequireAuth>
+              <MesSessions />
             </RequireAuth>
           }
         />

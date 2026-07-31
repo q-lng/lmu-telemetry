@@ -1,13 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TouchEvent as ReactTouchEvent } from 'react';
-import { fetchSessions, uploadSession } from '../api';
-import type { ChannelDescriptor, ChannelSeries, CompareSeries, Lane, LapInfo, SessionMetadata, SessionSummary } from '../types';
+import { fetchSessions, setFileVisibility, setLapVisibility, uploadSession } from '../api';
+import type {
+  ChannelDescriptor,
+  ChannelSeries,
+  CompareSeries,
+  Lane,
+  LapInfo,
+  LapVisibility,
+  SessionMetadata,
+  SessionSummary,
+} from '../types';
 import { createServerDataSource, createWasmDataSource, type DataSource } from '../dataSource';
 import { ChannelPlot } from '../components/ChannelPlot';
 import { TrackMap } from '../components/TrackMap';
 import { TelemetryLegend } from '../components/TelemetryLegend';
 import { channelColor, CORNER_STYLE } from '../palette';
 import { resampleContinuous, resampleStep } from '../resample';
+import { useAuth } from '../AuthContext';
 
 interface ChannelLayoutItem {
   type: 'channel';
@@ -210,12 +220,24 @@ function savePresets(presets: Record<string, DisplayPreset>) {
 }
 
 export default function TelemetryViewer() {
+  const { user } = useAuth();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   // Guest mode: a .duckdb file opened straight in the browser via DuckDB-WASM —
   // no upload, no server round-trip at all. Picking a server session clears it.
   const [guestFile, setGuestFile] = useState<File | null>(null);
   const [guestState, setGuestState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
+  // "Publier" turns a guest file into a real server upload at the exact moment the
+  // user asks for it — guest mode's whole point (no server round-trip) stops there,
+  // not before, since "public"/"friends" visibility is meaningless without the
+  // server actually having the data to serve to others.
+  const [publishVisibility, setPublishVisibility] = useState<LapVisibility>('public');
+  const [publishScope, setPublishScope] = useState<'file' | 'lap'>('file');
+  const [publishState, setPublishState] = useState<{ busy: boolean; error: string | null; done: boolean }>({
+    busy: false,
+    error: null,
+    done: false,
+  });
   const [dataSource, setDataSource] = useState<DataSource | null>(null);
   const [metadata, setMetadata] = useState<SessionMetadata | null>(null);
   const [channels, setChannels] = useState<ChannelDescriptor[]>([]);
@@ -314,7 +336,9 @@ export default function TelemetryViewer() {
   }
 
   useEffect(() => {
-    reloadSessions();
+    // Lets a link from the search page (?file=...) open directly on that session.
+    const params = new URLSearchParams(window.location.search);
+    reloadSessions(params.get('file') ?? undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -693,6 +717,22 @@ export default function TelemetryViewer() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
+  async function handlePublish() {
+    if (!guestFile) return;
+    setPublishState({ busy: true, error: null, done: false });
+    try {
+      const { file: savedName } = await uploadSession(guestFile);
+      if (publishScope === 'lap' && selectedLap !== 'full') {
+        await setLapVisibility(savedName, selectedLap, publishVisibility);
+      } else {
+        await setFileVisibility(savedName, publishVisibility);
+      }
+      setPublishState({ busy: false, error: null, done: true });
+    } catch (err) {
+      setPublishState({ busy: false, error: (err as Error).message, done: false });
+    }
+  }
+
   function setLaneWeight(key: string, weight: number) {
     setLaneWeights((prev) => ({ ...prev, [key]: weight }));
   }
@@ -860,6 +900,41 @@ export default function TelemetryViewer() {
           />
           {guestState.error && <div className="upload-error">{guestState.error}</div>}
         </div>
+
+        {guestFile && user && (
+          <div className="field">
+            Publier cette session
+            <label className="compare-source-toggle">
+              <input
+                type="checkbox"
+                checked={publishScope === 'lap'}
+                disabled={selectedLap === 'full'}
+                onChange={(e) => setPublishScope(e.target.checked ? 'lap' : 'file')}
+              />
+              Seulement le tour sélectionné
+              {selectedLap === 'full' && ' (sélectionne un tour)'}
+            </label>
+            <div className="segmented">
+              <button
+                className={publishVisibility === 'friends' ? 'active' : ''}
+                onClick={() => setPublishVisibility('friends')}
+              >
+                Amis
+              </button>
+              <button
+                className={publishVisibility === 'public' ? 'active' : ''}
+                onClick={() => setPublishVisibility('public')}
+              >
+                Public
+              </button>
+            </div>
+            <button className="upload-btn" disabled={publishState.busy} onClick={handlePublish}>
+              {publishState.busy ? 'Publication…' : 'Publier'}
+            </button>
+            {publishState.error && <div className="upload-error">{publishState.error}</div>}
+            {publishState.done && <div className="field-hint">Publié — retrouve-le dans "Mes sessions".</div>}
+          </div>
+        )}
 
         <div className="field">
           Preset d'affichage

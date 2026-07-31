@@ -29,6 +29,11 @@ export async function initSocialSchema(): Promise<void> {
   await runSchemaFile('socialSchema.sql');
 }
 
+/** Runs the idempotent file-visibility schema DDL (telemetry_files/lap_shares) at startup. */
+export async function initFilesSchema(): Promise<void> {
+  await runSchemaFile('filesSchema.sql');
+}
+
 /** Runs `fn` inside a single client transaction, committing on success and rolling
  * back on any thrown error — needed for multi-statement mutations (e.g. accepting a
  * friend request: delete the request row + insert the friendship row atomically). */

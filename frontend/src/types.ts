@@ -61,6 +61,29 @@ export interface LapInfo {
   elapsedTime: number;
 }
 
+export type Visibility = 'private' | 'friends' | 'public';
+export type LapVisibility = 'friends' | 'public';
+
+export interface FileRecord {
+  filename: string;
+  ownerId: number | null;
+  visibility: Visibility;
+  track: string | null;
+  car: string | null;
+}
+
+export interface LapShare {
+  lapNumber: number;
+  visibility: LapVisibility;
+}
+
+export interface SharedLapResult {
+  filename: string;
+  lapNumber: number;
+  track: string | null;
+  car: string | null;
+}
+
 export interface ColumnStyle {
   label: string;
   color: string;

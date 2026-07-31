@@ -1,0 +1,275 @@
+import type { FastifyInstance } from 'fastify';
+import path from 'node:path';
+import fs from 'node:fs';
+import { pipeline } from 'node:stream/promises';
+import { listChannels, getChannelSeries, getLaps, evictStartTsCache } from './channels.js';
+import { getSessionMetadata, type SessionMetadata, type SessionSummary } from './metadata.js';
+import { DATA_DIR, evictDb } from './db.js';
+import { requireAuth } from './auth.js';
+import {
+  canViewFile,
+  canViewLap,
+  getFileRecord,
+  listLapShares,
+  listVisibleFiles,
+  searchSharedLaps,
+  setFileVisibility,
+  setLapVisibility,
+  upsertFileRecord,
+  type LapVisibility,
+  type Visibility,
+} from './access.js';
+
+function isVisibility(v: unknown): v is Visibility {
+  return v === 'private' || v === 'friends' || v === 'public';
+}
+
+function isLapVisibility(v: unknown): v is LapVisibility {
+  return v === 'friends' || v === 'public';
+}
+
+export async function registerFiles(app: FastifyInstance): Promise<void> {
+  app.get<{ Querystring: { track?: string; car?: string } }>('/api/sessions', async (req) => {
+    const files = await listVisibleFiles(req.userId, { track: req.query.track, car: req.query.car });
+    return Promise.all(
+      files.map(async (f): Promise<SessionSummary> => {
+        const meta = await getSessionMetadata(f.filename).catch(() => null);
+        return {
+          file: f.filename,
+          track: meta?.info.TrackName,
+          sessionType: meta?.info.SessionType,
+          driverName: meta?.info.DriverName,
+          carName: meta?.info.CarName,
+          recordingTime: meta?.info.RecordingTime,
+        };
+      }),
+    );
+  });
+
+  app.get('/api/sessions/mine', { preHandler: requireAuth }, async (req) => {
+    const files = await listVisibleFiles(req.userId);
+    return { files: files.filter((f) => f.ownerId === req.userId) };
+  });
+
+  app.post<{ Params: { file: string }; Body: { visibility?: string } }>(
+    '/api/sessions/:file/visibility',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const record = await getFileRecord(req.params.file);
+      if (!record || record.ownerId !== req.userId) {
+        reply.code(404).send({ error: 'Fichier introuvable' });
+        return;
+      }
+      if (!isVisibility(req.body?.visibility)) {
+        reply.code(400).send({ error: 'Visibilité invalide' });
+        return;
+      }
+      await setFileVisibility(req.params.file, req.body!.visibility as Visibility);
+      reply.code(204).send();
+    },
+  );
+
+  app.get<{ Params: { file: string } }>(
+    '/api/sessions/:file/lap-shares',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const record = await getFileRecord(req.params.file);
+      if (!record || record.ownerId !== req.userId) {
+        reply.code(404).send({ error: 'Fichier introuvable' });
+        return;
+      }
+      return { shares: await listLapShares(req.params.file) };
+    },
+  );
+
+  app.post<{ Params: { file: string; lap: string }; Body: { visibility: LapVisibility | null } }>(
+    '/api/sessions/:file/laps/:lap/visibility',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const record = await getFileRecord(req.params.file);
+      if (!record || record.ownerId !== req.userId) {
+        reply.code(404).send({ error: 'Fichier introuvable' });
+        return;
+      }
+      const visibility = req.body?.visibility ?? null;
+      if (visibility !== null && !isLapVisibility(visibility)) {
+        reply.code(400).send({ error: 'Visibilité invalide' });
+        return;
+      }
+      await setLapVisibility(req.params.file, Number(req.params.lap), visibility);
+      reply.code(204).send();
+    },
+  );
+
+  app.post('/api/sessions/upload', { preHandler: requireAuth }, async (req, reply) => {
+    const data = await req.file();
+    if (!data) {
+      reply.code(400).send({ error: 'No file provided' });
+      return;
+    }
+    const filename = path.basename(data.filename);
+    if (!filename.toLowerCase().endsWith('.duckdb')) {
+      reply.code(400).send({ error: 'File must have a .duckdb extension' });
+      return;
+    }
+    const dest = path.join(DATA_DIR, filename);
+    const tmpDest = `${dest}.uploading`;
+    try {
+      await pipeline(data.file, fs.createWriteStream(tmpDest));
+      if (data.file.truncated) throw new Error('File too large');
+      fs.renameSync(tmpDest, dest);
+    } catch (err) {
+      fs.rmSync(tmpDest, { force: true });
+      reply.code(500).send({ error: (err as Error).message });
+      return;
+    }
+    evictDb(dest);
+    evictStartTsCache(filename);
+    const meta = await getSessionMetadata(filename).catch(
+      (): SessionMetadata => ({ info: {}, carSetup: null }),
+    );
+    await upsertFileRecord(filename, {
+      ownerId: req.userId!,
+      track: meta.info.TrackName ?? null,
+      car: meta.info.CarName ?? null,
+    });
+    reply.send({ file: filename });
+  });
+
+  app.get<{ Params: { file: string } }>('/api/sessions/:file/metadata', async (req, reply) => {
+    if (!(await canViewFile(req.params.file, req.userId))) {
+      reply.code(403).send({ error: 'Accès refusé' });
+      return;
+    }
+    try {
+      return await getSessionMetadata(req.params.file);
+    } catch (err) {
+      reply.code(404);
+      return { error: (err as Error).message };
+    }
+  });
+
+  app.get<{ Params: { file: string } }>('/api/sessions/:file/channels', async (req, reply) => {
+    if (!(await canViewFile(req.params.file, req.userId))) {
+      reply.code(403).send({ error: 'Accès refusé' });
+      return;
+    }
+    try {
+      return await listChannels(req.params.file);
+    } catch (err) {
+      reply.code(404);
+      return { error: (err as Error).message };
+    }
+  });
+
+  app.get<{ Params: { file: string } }>('/api/sessions/:file/laps', async (req, reply) => {
+    if (!(await canViewFile(req.params.file, req.userId))) {
+      reply.code(403).send({ error: 'Accès refusé' });
+      return;
+    }
+    try {
+      return await getLaps(req.params.file);
+    } catch (err) {
+      reply.code(404);
+      return { error: (err as Error).message };
+    }
+  });
+
+  app.get<{ Params: { file: string; name: string }; Querystring: { from?: string; to?: string } }>(
+    '/api/sessions/:file/channel/:name',
+    async (req, reply) => {
+      if (!(await canViewFile(req.params.file, req.userId))) {
+        reply.code(403).send({ error: 'Accès refusé' });
+        return;
+      }
+      try {
+        const { from, to } = req.query;
+        const range = from !== undefined && to !== undefined ? { from: Number(from), to: Number(to) } : undefined;
+        return await getChannelSeries(req.params.file, req.params.name, range);
+      } catch (err) {
+        reply.code(404);
+        return { error: (err as Error).message };
+      }
+    },
+  );
+
+  // ---- Shared lap read routes: auth optional, gated by canViewLap instead of
+  // canViewFile, so a single lap can be reachable even when its parent file stays
+  // private. ----
+
+  app.get<{ Params: { file: string; lap: string } }>('/api/shared-lap/:file/:lap/metadata', async (req, reply) => {
+    if (!(await canViewLap(req.params.file, Number(req.params.lap), req.userId))) {
+      reply.code(403).send({ error: 'Accès refusé' });
+      return;
+    }
+    try {
+      return await getSessionMetadata(req.params.file);
+    } catch (err) {
+      reply.code(404);
+      return { error: (err as Error).message };
+    }
+  });
+
+  app.get<{ Params: { file: string; lap: string } }>('/api/shared-lap/:file/:lap/laps', async (req, reply) => {
+    const lapNumber = Number(req.params.lap);
+    if (!(await canViewLap(req.params.file, lapNumber, req.userId))) {
+      reply.code(403).send({ error: 'Accès refusé' });
+      return;
+    }
+    try {
+      const laps = await getLaps(req.params.file);
+      const lap = laps.find((l) => l.lap === lapNumber);
+      if (!lap) {
+        reply.code(404).send({ error: 'Tour introuvable' });
+        return;
+      }
+      return [lap];
+    } catch (err) {
+      reply.code(404);
+      return { error: (err as Error).message };
+    }
+  });
+
+  app.get<{ Params: { file: string; lap: string } }>('/api/shared-lap/:file/:lap/channels', async (req, reply) => {
+    if (!(await canViewLap(req.params.file, Number(req.params.lap), req.userId))) {
+      reply.code(403).send({ error: 'Accès refusé' });
+      return;
+    }
+    try {
+      return await listChannels(req.params.file);
+    } catch (err) {
+      reply.code(404);
+      return { error: (err as Error).message };
+    }
+  });
+
+  app.get<{ Params: { file: string; lap: string; name: string } }>(
+    '/api/shared-lap/:file/:lap/channel/:name',
+    async (req, reply) => {
+      const lapNumber = Number(req.params.lap);
+      if (!(await canViewLap(req.params.file, lapNumber, req.userId))) {
+        reply.code(403).send({ error: 'Accès refusé' });
+        return;
+      }
+      try {
+        const laps = await getLaps(req.params.file);
+        const lap = laps.find((l) => l.lap === lapNumber);
+        if (!lap) {
+          reply.code(404).send({ error: 'Tour introuvable' });
+          return;
+        }
+        // The range is computed here from the lap record, never taken from the
+        // client — a viewer restricted to this one lap must not be able to request
+        // any other window of the file just by passing a different range.
+        return await getChannelSeries(req.params.file, req.params.name, { from: lap.startTs, to: lap.endTs });
+      } catch (err) {
+        reply.code(404);
+        return { error: (err as Error).message };
+      }
+    },
+  );
+
+  app.get<{ Querystring: { track?: string; car?: string } }>('/api/shared-laps/search', async (req) => {
+    return { laps: await searchSharedLaps(req.userId, { track: req.query.track, car: req.query.car }) };
+  });
+}
