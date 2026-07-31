@@ -128,7 +128,7 @@ export function Connexion() {
           </button>
 
           {mode === 'login' && (
-            <a href="/mot-de-passe-oublie" className="auth-forgot-link">
+            <a href="/forgot-password" className="auth-forgot-link">
               Mot de passe oublié ?
             </a>
           )}

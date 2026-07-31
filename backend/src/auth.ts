@@ -145,7 +145,7 @@ export async function registerAuth(app: FastifyInstance): Promise<void> {
       const { token } = await createResetToken(user.id);
       const base = process.env.PUBLIC_BASE_URL;
       if (!base) app.log.warn('PUBLIC_BASE_URL is not set — password reset email link will be relative/unusable.');
-      const resetUrl = `${base ?? ''}/reinitialiser-mot-de-passe?token=${encodeURIComponent(token)}`;
+      const resetUrl = `${base ?? ''}/reset-password?token=${encodeURIComponent(token)}`;
       sendPasswordResetEmail(toPublicUser(user), resetUrl).catch((err) => app.log.error(err));
     }
     // Always the same response whether or not the email matches an account —

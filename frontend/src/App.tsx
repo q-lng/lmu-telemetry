@@ -33,8 +33,8 @@ export default function App() {
         <Route index element={<LandingPage />} />
         <Route path="telemetrie" element={<TelemetryViewer />} />
         <Route path="connexion" element={<Connexion />} />
-        <Route path="mot-de-passe-oublie" element={<ForgotPassword />} />
-        <Route path="reinitialiser-mot-de-passe" element={<ResetPassword />} />
+        <Route path="forgot-password" element={<ForgotPassword />} />
+        <Route path="reset-password" element={<ResetPassword />} />
         <Route path="parcourir" element={<Browse />} />
         <Route path="partage/:file/:lap" element={<SharedLap />} />
         <Route
