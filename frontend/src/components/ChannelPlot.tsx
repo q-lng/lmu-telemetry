@@ -297,10 +297,7 @@ export function ChannelPlot({
       padding: [4, 8, showXAxis ? 4 : 0, 0],
       cursor: { drag: { x: false, y: false }, sync: { key: syncKey, scales: ['x', null] } },
       legend: { show: false },
-      scales: {
-        x: { time: false, ...(xDomain ? { range: xDomain } : {}) },
-        y: { range: computeFixedYRange(data) },
-      },
+      scales: { x: { time: false }, y: { range: computeFixedYRange(data) } },
       axes: [
         {
           show: true,
@@ -373,12 +370,19 @@ export function ChannelPlot({
 
     const plot = new uPlot(opts, data as uPlot.AlignedData, containerRef.current);
     plotRef.current = plot;
-    // Restore whatever pan/zoom window was active before this instance was
-    // rebuilt (e.g. toggling a compared lap) — otherwise every rebuild silently
-    // resets to the full xDomain, discarding the user's current zoom.
+    // Set the scale explicitly exactly once at construction — restoring
+    // whatever pan/zoom window was active before this instance was rebuilt
+    // (e.g. toggling a compared lap), or else the shared xDomain so every lane
+    // starts in sync instead of each auto-ranging to its own data span (see
+    // xDomain above). A ONE-TIME imperative setScale call, same method
+    // attachZoomPan itself uses for actual zoom/pan — NOT a persistent
+    // `scales.x.range` config, which fought with attachZoomPan's own setScale
+    // calls on every redraw and broke zooming entirely.
     const savedRange = viewRangeRef.current;
     if (savedRange) {
       plot.setScale('x', { min: savedRange.min, max: savedRange.max });
+    } else if (xDomain) {
+      plot.setScale('x', { min: xDomain[0], max: xDomain[1] });
     }
     const detachZoomPan = attachZoomPan(plot, syncKey, onCursorClick);
 

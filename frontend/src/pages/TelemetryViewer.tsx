@@ -371,6 +371,19 @@ export default function TelemetryViewer() {
   const [comparedLaps, setComparedLaps] = useState<ComparedLap[]>([]);
   const [colorMode, setColorMode] = useState<ColorMode>('byChannel');
   const [colorPrefsOpen, setColorPrefsOpen] = useState(false);
+  // Preferences load async — apply the saved color mode once, as soon as it
+  // arrives, without clobbering any toggle the user makes before/after that.
+  const appliedColorModeRef = useRef(false);
+  useEffect(() => {
+    if (appliedColorModeRef.current) return;
+    if (preferences.colorMode !== 'byChannel' && preferences.colorMode !== 'byLap') return;
+    appliedColorModeRef.current = true;
+    setColorMode(preferences.colorMode);
+  }, [preferences]);
+  function setColorModeAndSave(mode: ColorMode) {
+    setColorMode(mode);
+    setPreference('colorMode', mode);
+  }
 
   const [externalSources, setExternalSources] = useState<ExternalSource[]>([]);
   const [addSourceOpen, setAddSourceOpen] = useState(false);
@@ -1369,10 +1382,10 @@ export default function TelemetryViewer() {
         <label className="field">
           {t('tv.colorModeLabel')}
           <div className="segmented">
-            <button className={colorMode === 'byChannel' ? 'active' : ''} onClick={() => setColorMode('byChannel')}>
+            <button className={colorMode === 'byChannel' ? 'active' : ''} onClick={() => setColorModeAndSave('byChannel')}>
               {t('tv.colorModeByChannel')}
             </button>
-            <button className={colorMode === 'byLap' ? 'active' : ''} onClick={() => setColorMode('byLap')}>
+            <button className={colorMode === 'byLap' ? 'active' : ''} onClick={() => setColorModeAndSave('byLap')}>
               {t('tv.colorModeByLap')}
             </button>
             {/* Compared-lap colors apply in both modes (only the reference-lap
