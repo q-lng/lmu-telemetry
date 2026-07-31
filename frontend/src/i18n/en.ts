@@ -178,6 +178,9 @@ export const en = {
   'tv.removeSource': 'Remove this session',
   'tv.chooseSessionPlaceholder': '— Choose a session —',
   'tv.orOpenLocalFile': 'Or open a local file…',
+  'tv.deltaChannelToggle': 'Show delta-time channel',
+  'tv.deltaChannelLabel': 'Delta',
+  'tv.deltaChannelHint': 'Select a reference lap and at least one compared lap to enable this',
   'tv.trackMismatch': (p: { track1?: string; track2?: string }) =>
     `Different tracks (${p.track1} vs ${p.track2}) — the comparison may not be meaningful.`,
   'tv.channelsShown': 'Channels shown (graph order)',

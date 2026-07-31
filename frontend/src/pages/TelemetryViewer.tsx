@@ -76,6 +76,11 @@ const CLUTCH_CHANNEL = 'Clutch Pos Unfiltered';
 // above throttle, clutch (if enabled) last.
 const PEDALS_SPLIT_ORDER = ['Brake Pos Unfiltered', 'Throttle Pos Unfiltered', CLUTCH_CHANNEL];
 
+// Reserved synthetic channel name — never a real backend channel, special-cased
+// throughout (excluded from selectedChannels' real fetch, built entirely
+// client-side in the lanes builder from distRef + deltaByLapId).
+const DELTA_CHANNEL_NAME = 'Delta Time';
+
 const INITIAL_LAYOUT: LayoutItem[] = [
   { type: 'channel', name: 'Ground Speed' },
   { type: 'channel', name: 'Gear' },
@@ -245,6 +250,43 @@ async function findDistanceLapRange(
   return { from: trueStart, to: trueEnd - 0.01 };
 }
 
+/** Inverts a lap's own (time, distance) pairs — which naturally give distance
+ * as a function of time — into time as a function of distance, by reusing
+ * resampleContinuous with the two roles swapped: distance becomes the "source
+ * x domain" (ascending within one isolated lap window, same assumption
+ * findDistanceLapRange/toDistanceX already rely on) and time becomes the
+ * "source values" resampled onto the query distances. Used by the delta-time
+ * channel: "how long did this lap take to reach distance d" for each of the
+ * reference lap's own distance samples, for every compared lap. */
+function invertTimeAtDistance(
+  t: number[],
+  distanceValues: (number | null)[],
+  queryDistances: (number | null)[],
+): (number | null)[] {
+  const cleanDist: number[] = [];
+  const cleanTime: number[] = [];
+  for (let i = 0; i < t.length; i++) {
+    const d = distanceValues[i];
+    if (d == null) continue;
+    cleanDist.push(d);
+    cleanTime.push(t[i]);
+  }
+  const validIdx: number[] = [];
+  const validQuery: number[] = [];
+  queryDistances.forEach((d, i) => {
+    if (d != null) {
+      validIdx.push(i);
+      validQuery.push(d);
+    }
+  });
+  const resampled = resampleContinuous(cleanDist, cleanTime, validQuery);
+  const out: (number | null)[] = new Array(queryDistances.length).fill(null);
+  validIdx.forEach((originalIdx, k) => {
+    out[originalIdx] = resampled[k];
+  });
+  return out;
+}
+
 interface DisplayPreset {
   layout: LayoutItem[];
   laneWeights: Record<string, number>;
@@ -326,6 +368,9 @@ export default function TelemetryViewer() {
   const [seriesByName, setSeriesByName] = useState<Record<string, ChannelSeries>>({});
   const [seriesLoading, setSeriesLoading] = useState(false);
   const [comparesByLapId, setComparesByLapId] = useState<Record<string, Record<string, CompareSeries>>>({});
+  // Delta-time channel: one array per compared lap, sharing distRef's own time
+  // grid — see invertTimeAtDistance and the fetch effect below.
+  const [deltaByLapId, setDeltaByLapId] = useState<Record<string, (number | null)[]>>({});
   const [distRef, setDistRef] = useState<ChannelSeries | null>(null);
   const [gps, setGps] = useState<{ t: number[]; lat: number[]; lon: number[] } | null>(null);
   const [cursorT, setCursorT] = useState<number | null>(null);
@@ -484,7 +529,10 @@ export default function TelemetryViewer() {
   }
 
   const selectedChannels = useMemo(
-    () => layout.flatMap((it) => (it.type === 'channel' ? [it.name] : it.channels)),
+    () =>
+      layout
+        .flatMap((it) => (it.type === 'channel' ? [it.name] : it.channels))
+        .filter((name) => name !== DELTA_CHANNEL_NAME),
     [layout],
   );
 
@@ -734,6 +782,51 @@ export default function TelemetryViewer() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataSource, externalSources, comparedLaps, selectedChannels, selectedLap, seriesByName, xAxisMode, distRef]);
+
+  // Delta-time channel — independent of xAxisMode (the underlying math always
+  // needs distance-based correspondence between laps, regardless of which axis
+  // is currently displayed), only computed when the channel is actually toggled
+  // on. Each compared lap's own Lap Dist is fetched over ITS OWN
+  // distance-corrected range and inverted (see invertTimeAtDistance) to get
+  // "time at distance d" for each of the reference's own distance samples, then
+  // delta = that compared-lap time minus the reference's own elapsed time there.
+  const deltaChannelShown = layout.some((it) => it.type === 'channel' && it.name === DELTA_CHANNEL_NAME);
+  useEffect(() => {
+    if (!deltaChannelShown || !dataSource || selectedLap === 'full' || comparedLaps.length === 0 || !distRef) {
+      setDeltaByLapId({});
+      return;
+    }
+    const refDist = distRef.values.value as (number | null)[];
+    let cancelled = false;
+
+    async function computeForLap(cl: ComparedLap): Promise<[string, (number | null)[]] | null> {
+      const resolved = resolveComparedLapSource(cl);
+      if (!resolved) return null;
+      const { ds, lapInfo } = resolved;
+      const lapRange = await findDistanceLapRange(ds, lapInfo.startTs, lapInfo.endTs);
+      const lapOffset = lapRange.from;
+      const s = await ds.fetchChannelSeries('Lap Dist', lapRange).catch(() => null);
+      if (!s) return null;
+      const tRel = s.t.map((x) => x - lapOffset);
+      const timeAtRefDist = invertTimeAtDistance(tRel, s.values.value as (number | null)[], refDist);
+      const delta = timeAtRefDist.map((tc, i) => (tc == null || distRef == null ? null : tc - distRef.t[i]));
+      return [cl.id, delta];
+    }
+
+    Promise.all(comparedLaps.map(computeForLap)).then((entries) => {
+      if (cancelled) return;
+      const next: Record<string, (number | null)[]> = {};
+      entries.forEach((entry) => {
+        if (entry) next[entry[0]] = entry[1];
+      });
+      setDeltaByLapId(next);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deltaChannelShown, dataSource, externalSources, comparedLaps, selectedLap, distRef]);
 
   function toggleChannel(name: string) {
     setLayout((prev) => {
@@ -1034,6 +1127,31 @@ export default function TelemetryViewer() {
             compares: buildLaneCompares(present, combined),
           });
         }
+      } else if (item.name === DELTA_CHANNEL_NAME) {
+        // Synthetic, entirely client-side: one column per compared lap (no
+        // separate "reference" line — a lap's delta-to-itself is trivially 0),
+        // sharing distRef's own time grid so it flows through withXAxis exactly
+        // like any real channel for both time and distance display modes.
+        if (selectedLap === 'full' || comparedLaps.length === 0 || !distRef) continue;
+        const values: Record<string, (number | null)[]> = {};
+        comparedLaps.forEach((cl) => {
+          values[cl.id] = deltaByLapId[cl.id] ?? distRef.t.map(() => null);
+        });
+        const deltaSeries: ChannelSeries = {
+          name: DELTA_CHANNEL_NAME,
+          kind: 'continuous',
+          unit: 's',
+          valueColumns: comparedLaps.map((cl) => cl.id),
+          t: distRef.t,
+          values,
+        };
+        result.push({
+          key: DELTA_CHANNEL_NAME,
+          label: t('tv.deltaChannelLabel'),
+          series: withXAxis(deltaSeries),
+          columnStyles: comparedLaps.map((cl, index) => ({ label: comparedLapLabel(cl), color: comparedLapColorAt(index) })),
+          compares: [],
+        });
       } else {
         const series = seriesByName[item.name];
         if (!series) continue;
@@ -1064,7 +1182,9 @@ export default function TelemetryViewer() {
     layout,
     seriesByName,
     comparesByLapId,
+    deltaByLapId,
     comparedLaps,
+    selectedLap,
     colorMode,
     preferredReferenceLapColor,
     preferredComparedLapColors,
@@ -1514,6 +1634,17 @@ export default function TelemetryViewer() {
             </button>
           )}
         </div>
+
+        <label className="channel-checkbox">
+          <input
+            type="checkbox"
+            disabled={selectedLap === 'full' || comparedLaps.length === 0}
+            checked={layout.some((it) => it.type === 'channel' && it.name === DELTA_CHANNEL_NAME)}
+            onChange={() => toggleChannel(DELTA_CHANNEL_NAME)}
+            title={selectedLap === 'full' || comparedLaps.length === 0 ? t('tv.deltaChannelHint') : undefined}
+          />
+          {t('tv.deltaChannelToggle')}
+        </label>
 
         {layout.length > 0 && (
           <div className="field">
