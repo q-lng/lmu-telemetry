@@ -105,6 +105,7 @@ const INITIAL_LANE_WEIGHTS: Record<string, number> = {
   'default-pedals': LANE_SIZE.tall,
   'Steering Pos': LANE_SIZE.medium,
   'default-pits': LANE_SIZE.small,
+  [DELTA_CHANNEL_NAME]: LANE_SIZE.small,
 };
 
 function buildCombinedSeries(names: string[], seriesByName: Record<string, ChannelSeries>, name: string): ChannelSeries {
@@ -362,6 +363,31 @@ export default function TelemetryViewer() {
       }),
     );
   }, [preferences]);
+  // Same pattern for the delta-time channel: whether it's shown, and (once the
+  // user drags it somewhere) which position to restore it at — defaults to the
+  // top (index 0) the first time it's ever enabled.
+  const appliedDeltaPrefsRef = useRef(false);
+  useEffect(() => {
+    if (appliedDeltaPrefsRef.current) return;
+    if (preferences.deltaChannelShown === undefined) return;
+    appliedDeltaPrefsRef.current = true;
+    if (preferences.deltaChannelShown === true) {
+      const idx = typeof preferences.deltaChannelIndex === 'number' ? preferences.deltaChannelIndex : 0;
+      setLayout((prev) => {
+        if (prev.some((it) => it.type === 'channel' && it.name === DELTA_CHANNEL_NAME)) return prev;
+        const next = [...prev];
+        next.splice(Math.min(Math.max(idx, 0), next.length), 0, { type: 'channel', name: DELTA_CHANNEL_NAME });
+        return next;
+      });
+    }
+  }, [preferences]);
+  // Whenever the layout changes, remember the delta channel's current position
+  // (if shown) so re-enabling it later restores where the user last dragged it
+  // to, instead of always resetting to the top.
+  useEffect(() => {
+    const idx = layout.findIndex((it) => it.type === 'channel' && it.name === DELTA_CHANNEL_NAME);
+    if (idx !== -1) setPreference('deltaChannelIndex', idx);
+  }, [layout]);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [groupSelection, setGroupSelection] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState('');
@@ -829,6 +855,13 @@ export default function TelemetryViewer() {
   }, [deltaChannelShown, dataSource, externalSources, comparedLaps, selectedLap, distRef]);
 
   function toggleChannel(name: string) {
+    // Keep the "shown" preference in sync regardless of which UI affordance
+    // removes/adds it (the dedicated checkbox, or the generic "✕" in the
+    // "Channels shown" list) — delegate to the same function either way.
+    if (name === DELTA_CHANNEL_NAME) {
+      toggleDeltaChannel();
+      return;
+    }
     setLayout((prev) => {
       const standaloneIdx = prev.findIndex((it) => it.type === 'channel' && it.name === name);
       if (standaloneIdx >= 0) return prev.filter((_, i) => i !== standaloneIdx);
@@ -910,6 +943,21 @@ export default function TelemetryViewer() {
       next[index] = { ...cur, grouped };
       return next;
     });
+  }
+
+  function toggleDeltaChannel() {
+    const isShown = layout.some((it) => it.type === 'channel' && it.name === DELTA_CHANNEL_NAME);
+    setPreference('deltaChannelShown', !isShown);
+    if (isShown) {
+      setLayout((prev) => prev.filter((it) => !(it.type === 'channel' && it.name === DELTA_CHANNEL_NAME)));
+    } else {
+      const savedIdx = typeof preferences.deltaChannelIndex === 'number' ? preferences.deltaChannelIndex : 0;
+      setLayout((prev) => {
+        const next = [...prev];
+        next.splice(Math.min(Math.max(savedIdx, 0), next.length), 0, { type: 'channel', name: DELTA_CHANNEL_NAME });
+        return next;
+      });
+    }
   }
 
   function toggleGroupSelection(name: string) {
@@ -1640,7 +1688,7 @@ export default function TelemetryViewer() {
             type="checkbox"
             disabled={selectedLap === 'full' || comparedLaps.length === 0}
             checked={layout.some((it) => it.type === 'channel' && it.name === DELTA_CHANNEL_NAME)}
-            onChange={() => toggleChannel(DELTA_CHANNEL_NAME)}
+            onChange={toggleDeltaChannel}
             title={selectedLap === 'full' || comparedLaps.length === 0 ? t('tv.deltaChannelHint') : undefined}
           />
           {t('tv.deltaChannelToggle')}
