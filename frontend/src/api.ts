@@ -1,12 +1,17 @@
 import type {
   ChannelDescriptor,
   ChannelSeries,
+  FileRecord,
   FriendRequestSummary,
   LapInfo,
+  LapShare,
+  LapVisibility,
   ProfileSummary,
   PublicUser,
   SessionMetadata,
   SessionSummary,
+  SharedLapResult,
+  Visibility,
 } from './types';
 
 async function getJson<T>(url: string): Promise<T> {
@@ -57,8 +62,15 @@ export async function fetchMe(): Promise<PublicUser | null> {
   return body.user;
 }
 
-export function fetchSessions(): Promise<SessionSummary[]> {
-  return getJson('/api/sessions');
+export function fetchSessions(
+  filter: { track?: string; car?: string; excludeMine?: boolean } = {},
+): Promise<SessionSummary[]> {
+  const params = new URLSearchParams();
+  if (filter.track) params.set('track', filter.track);
+  if (filter.car) params.set('car', filter.car);
+  if (filter.excludeMine) params.set('excludeMine', 'true');
+  const q = params.toString();
+  return getJson(`/api/sessions${q ? `?${q}` : ''}`);
 }
 
 export function fetchMetadata(file: string): Promise<SessionMetadata> {
@@ -139,4 +151,46 @@ export function fetchFollowing(): Promise<PublicUser[]> {
 
 export function fetchFollowers(): Promise<PublicUser[]> {
   return getJson<{ users: PublicUser[] }>('/api/follows/followers').then((r) => r.users);
+}
+
+export function fetchMyFiles(): Promise<FileRecord[]> {
+  return getJson<{ files: FileRecord[] }>('/api/sessions/mine').then((r) => r.files);
+}
+
+export function setFileVisibility(filename: string, visibility: Visibility): Promise<void> {
+  return postJson(`/api/sessions/${encodeURIComponent(filename)}/visibility`, { visibility });
+}
+
+export function fetchLapShares(filename: string): Promise<LapShare[]> {
+  return getJson<{ shares: LapShare[] }>(`/api/sessions/${encodeURIComponent(filename)}/lap-shares`).then(
+    (r) => r.shares,
+  );
+}
+
+export function setLapVisibility(filename: string, lapNumber: number, visibility: LapVisibility | null): Promise<void> {
+  return postJson(`/api/sessions/${encodeURIComponent(filename)}/laps/${lapNumber}/visibility`, { visibility });
+}
+
+export function searchSharedLaps(filter: { track?: string; car?: string } = {}): Promise<SharedLapResult[]> {
+  const params = new URLSearchParams();
+  if (filter.track) params.set('track', filter.track);
+  if (filter.car) params.set('car', filter.car);
+  const q = params.toString();
+  return getJson<{ laps: SharedLapResult[] }>(`/api/shared-laps/search${q ? `?${q}` : ''}`).then((r) => r.laps);
+}
+
+export function fetchSharedLapMetadata(file: string, lap: number): Promise<SessionMetadata> {
+  return getJson(`/api/shared-lap/${encodeURIComponent(file)}/${lap}/metadata`);
+}
+
+export function fetchSharedLapChannels(file: string, lap: number): Promise<ChannelDescriptor[]> {
+  return getJson(`/api/shared-lap/${encodeURIComponent(file)}/${lap}/channels`);
+}
+
+export function fetchSharedLapLaps(file: string, lap: number): Promise<LapInfo[]> {
+  return getJson(`/api/shared-lap/${encodeURIComponent(file)}/${lap}/laps`);
+}
+
+export function fetchSharedLapChannelSeries(file: string, lap: number, name: string): Promise<ChannelSeries> {
+  return getJson(`/api/shared-lap/${encodeURIComponent(file)}/${lap}/channel/${encodeURIComponent(name)}`);
 }

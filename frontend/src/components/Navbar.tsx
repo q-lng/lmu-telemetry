@@ -25,10 +25,18 @@ export function Navbar() {
         <a href="/telemetrie" aria-current={path === '/telemetrie' ? 'page' : undefined}>
           Application
         </a>
+        <a href="/parcourir" aria-current={path === '/parcourir' ? 'page' : undefined}>
+          Parcourir
+        </a>
         {user && (
-          <a href="/amis" aria-current={path === '/amis' ? 'page' : undefined}>
-            Amis
-          </a>
+          <>
+            <a href="/amis" aria-current={path === '/amis' ? 'page' : undefined}>
+              Amis
+            </a>
+            <a href="/mes-sessions" aria-current={path === '/mes-sessions' ? 'page' : undefined}>
+              Mes sessions
+            </a>
+          </>
         )}
       </div>
       <div className="navbar-spacer" />

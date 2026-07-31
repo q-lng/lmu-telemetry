@@ -4,6 +4,10 @@ import {
   fetchChannels as apiFetchChannels,
   fetchLaps as apiFetchLaps,
   fetchMetadata as apiFetchMetadata,
+  fetchSharedLapChannelSeries,
+  fetchSharedLapChannels,
+  fetchSharedLapLaps,
+  fetchSharedLapMetadata,
 } from './api';
 import { openLocalFile, type WasmSession } from './wasm/duckdb';
 
@@ -26,6 +30,19 @@ export function createServerDataSource(file: string): DataSource {
     fetchChannels: () => apiFetchChannels(file),
     fetchLaps: () => apiFetchLaps(file),
     fetchChannelSeries: (name, range) => apiFetchChannelSeries(file, name, range),
+  };
+}
+
+/** A single publicly (or friends-)shared lap — the file itself may stay private,
+ * this reads only that one lap's data via the /api/shared-lap/... routes, which
+ * compute the time window server-side rather than trusting a client range. */
+export function createSharedLapDataSource(file: string, lapNumber: number): DataSource {
+  return {
+    label: `${file} — tour ${lapNumber}`,
+    fetchMetadata: () => fetchSharedLapMetadata(file, lapNumber),
+    fetchChannels: () => fetchSharedLapChannels(file, lapNumber),
+    fetchLaps: () => fetchSharedLapLaps(file, lapNumber),
+    fetchChannelSeries: (name) => fetchSharedLapChannelSeries(file, lapNumber, name),
   };
 }
 

@@ -1,5 +1,4 @@
 import { query } from './db.js';
-import { listSessionFiles } from './db.js';
 
 export interface SessionMetadata {
   info: Record<string, string>;
@@ -31,26 +30,4 @@ export interface SessionSummary {
   driverName?: string;
   carName?: string;
   recordingTime?: string;
-}
-
-export async function listSessions(): Promise<SessionSummary[]> {
-  const files = listSessionFiles();
-  const summaries = await Promise.all(
-    files.map(async (file): Promise<SessionSummary> => {
-      try {
-        const { info } = await getSessionMetadata(file);
-        return {
-          file,
-          track: info.TrackName,
-          sessionType: info.SessionType,
-          driverName: info.DriverName,
-          carName: info.CarName,
-          recordingTime: info.RecordingTime,
-        };
-      } catch {
-        return { file };
-      }
-    }),
-  );
-  return summaries;
 }
