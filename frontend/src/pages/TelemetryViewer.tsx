@@ -295,6 +295,31 @@ export default function TelemetryViewer() {
   const [selectedLap, setSelectedLap] = useState<number | 'full'>('full');
   const [xAxisMode, setXAxisMode] = useState<'time' | 'distance'>('time');
   const [layout, setLayout] = useState<LayoutItem[]>(INITIAL_LAYOUT);
+  // Apply the saved Pedals grouped/clutch preference once, as soon as it's
+  // loaded (preferences load async, after INITIAL_LAYOUT's own defaults have
+  // already rendered) — guarded so it never clobbers the user's own later
+  // toggles once applied (or for guests/fresh accounts, where it just never fires).
+  const appliedPedalsPrefsRef = useRef(false);
+  useEffect(() => {
+    if (appliedPedalsPrefsRef.current) return;
+    if (preferences.pedalsGrouped === undefined && preferences.pedalsClutch === undefined) return;
+    appliedPedalsPrefsRef.current = true;
+    setLayout((prev) =>
+      prev.map((item) => {
+        if (item.type !== 'group' || item.special !== 'pedals') return item;
+        const grouped = typeof preferences.pedalsGrouped === 'boolean' ? preferences.pedalsGrouped : item.grouped;
+        const wantsClutch = !!preferences.pedalsClutch;
+        const hasClutch = item.channels.includes(CLUTCH_CHANNEL);
+        const channels =
+          wantsClutch === hasClutch
+            ? item.channels
+            : wantsClutch
+              ? [...item.channels, CLUTCH_CHANNEL]
+              : item.channels.filter((c) => c !== CLUTCH_CHANNEL);
+        return { ...item, grouped, channels };
+      }),
+    );
+  }, [preferences]);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [groupSelection, setGroupSelection] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState('');
@@ -753,23 +778,30 @@ export default function TelemetryViewer() {
   }
 
   function togglePedalsClutch(index: number) {
+    const item = layout[index];
+    if (item.type !== 'group') return;
+    const has = item.channels.includes(CLUTCH_CHANNEL);
+    setPreference('pedalsClutch', !has);
     setLayout((prev) => {
-      const item = prev[index];
-      if (item.type !== 'group') return prev;
-      const has = item.channels.includes(CLUTCH_CHANNEL);
-      const channels = has ? item.channels.filter((c) => c !== CLUTCH_CHANNEL) : [...item.channels, CLUTCH_CHANNEL];
+      const cur = prev[index];
+      if (cur.type !== 'group') return prev;
+      const channels = has ? cur.channels.filter((c) => c !== CLUTCH_CHANNEL) : [...cur.channels, CLUTCH_CHANNEL];
       const next = [...prev];
-      next[index] = { ...item, channels };
+      next[index] = { ...cur, channels };
       return next;
     });
   }
 
   function togglePedalsGrouped(index: number) {
+    const item = layout[index];
+    if (item.type !== 'group') return;
+    const grouped = item.grouped === false ? true : false;
+    setPreference('pedalsGrouped', grouped);
     setLayout((prev) => {
-      const item = prev[index];
-      if (item.type !== 'group') return prev;
+      const cur = prev[index];
+      if (cur.type !== 'group') return prev;
       const next = [...prev];
-      next[index] = { ...item, grouped: item.grouped === false ? true : false };
+      next[index] = { ...cur, grouped };
       return next;
     });
   }
@@ -854,6 +886,29 @@ export default function TelemetryViewer() {
   // (not just gated in the UI) so a loaded preset or stale state can't sneak an
   // invalid combination through.
   const effectiveXAxisMode: 'time' | 'distance' = selectedLap === 'full' ? 'time' : xAxisMode;
+
+  // Shared X-axis domain for every lane, derived from distRef (a dense, always-
+  // fetched continuous channel — "Lap Dist") rather than letting each ChannelPlot
+  // auto-range from its OWN data. Without this, a sparse event channel (Gear, In
+  // Pits...) whose own timestamps don't span the full lap window gets a narrower
+  // default scale than dense channels — cursor.sync maps position via each plot's
+  // OWN scale, so the same instant lands on a different pixel until a zoom forces
+  // uPlot to sync them to the identical [min,max] via attachZoomPan.
+  const xDomain = useMemo<[number, number] | null>(() => {
+    if (!distRef || distRef.t.length === 0) return null;
+    function minMax(values: (number | null)[]): [number, number] | null {
+      let min = Infinity;
+      let max = -Infinity;
+      for (const v of values) {
+        if (v == null) continue;
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+      return isFinite(min) && isFinite(max) ? [min, max] : null;
+    }
+    if (effectiveXAxisMode === 'distance') return minMax(distRef.values.value as (number | null)[]);
+    return minMax(distRef.t);
+  }, [distRef, effectiveXAxisMode]);
 
   // Memoized so a bare cursor move (very high frequency) never rebuilds lane objects —
   // that would otherwise tear down and recreate every uPlot canvas on each mousemove.
@@ -1024,6 +1079,8 @@ export default function TelemetryViewer() {
         showXAxis={flatIndex === lanes.length - 1}
         xAxisMode={effectiveXAxisMode}
         weight={laneWeights[lane.key] ?? LANE_SIZE.medium}
+        xDomain={xDomain}
+        viewRange={viewRange}
         cursorT={cursorT}
         cursorLocked={cursorLocked}
         onWeightChange={setLaneWeight}

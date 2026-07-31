@@ -188,6 +188,16 @@ interface Props {
    * always fills exactly the available vertical space, so lanes are sized purely
    * by their weight relative to each other, never by an absolute pixel height. */
   weight: number;
+  /** Shared default X range across every lane (from a dense reference channel) —
+   * without this, a sparse event channel (Gear, ...) would auto-range to just its
+   * own data span, narrower than dense channels, throwing off cursor.sync until a
+   * zoom forces every lane back to the identical [min,max]. */
+  xDomain?: [number, number] | null;
+  /** Current pan/zoom window, restored on (re)construction via a ref (NOT a
+   * dependency of the rebuild effect below) so a lane rebuilding for an unrelated
+   * reason (toggling a compared lap, etc.) doesn't lose the user's current zoom —
+   * only reading this fresh every time would itself force a rebuild on every zoom. */
+  viewRange?: { min: number; max: number } | null;
   /** Cursor position, only used to show a live per-compared-lap delta next to the
    * label — deliberately NOT in the uPlot-rebuild effect's dependency array below,
    * so a mousemove re-renders just this label text, never tears down the chart. */
@@ -208,6 +218,8 @@ export function ChannelPlot({
   showXAxis,
   xAxisMode,
   weight,
+  xDomain,
+  viewRange,
   cursorT,
   cursorLocked,
   onWeightChange,
@@ -217,6 +229,10 @@ export function ChannelPlot({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const plotRef = useRef<uPlot | null>(null);
+  const viewRangeRef = useRef(viewRange);
+  useEffect(() => {
+    viewRangeRef.current = viewRange;
+  }, [viewRange]);
   // Read fresh inside the setCursor/draw hooks below (which are only rebuilt when
   // `lane` changes, not on every cursor tick) — a plain closure over cursorT/
   // cursorLocked would go stale the moment the user moves the mouse after locking.
@@ -281,7 +297,10 @@ export function ChannelPlot({
       padding: [4, 8, showXAxis ? 4 : 0, 0],
       cursor: { drag: { x: false, y: false }, sync: { key: syncKey, scales: ['x', null] } },
       legend: { show: false },
-      scales: { x: { time: false }, y: { range: computeFixedYRange(data) } },
+      scales: {
+        x: { time: false, ...(xDomain ? { range: xDomain } : {}) },
+        y: { range: computeFixedYRange(data) },
+      },
       axes: [
         {
           show: true,
@@ -354,6 +373,13 @@ export function ChannelPlot({
 
     const plot = new uPlot(opts, data as uPlot.AlignedData, containerRef.current);
     plotRef.current = plot;
+    // Restore whatever pan/zoom window was active before this instance was
+    // rebuilt (e.g. toggling a compared lap) — otherwise every rebuild silently
+    // resets to the full xDomain, discarding the user's current zoom.
+    const savedRange = viewRangeRef.current;
+    if (savedRange) {
+      plot.setScale('x', { min: savedRange.min, max: savedRange.max });
+    }
     const detachZoomPan = attachZoomPan(plot, syncKey, onCursorClick);
 
     if (showXAxis && onViewRangeChange && plot.scales.x.min != null && plot.scales.x.max != null) {
@@ -377,7 +403,7 @@ export function ChannelPlot({
       plotRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lane, syncKey, showXAxis, xAxisMode]);
+  }, [lane, syncKey, showXAxis, xAxisMode, xDomain]);
 
   function handleResizeStart(e: ReactMouseEvent) {
     e.preventDefault();
@@ -409,7 +435,7 @@ export function ChannelPlot({
     <div className="lane" style={{ flexGrow: weight }}>
       <div className="lane-label">
         {lane.label}
-        {cursorT != null && lane.compares.length > 0 && (
+        {cursorT != null && (
           <span className="lane-label-values">
             {lane.series.valueColumns.map((col, i) => {
               const referenceValue = nearestValue(lane.series.t, lane.series.values[col], cursorT);

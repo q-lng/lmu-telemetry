@@ -122,6 +122,16 @@ export function SharedLap() {
     return result;
   }, [seriesByName]);
 
+  // Shared X domain from GPS (dense, always fetched) — without this, Gear's own
+  // sparse timestamps (which don't span the full lap) would give it a narrower
+  // default range than the other lanes, throwing off cursor.sync until a zoom
+  // forces every lane back to the identical [min,max]. See TelemetryViewer's
+  // xDomain for the full explanation.
+  const xDomain = useMemo<[number, number] | null>(() => {
+    if (!gps || gps.t.length === 0) return null;
+    return [gps.t[0], gps.t[gps.t.length - 1]];
+  }, [gps]);
+
   if (loading) {
     return (
       <div className="page-loading">
@@ -171,6 +181,8 @@ export function SharedLap() {
             showXAxis={i === lanes.length - 1}
             xAxisMode="time"
             weight={1}
+            xDomain={xDomain}
+            viewRange={viewRange}
             cursorT={cursorT}
             cursorLocked={cursorLocked}
             onCursorMove={setCursorT}
