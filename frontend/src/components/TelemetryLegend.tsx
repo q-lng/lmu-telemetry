@@ -1,6 +1,5 @@
 import type { Lane } from '../types';
 import { nearestValue } from '../nearest';
-import { COMPARE_COLOR } from '../palette';
 import { t } from '../i18n';
 
 interface Props {
@@ -14,9 +13,14 @@ function formatValue(v: number | boolean | null): string {
   return Number.isInteger(v) ? String(v) : v.toFixed(2);
 }
 
+function formatDelta(v: number): string {
+  const sign = v >= 0 ? '+' : '-';
+  const abs = Math.abs(v);
+  return `${sign}${Number.isInteger(abs) ? String(abs) : abs.toFixed(2)}`;
+}
+
 export function TelemetryLegend({ lanes, cursorT }: Props) {
   const rows = lanes.flatMap((lane) => {
-    const isMulti = lane.series.valueColumns.length > 1;
     const primary = lane.series.valueColumns.map((col, i) => ({
       key: `${lane.key}__${col}`,
       color: lane.columnStyles[i].color,
@@ -24,24 +28,33 @@ export function TelemetryLegend({ lanes, cursorT }: Props) {
       label: lane.columnStyles[i].label,
       unit: lane.series.unit,
       value: nearestValue(lane.series.t, lane.series.values[col], cursorT),
+      delta: null as string | null,
     }));
-    // One compare row per column that actually has compare data — a grouped lane
-    // (e.g. Pedals) can have a comparison for every member, not just the first.
-    if (lane.compare) {
-      const compare = lane.compare;
+    // One row per compared lap per column that actually has compare data — a
+    // grouped lane (e.g. Pedals) can have a comparison for every member, not
+    // just the first. Each row shows that lap's value plus its delta against
+    // the reference lap shown just above (skipped for non-numeric/boolean columns).
+    lane.compares.forEach((cmp) => {
       lane.series.valueColumns.forEach((col, i) => {
-        const compareValues = compare.values[col];
+        const compareValues = cmp.series.values[col];
         if (!compareValues) return;
+        const compareValue = nearestValue(cmp.series.t, compareValues, cursorT);
+        const referenceValue = nearestValue(lane.series.t, lane.series.values[col], cursorT);
+        const delta =
+          typeof compareValue === 'number' && typeof referenceValue === 'number'
+            ? formatDelta(compareValue - referenceValue)
+            : null;
         primary.push({
-          key: `${lane.key}__${col}__compare`,
-          color: isMulti ? lane.columnStyles[i].color : COMPARE_COLOR,
-          dashed: true,
-          label: `${lane.columnStyles[i].label}${t('telemetryLegend.comparedSuffix')}`,
+          key: `${lane.key}__${col}__${cmp.id}`,
+          color: cmp.color,
+          dashed: false,
+          label: `${lane.columnStyles[i].label}${t('telemetryLegend.comparedSuffix')} — ${cmp.label}`,
           unit: lane.series.unit,
-          value: nearestValue(compare.t, compareValues, cursorT),
+          value: compareValue,
+          delta,
         });
       });
-    }
+    });
     return primary;
   });
 
@@ -54,6 +67,7 @@ export function TelemetryLegend({ lanes, cursorT }: Props) {
           <span className="legend-label">{r.label}</span>
           <span className="legend-value">
             {formatValue(r.value)} <span className="legend-unit">{r.unit}</span>
+            {r.delta && <span className="legend-delta">Δ {r.delta}</span>}
           </span>
         </div>
       ))}

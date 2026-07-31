@@ -78,10 +78,10 @@ export function SharedLap() {
   const lanes: Lane[] = useMemo(() => {
     const result: Lane[] = [];
     const speed = seriesByName['Ground Speed'];
-    if (speed) result.push({ key: 'speed', label: 'Ground Speed', series: speed, columnStyles: [{ label: 'Ground Speed', color: channelColor(0) }] });
+    if (speed) result.push({ key: 'speed', label: 'Ground Speed', series: speed, columnStyles: [{ label: 'Ground Speed', color: channelColor(0) }], compares: [] });
 
     const gear = seriesByName['Gear'];
-    if (gear) result.push({ key: 'gear', label: 'Gear', series: gear, columnStyles: [{ label: 'Gear', color: channelColor(1) }] });
+    if (gear) result.push({ key: 'gear', label: 'Gear', series: gear, columnStyles: [{ label: 'Gear', color: channelColor(1) }], compares: [] });
 
     const throttle = seriesByName['Throttle Pos Unfiltered'];
     const brake = seriesByName['Brake Pos Unfiltered'];
@@ -101,13 +101,14 @@ export function SharedLap() {
           { label: 'Throttle Pos Unfiltered', color: '#008300' },
           { label: 'Brake Pos Unfiltered', color: '#e66767' },
         ],
+        compares: [],
       });
     } else if (throttle) {
-      result.push({ key: 'throttle', label: 'Throttle Pos Unfiltered', series: throttle, columnStyles: [{ label: 'Throttle Pos Unfiltered', color: '#008300' }] });
+      result.push({ key: 'throttle', label: 'Throttle Pos Unfiltered', series: throttle, columnStyles: [{ label: 'Throttle Pos Unfiltered', color: '#008300' }], compares: [] });
     }
 
     const steering = seriesByName['Steering Pos'];
-    if (steering) result.push({ key: 'steering', label: 'Steering Pos', series: steering, columnStyles: [{ label: 'Steering Pos', color: channelColor(2) }] });
+    if (steering) result.push({ key: 'steering', label: 'Steering Pos', series: steering, columnStyles: [{ label: 'Steering Pos', color: channelColor(2) }], compares: [] });
 
     return result;
   }, [seriesByName]);

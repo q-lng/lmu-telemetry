@@ -904,6 +904,45 @@ body {
   color: var(--danger);
 }
 
+.compared-laps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 160px;
+  overflow-y: auto;
+  margin: 4px 0;
+}
+
+.compare-external-source {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  margin: 6px 0;
+}
+
+.compare-external-source-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--secondary-ink);
+}
+
+.compare-external-source-header button {
+  background: none;
+  border: none;
+  color: var(--muted-ink);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+}
+
+.compare-external-source-header button:hover {
+  color: var(--danger);
+}
+
 .preset-row {
   display: flex;
   gap: 4px;
@@ -1188,6 +1227,13 @@ body {
   color: var(--muted-ink);
   font-weight: 400;
   font-size: 11px;
+}
+
+.legend-delta {
+  color: var(--secondary-ink);
+  font-weight: 400;
+  font-size: 11px;
+  margin-left: 6px;
 }
 
 /* One unified bordered block containing every stacked lane, MoTeC-style: a single

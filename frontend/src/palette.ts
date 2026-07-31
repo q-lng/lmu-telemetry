@@ -32,10 +32,31 @@ export const CORNER_STYLE: { label: string; color: string; dash?: number[] }[] =
   { label: 'ARD', color: CATEGORICAL_DARK[1], dash: DASH_DASHED },
 ];
 
-/** Fixed neutral hue for the comparison-lap overlay — distinct from every
- * categorical/known channel color, so it stays visible even where the two
- * traces overlap (a faded version of the same hue disappears into it). */
-export const COMPARE_COLOR = '#c3c2b7';
+/** "By lap" color mode: every reference-lap channel shares this one neutral
+ * color, so distinct compared-lap colors are what the eye follows instead of
+ * per-channel hues. Distinct from every compared-lap color below. */
+export const REFERENCE_UNIFORM_COLOR = '#9aa0a6';
+
+/**
+ * Colors assigned to compared laps in the order they're added (not by channel)
+ * — stable per lap even if another compared lap is later removed. First is a
+ * plain white "ghost" trace (the common case: one reference vs one compared
+ * lap), solid rather than dashed so hue/brightness alone carries the identity.
+ */
+const COMPARED_LAP_COLORS = [
+  '#ffffff',
+  '#f2b705',
+  '#ff5fae',
+  '#5ecbf2',
+  '#8f6fe0',
+  '#7ee08f',
+  '#ff8a3d',
+  '#3cd9c5',
+];
+
+export function comparedLapColor(index: number): string {
+  return COMPARED_LAP_COLORS[index % COMPARED_LAP_COLORS.length];
+}
 
 export const CHART_CHROME = {
   surface: '#1a1a19',

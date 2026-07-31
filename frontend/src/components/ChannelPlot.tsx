@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import uPlot from 'uplot';
 import type { Lane } from '../types';
-import { CHART_CHROME, COMPARE_COLOR } from '../palette';
+import { CHART_CHROME } from '../palette';
 import { t } from '../i18n';
 
 function formatTime(s: number): string {
@@ -184,44 +184,42 @@ export function ChannelPlot({
 
   useEffect(() => {
     if (!containerRef.current) return;
-    const { series, columnStyles, compare } = lane;
+    const { series, columnStyles, compares } = lane;
     const isEvent = series.kind === 'event';
     const stepPaths = isEvent ? uPlot.paths.stepped!({ align: 1 }) : undefined;
 
-    const isMulti = series.valueColumns.length > 1;
     const data: (number | null)[][] = [series.t, ...series.valueColumns.map((col) => numeric(series.values[col]))];
     const seriesOpts: uPlot.Series[] = [
       {},
       ...series.valueColumns.map((col, i) => ({
         label: columnStyles[i].label,
         stroke: columnStyles[i].color,
-        // slightly thicker when a comparison lap overlays it, so the primary trace stays the clear focal line
-        width: compare ? 2 : 1.5,
+        // slightly thicker when compared laps overlay it, so the reference trace stays the clear focal line
+        width: compares.length > 0 ? 2 : 1.5,
         dash: columnStyles[i].dash,
         paths: stepPaths,
         points: { show: false },
       })),
     ];
 
-    if (compare) {
+    // Each compared lap gets its own solid color (no more dashing — the color
+    // itself is what tells laps apart now), applied to every value column of
+    // this lane for that lap (a grouped lane's members aren't distinguished
+    // from one another within a single compared lap's overlay).
+    compares.forEach((cmp) => {
       series.valueColumns.forEach((col, i) => {
-        const compareValues = compare.values[col];
+        const compareValues = cmp.series.values[col];
         if (!compareValues) return;
         data.push(compareValues);
         seriesOpts.push({
-          label: `${columnStyles[i].label}${t('channelPlot.comparedSuffix')}`,
-          // a single-channel lane uses a fixed neutral hue so the ghost trace never
-          // disappears into the primary; a grouped lane already has one color per
-          // member, so reuse that instead — a second neutral trace couldn't be told
-          // apart from the others'.
-          stroke: isMulti ? columnStyles[i].color : COMPARE_COLOR,
+          label: `${columnStyles[i].label}${t('channelPlot.comparedSuffix')} — ${cmp.label}`,
+          stroke: cmp.color,
           width: 2.5,
-          dash: [3, 5],
           paths: stepPaths,
           points: { show: false },
         });
       });
-    }
+    });
 
     const opts: uPlot.Options = {
       width: containerRef.current.clientWidth,
