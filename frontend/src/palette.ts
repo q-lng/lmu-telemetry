@@ -40,11 +40,12 @@ export const REFERENCE_UNIFORM_COLOR = '#9aa0a6';
 /**
  * Colors assigned to compared laps in the order they're added (not by channel)
  * — stable per lap even if another compared lap is later removed. First is a
- * plain white "ghost" trace (the common case: one reference vs one compared
- * lap), solid rather than dashed so hue/brightness alone carries the identity.
+ * light grey "ghost" trace (the common case: one reference vs one compared
+ * lap) — more legible than pure white — solid rather than dashed so
+ * hue/brightness alone carries the identity.
  */
 const COMPARED_LAP_COLORS = [
-  '#ffffff',
+  '#c0c0c0',
   '#f2b705',
   '#ff5fae',
   '#5ecbf2',
@@ -52,10 +53,36 @@ const COMPARED_LAP_COLORS = [
   '#7ee08f',
   '#ff8a3d',
   '#3cd9c5',
+  '#c9d94a',
 ];
 
+/** Mixes `hex` toward white (amount > 0) or black (amount < 0), clamped to
+ * [-1, 1] — used to derive extra shades once the base palette runs out. */
+function adjustLightness(hex: string, amount: number): string {
+  const clamped = Math.max(-1, Math.min(1, amount));
+  const num = parseInt(hex.slice(1), 16);
+  const channel = (shift: number) => {
+    const c = (num >> shift) & 0xff;
+    const mixed = clamped >= 0 ? c + (255 - c) * clamped : c * (1 + clamped);
+    return Math.min(255, Math.max(0, Math.round(mixed)));
+  };
+  return `#${[channel(16), channel(8), channel(0)].map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+}
+
+/**
+ * Beyond the base palette (rare — 9+ compared laps at once), colors would
+ * otherwise repeat exactly and become indistinguishable. Each extra full
+ * cycle through the palette alternates darker/lighter shades of the same
+ * base hues instead — not infinitely distinguishable, but better than a
+ * flat repeat.
+ */
 export function comparedLapColor(index: number): string {
-  return COMPARED_LAP_COLORS[index % COMPARED_LAP_COLORS.length];
+  const base = COMPARED_LAP_COLORS[index % COMPARED_LAP_COLORS.length];
+  const cycle = Math.floor(index / COMPARED_LAP_COLORS.length);
+  if (cycle === 0) return base;
+  const step = Math.ceil(cycle / 2) * 0.25;
+  const amount = cycle % 2 === 1 ? -step : step;
+  return adjustLightness(base, amount);
 }
 
 export const CHART_CHROME = {

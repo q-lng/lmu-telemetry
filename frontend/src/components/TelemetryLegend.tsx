@@ -14,6 +14,11 @@ interface Props {
   comparedLapColumns: ComparedLapColumn[];
 }
 
+// Beyond this many compared-lap columns, the table stops fitting sensibly no
+// matter how narrow each column gets — cap it and say how many are hidden
+// (still fully visible in the graphs themselves) rather than degrading silently.
+const MAX_LEGEND_LAP_COLUMNS = 3;
+
 function formatValue(v: number | boolean | null): string {
   if (v === null || v === undefined) return '–';
   if (typeof v === 'boolean') return v ? t('telemetryLegend.on') : t('telemetryLegend.off');
@@ -72,7 +77,9 @@ export function TelemetryLegend({ lanes, cursorT, comparedLapColumns }: Props) {
     );
   }
 
-  const otherColumnWidth = 68 / (1 + comparedLapColumns.length);
+  const shownColumns = comparedLapColumns.slice(0, MAX_LEGEND_LAP_COLUMNS);
+  const hiddenCount = comparedLapColumns.length - shownColumns.length;
+  const otherColumnWidth = 68 / (1 + shownColumns.length);
 
   return (
     <div className="telemetry-legend">
@@ -80,7 +87,7 @@ export function TelemetryLegend({ lanes, cursorT, comparedLapColumns }: Props) {
         <colgroup>
           <col style={{ width: '32%' }} />
           <col style={{ width: `${otherColumnWidth}%` }} />
-          {comparedLapColumns.map((col) => (
+          {shownColumns.map((col) => (
             <col key={col.id} style={{ width: `${otherColumnWidth}%` }} />
           ))}
         </colgroup>
@@ -88,7 +95,7 @@ export function TelemetryLegend({ lanes, cursorT, comparedLapColumns }: Props) {
           <tr>
             <th>{t('telemetryLegend.channel')}</th>
             <th>{t('telemetryLegend.reference')}</th>
-            {comparedLapColumns.map((col) => (
+            {shownColumns.map((col) => (
               <th key={col.id} style={{ color: col.color }}>
                 {col.label}
               </th>
@@ -105,7 +112,7 @@ export function TelemetryLegend({ lanes, cursorT, comparedLapColumns }: Props) {
               <td className="legend-value-cell">
                 {formatValue(r.referenceValue)} <span className="legend-unit">{r.unit}</span>
               </td>
-              {comparedLapColumns.map((col) => {
+              {shownColumns.map((col) => {
                 const entry = r.compares[col.id];
                 return (
                   <td key={col.id} className="legend-value-cell">
@@ -124,6 +131,9 @@ export function TelemetryLegend({ lanes, cursorT, comparedLapColumns }: Props) {
           ))}
         </tbody>
       </table>
+      {hiddenCount > 0 && (
+        <div className="legend-overflow-hint">{t('telemetryLegend.moreLapsHidden', { count: hiddenCount })}</div>
+      )}
     </div>
   );
 }

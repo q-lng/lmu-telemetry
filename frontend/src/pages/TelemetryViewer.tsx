@@ -1220,28 +1220,30 @@ export default function TelemetryViewer() {
             <button className={colorMode === 'byLap' ? 'active' : ''} onClick={() => setColorMode('byLap')}>
               {t('tv.colorModeByLap')}
             </button>
-            {colorMode === 'byLap' && (
-              <button
-                className={colorPrefsOpen ? 'active' : ''}
-                onClick={() => setColorPrefsOpen((o) => !o)}
-                title={t('tv.colorPrefsToggle')}
-              >
-                ⚙
-              </button>
-            )}
+            {/* Compared-lap colors apply in both modes (only the reference-lap
+                coloring is byLap-specific), so this isn't gated on colorMode. */}
+            <button
+              className={colorPrefsOpen ? 'active' : ''}
+              onClick={() => setColorPrefsOpen((o) => !o)}
+              title={t('tv.colorPrefsToggle')}
+            >
+              ⚙
+            </button>
           </div>
         </label>
 
-        {colorMode === 'byLap' && colorPrefsOpen && (
+        {colorPrefsOpen && (
           <div className="field color-prefs">
-            <label className="color-pref-row">
-              <input
-                type="color"
-                value={preferredReferenceLapColor ?? REFERENCE_UNIFORM_COLOR}
-                onChange={(e) => setPreference('referenceLapColor', e.target.value)}
-              />
-              {t('tv.referenceLapColorLabel')}
-            </label>
+            {colorMode === 'byLap' && (
+              <label className="color-pref-row">
+                <input
+                  type="color"
+                  value={preferredReferenceLapColor ?? REFERENCE_UNIFORM_COLOR}
+                  onChange={(e) => setPreference('referenceLapColor', e.target.value)}
+                />
+                {t('tv.referenceLapColorLabel')}
+              </label>
+            )}
             {Array.from({ length: COMPARED_LAP_COLOR_SLOTS }, (_, i) => (
               <label key={i} className="color-pref-row">
                 <input

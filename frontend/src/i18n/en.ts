@@ -125,6 +125,8 @@ export const en = {
   'telemetryLegend.selectChannelsHint': 'Select channels on the left',
   'telemetryLegend.channel': 'Channel',
   'telemetryLegend.reference': 'Reference',
+  'telemetryLegend.moreLapsHidden': (p: { count: number }) =>
+    `+${p.count} more compared lap${p.count > 1 ? 's' : ''} (see the graphs above)`,
   'telemetryLegend.on': 'ON',
   'telemetryLegend.off': 'OFF',
 

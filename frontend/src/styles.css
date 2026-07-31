@@ -1233,6 +1233,12 @@ body {
   padding: 8px 0;
 }
 
+.legend-overflow-hint {
+  color: var(--muted-ink);
+  font-size: 10px;
+  padding-top: 4px;
+}
+
 .telemetry-legend-table {
   table-layout: fixed;
   width: 100%;
