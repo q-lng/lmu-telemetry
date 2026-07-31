@@ -13,7 +13,10 @@ export function Browse() {
   async function runSearch() {
     setSearching(true);
     try {
-      const filter = { track: track.trim() || undefined, car: car.trim() || undefined };
+      // "Parcourir" is for discovering what OTHERS have shared — the viewer's own
+      // files (even public ones) already live in "Mes sessions"/the session picker,
+      // not mixed into search results here.
+      const filter = { track: track.trim() || undefined, car: car.trim() || undefined, excludeMine: true };
       const [s, l] = await Promise.all([fetchSessions(filter), searchSharedLaps(filter)]);
       setSessions(s);
       setLaps(l);

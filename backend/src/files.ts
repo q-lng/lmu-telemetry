@@ -29,8 +29,12 @@ function isLapVisibility(v: unknown): v is LapVisibility {
 }
 
 export async function registerFiles(app: FastifyInstance): Promise<void> {
-  app.get<{ Querystring: { track?: string; car?: string } }>('/api/sessions', async (req) => {
-    const files = await listVisibleFiles(req.userId, { track: req.query.track, car: req.query.car });
+  app.get<{ Querystring: { track?: string; car?: string; excludeMine?: string } }>('/api/sessions', async (req) => {
+    const files = await listVisibleFiles(
+      req.userId,
+      { track: req.query.track, car: req.query.car },
+      { excludeOwn: req.query.excludeMine === 'true' },
+    );
     return Promise.all(
       files.map(async (f): Promise<SessionSummary> => {
         const meta = await getSessionMetadata(f.filename).catch(() => null);
@@ -269,7 +273,15 @@ export async function registerFiles(app: FastifyInstance): Promise<void> {
     },
   );
 
-  app.get<{ Querystring: { track?: string; car?: string } }>('/api/shared-laps/search', async (req) => {
-    return { laps: await searchSharedLaps(req.userId, { track: req.query.track, car: req.query.car }) };
-  });
+  app.get<{ Querystring: { track?: string; car?: string; excludeMine?: string } }>(
+    '/api/shared-laps/search',
+    async (req) => {
+      const laps = await searchSharedLaps(
+        req.userId,
+        { track: req.query.track, car: req.query.car },
+        { excludeOwn: req.query.excludeMine === 'true' },
+      );
+      return { laps };
+    },
+  );
 }

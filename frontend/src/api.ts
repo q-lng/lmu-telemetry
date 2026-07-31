@@ -62,10 +62,13 @@ export async function fetchMe(): Promise<PublicUser | null> {
   return body.user;
 }
 
-export function fetchSessions(filter: { track?: string; car?: string } = {}): Promise<SessionSummary[]> {
+export function fetchSessions(
+  filter: { track?: string; car?: string; excludeMine?: boolean } = {},
+): Promise<SessionSummary[]> {
   const params = new URLSearchParams();
   if (filter.track) params.set('track', filter.track);
   if (filter.car) params.set('car', filter.car);
+  if (filter.excludeMine) params.set('excludeMine', 'true');
   const q = params.toString();
   return getJson(`/api/sessions${q ? `?${q}` : ''}`);
 }
@@ -168,10 +171,13 @@ export function setLapVisibility(filename: string, lapNumber: number, visibility
   return postJson(`/api/sessions/${encodeURIComponent(filename)}/laps/${lapNumber}/visibility`, { visibility });
 }
 
-export function searchSharedLaps(filter: { track?: string; car?: string } = {}): Promise<SharedLapResult[]> {
+export function searchSharedLaps(
+  filter: { track?: string; car?: string; excludeMine?: boolean } = {},
+): Promise<SharedLapResult[]> {
   const params = new URLSearchParams();
   if (filter.track) params.set('track', filter.track);
   if (filter.car) params.set('car', filter.car);
+  if (filter.excludeMine) params.set('excludeMine', 'true');
   const q = params.toString();
   return getJson<{ laps: SharedLapResult[] }>(`/api/shared-laps/search${q ? `?${q}` : ''}`).then((r) => r.laps);
 }
