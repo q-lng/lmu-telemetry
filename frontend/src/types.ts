@@ -97,13 +97,14 @@ export interface CompareSeries {
 
 // A lap checked for comparison against the reference lap — `id` is a stable key
 // (`${sourceId}:${lapNumber}`), `sourceId` is 'primary' (the open session) or an
-// ExternalSource's id, and `color` is assigned once at add-time so it stays
-// stable even if other compared laps are later removed.
+// ExternalSource's id. Deliberately has no `color` field — color is derived
+// purely from this lap's current position in the comparedLaps list (see
+// TelemetryViewer's `comparedLapColorAt`), so toggling the same lap off and
+// back on always gives it back the same color instead of drifting forward.
 export interface ComparedLap {
   id: string;
   sourceId: string;
   lapNumber: number;
-  color: string;
 }
 
 export interface LaneCompare {

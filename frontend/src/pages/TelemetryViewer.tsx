@@ -72,6 +72,9 @@ const KNOWN_COLORS: Record<string, string> = {
 };
 
 const CLUTCH_CHANNEL = 'Clutch Pos Unfiltered';
+// Display order when the Pedals group is split into separate graphs — brake
+// above throttle, clutch (if enabled) last.
+const PEDALS_SPLIT_ORDER = ['Brake Pos Unfiltered', 'Throttle Pos Unfiltered', CLUTCH_CHANNEL];
 
 const INITIAL_LAYOUT: LayoutItem[] = [
   { type: 'channel', name: 'Ground Speed' },
@@ -321,7 +324,6 @@ export default function TelemetryViewer() {
   // "external source" session (server session or local guest file) — e.g.
   // comparing your own two laps, plus a friend's fastest lap from another file.
   const [comparedLaps, setComparedLaps] = useState<ComparedLap[]>([]);
-  const comparedLapColorCounter = useRef(0);
   const [colorMode, setColorMode] = useState<ColorMode>('byChannel');
 
   const [externalSources, setExternalSources] = useState<ExternalSource[]>([]);
@@ -332,8 +334,11 @@ export default function TelemetryViewer() {
   });
   const addSourceGuestFileInputRef = useRef<HTMLInputElement>(null);
 
-  function nextComparedLapColor(): string {
-    const index = comparedLapColorCounter.current++;
+  // Color is purely a function of a compared lap's CURRENT position in the list
+  // (matching the "compared lap 1/2/3..." color preferences) — never stored, so
+  // toggling the same lap off and back on always gives it back the same color,
+  // and editing a color preference updates every currently-selected lap live.
+  function comparedLapColorAt(index: number): string {
     return preferredComparedLapColors?.[index] ?? comparedLapColor(index);
   }
 
@@ -347,7 +352,7 @@ export default function TelemetryViewer() {
         return prev.filter((cl) => !(cl.sourceId === sourceId && cl.lapNumber === lapNumber));
       }
       const id = `${sourceId}:${lapNumber}`;
-      return [...prev, { id, sourceId, lapNumber, color: nextComparedLapColor() }];
+      return [...prev, { id, sourceId, lapNumber }];
     });
   }
 
@@ -841,15 +846,15 @@ export default function TelemetryViewer() {
 
     function buildLaneCompares(names: string[], targetSeries: ChannelSeries): LaneCompare[] {
       const out: LaneCompare[] = [];
-      for (const cl of comparedLaps) {
+      comparedLaps.forEach((cl, index) => {
         const perChannel = comparesByLapId[cl.id];
-        if (!perChannel) continue;
+        if (!perChannel) return;
         const series = names.length === 1
           ? perChannel[names[0]] ?? null
           : buildCombinedCompare(names, perChannel, seriesByName, targetSeries.t);
-        if (!series) continue;
-        out.push({ id: cl.id, label: comparedLapLabel(cl), color: cl.color, series });
-      }
+        if (!series) return;
+        out.push({ id: cl.id, label: comparedLapLabel(cl), color: comparedLapColorAt(index), series });
+      });
       return out;
     }
 
@@ -862,7 +867,11 @@ export default function TelemetryViewer() {
           // tagged with the same boxId so the render layer keeps them visually
           // enclosed together under the group's name instead of scattering them
           // into the general layout.
-          present.forEach((c) => {
+          const orderedPresent =
+            item.special === 'pedals'
+              ? [...present].sort((a, b) => PEDALS_SPLIT_ORDER.indexOf(a) - PEDALS_SPLIT_ORDER.indexOf(b))
+              : present;
+          orderedPresent.forEach((c) => {
             const series = withXAxis(seriesByName[c]);
             result.push({
               key: `${item.id}__${c}`,
@@ -923,13 +932,28 @@ export default function TelemetryViewer() {
 
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout, seriesByName, comparesByLapId, comparedLaps, colorMode, preferredReferenceLapColor, effectiveXAxisMode, distRef]);
+  }, [
+    layout,
+    seriesByName,
+    comparesByLapId,
+    comparedLaps,
+    colorMode,
+    preferredReferenceLapColor,
+    preferredComparedLapColors,
+    externalSources,
+    effectiveXAxisMode,
+    distRef,
+  ]);
 
   const gpsX = gps ? (effectiveXAxisMode === 'distance' ? toDistanceX(gps.t, distRef) : gps.t) : [];
   // Global column order for the legend table — a lane missing data for one of
   // these (e.g. a channel absent from an external source) just shows a dash,
   // rather than each lane inventing its own column order.
-  const comparedLapColumns = comparedLaps.map((cl) => ({ id: cl.id, label: comparedLapLabel(cl), color: cl.color }));
+  const comparedLapColumns = comparedLaps.map((cl, index) => ({
+    id: cl.id,
+    label: comparedLapLabel(cl),
+    color: comparedLapColorAt(index),
+  }));
 
   function channelPlotFor(lane: Lane, flatIndex: number) {
     return (
@@ -1380,18 +1404,18 @@ export default function TelemetryViewer() {
                   {item.type === 'group' && item.special === 'pedals' && (
                     <>
                       <button
-                        className={`pedals-toggle-btn${item.channels.includes(CLUTCH_CHANNEL) ? ' active' : ''}`}
+                        className={item.channels.includes(CLUTCH_CHANNEL) ? 'active' : ''}
                         onClick={() => togglePedalsClutch(i)}
                         title={t('tv.pedalsToggleClutch')}
                       >
-                        {t('tv.clutchAbbrev')}
+                        C
                       </button>
                       <button
-                        className={`pedals-toggle-btn${item.grouped === false ? ' active' : ''}`}
+                        className={item.grouped === false ? 'active' : ''}
                         onClick={() => togglePedalsGrouped(i)}
                         title={t('tv.pedalsToggleGrouped')}
                       >
-                        {item.grouped === false ? t('tv.ungroupedShort') : t('tv.groupedShort')}
+                        {item.grouped === false ? '▦' : '▣'}
                       </button>
                     </>
                   )}

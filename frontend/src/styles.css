@@ -1136,13 +1136,6 @@ body {
   background: var(--accent);
 }
 
-.pedals-toggle-btn {
-  width: auto;
-  padding: 0 6px;
-  font-size: 10px;
-  white-space: nowrap;
-}
-
 .channel-list {
   display: flex;
   flex-direction: column;
