@@ -1,4 +1,19 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: lmu
+      POSTGRES_USER: lmu
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lmu -d lmu"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   backend:
     build: ./backend
     ports:
@@ -9,6 +24,12 @@ services:
     environment:
       DATA_DIR: /data
       PORT: 3001
+      DATABASE_URL: postgresql://lmu:${POSTGRES_PASSWORD}@postgres:5432/lmu
+      COOKIE_SECRET: ${COOKIE_SECRET}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   frontend:
     build: ./frontend
@@ -23,3 +44,6 @@ services:
       BACKEND_URL: http://backend:3001
     depends_on:
       - backend
+
+volumes:
+  pgdata:

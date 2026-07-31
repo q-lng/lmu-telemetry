@@ -32,6 +32,27 @@ export interface ChannelSeries {
   values: Record<string, (number | boolean | null)[]>;
 }
 
+export interface PublicUser {
+  id: number;
+  email: string;
+  pseudo: string;
+  nom: string;
+  prenom: string;
+}
+
+export interface ProfileSummary extends PublicUser {
+  isFriend: boolean;
+  isFollowing: boolean;
+  requestState: 'none' | 'sent' | 'received';
+  friendRequestId?: number;
+}
+
+export interface FriendRequestSummary {
+  id: number;
+  user: PublicUser;
+  createdAt: string;
+}
+
 export interface LapInfo {
   lap: number;
   startTs: number;
