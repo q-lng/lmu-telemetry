@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import uPlot from 'uplot';
 import type { Lane } from '../types';
@@ -32,6 +32,23 @@ function formatValue(v: number | boolean | null): string {
 
 function numeric(values: (number | boolean | null)[]): (number | null)[] {
   return values.map((v) => (typeof v === 'boolean' ? (v ? 1 : 0) : v));
+}
+
+/** The numeric data arrays uPlot needs — shared between construction and the
+ * data-only refresh effect below, so a plain new batch of values (same
+ * channels/compares, nothing structural changed) goes through the exact same
+ * column layout either way. */
+function buildPlotData(lane: Lane): (number | null)[][] {
+  const { series, compares } = lane;
+  const data: (number | null)[][] = [series.t, ...series.valueColumns.map((col) => numeric(series.values[col]))];
+  compares.forEach((cmp) => {
+    series.valueColumns.forEach((col) => {
+      const compareValues = cmp.series.values[col];
+      if (!compareValues) return;
+      data.push(compareValues);
+    });
+  });
+  return data;
 }
 
 // Reference and compared-lap traces are the same thickness — color is what
@@ -87,14 +104,21 @@ const CLICK_MOVE_THRESHOLD = 4;
  * to every lane sharing `syncKey` — `cursor.sync.scales` only syncs uPlot's own
  * native cursor/drag interactions, not externally-invoked `setScale()` calls, so
  * the resulting range is pushed by hand to every plot in `uPlot.sync(syncKey)`.
- * Bounds are taken from the actual x data (not `u.scales.x`, which reflects the
- * current — possibly already zoomed — view and can lag right after construction).
+ * Bounds come from the shared `xDomain` (falling back to this plot's own x data
+ * only if it's unavailable) — NOT `u.data[0]`, which for a sparse event channel
+ * (Gear, ...) can be narrower than the actual full lap/session, capping how far
+ * this one lane could ever zoom/pan out regardless of the other lanes' range.
  * `onClickAt` fires instead of a pan when the mouse barely moved between down/up. */
-function attachZoomPan(u: uPlot, syncKey: string, onClickAt?: (value: number) => void): () => void {
+function attachZoomPan(
+  u: uPlot,
+  syncKey: string,
+  xDomain: [number, number] | null | undefined,
+  onClickAt?: (value: number) => void,
+): () => void {
   const over = u.over;
   const xs = u.data[0] as number[];
-  const fullMin = xs[0];
-  const fullMax = xs[xs.length - 1];
+  const fullMin = xDomain ? xDomain[0] : xs[0];
+  const fullMax = xDomain ? xDomain[1] : xs[xs.length - 1];
   const fullRange = fullMax - fullMin || 1;
 
   function clampRange(min: number, max: number): [number, number] {
@@ -270,13 +294,35 @@ export function ChannelPlot({
     }
   }, [cursorLocked, cursorT]);
 
+  // Everything that actually determines uPlot's OPTIONS shape (series count/
+  // kind/colors/dash, Y-centering) — deliberately excluding the raw t/values
+  // arrays. `lanes` (in TelemetryViewer) rebuilds every Lane object (new
+  // references) on nearly any state change, so keying the rebuild effect
+  // below on `lane` itself meant EVERY currently-shown graph got destroyed
+  // and reconstructed on nearly any update — expensive enough (with real
+  // telemetry-sized series) to freeze the page, corrupting anything else in
+  // flight at that moment (e.g. an in-progress drag-reorder). Keying it on
+  // this signature instead means a lane whose own content didn't actually
+  // change (just data updates elsewhere, or this lane simply moved position)
+  // skips the rebuild entirely — see the data-only refresh effect below for
+  // how new values still reach the chart in that case.
+  const structuralSignature = useMemo(() => {
+    return [
+      lane.series.kind,
+      lane.series.valueColumns.join(','),
+      lane.compares.map((c) => `${c.id}:${c.color}`).join(','),
+      lane.centerYOnZero ? '1' : '0',
+      lane.columnStyles.map((cs) => `${cs.color}:${cs.dash ? cs.dash.join('-') : ''}:${cs.label}`).join(','),
+    ].join('|');
+  }, [lane]);
+
   useEffect(() => {
     if (!containerRef.current) return;
     const { series, columnStyles, compares } = lane;
     const isEvent = series.kind === 'event';
     const stepPaths = isEvent ? uPlot.paths.stepped!({ align: 1 }) : undefined;
 
-    const data: (number | null)[][] = [series.t, ...series.valueColumns.map((col) => numeric(series.values[col]))];
+    const data = buildPlotData(lane);
     const seriesOpts: uPlot.Series[] = [
       {},
       ...series.valueColumns.map((col, i) => ({
@@ -298,7 +344,6 @@ export function ChannelPlot({
       series.valueColumns.forEach((col, i) => {
         const compareValues = cmp.series.values[col];
         if (!compareValues) return;
-        data.push(compareValues);
         seriesOpts.push({
           label: `${columnStyles[i].label}${t('channelPlot.comparedSuffix')} — ${cmp.label}`,
           stroke: cmp.color,
@@ -308,6 +353,18 @@ export function ChannelPlot({
         });
       });
     });
+
+    // Suppresses the setScale hook's onViewRangeChange report for the ONE
+    // scale-seeding call made right after construction (below) — otherwise a
+    // rebuild that happens to fire before xDomain has caught up with a newly
+    // selected lap (distRef/xDomain update asynchronously, not in the same
+    // tick as selecting the lap) reports that still-stale, wider range back
+    // up as if it were a deliberate zoom. That gets "preserved" across the
+    // NEXT rebuild (the one where xDomain finally reflects the new lap),
+    // permanently locking the view to the wrong domain until a real zoom
+    // overwrites it. Only genuine interactive zoom/pan (attachZoomPan's own
+    // setScale calls, made after this flag flips back) should ever report.
+    let suppressReport = true;
 
     const opts: uPlot.Options = {
       width: containerRef.current.clientWidth,
@@ -357,7 +414,7 @@ export function ChannelPlot({
         // redundant repeated updates for the same value.
         setScale: [
           (u, key) => {
-            if (!showXAxis || key !== 'x' || !onViewRangeChange) return;
+            if (suppressReport || !showXAxis || key !== 'x' || !onViewRangeChange) return;
             const { min, max } = u.scales.x;
             if (min != null && max != null) onViewRangeChange({ min, max });
           },
@@ -405,11 +462,8 @@ export function ChannelPlot({
     } else if (xDomain) {
       plot.setScale('x', { min: xDomain[0], max: xDomain[1] });
     }
-    const detachZoomPan = attachZoomPan(plot, syncKey, onCursorClick);
-
-    if (showXAxis && onViewRangeChange && plot.scales.x.min != null && plot.scales.x.max != null) {
-      onViewRangeChange({ min: plot.scales.x.min, max: plot.scales.x.max });
-    }
+    suppressReport = false;
+    const detachZoomPan = attachZoomPan(plot, syncKey, xDomain, onCursorClick);
 
     // The lane's pixel size is entirely a function of CSS flex-grow (see the
     // `.lane` weight style below) — this observer is what turns that layout
@@ -428,7 +482,23 @@ export function ChannelPlot({
       plotRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lane, syncKey, showXAxis, xAxisMode, xDomain]);
+  }, [structuralSignature, syncKey, showXAxis, xAxisMode, xDomain]);
+
+  // Cheap path for a lane whose structure didn't change (see
+  // structuralSignature above) but whose actual values did — a new fetch
+  // resolved, a compared lap's data arrived, etc. setData(..., false)
+  // refreshes the chart in place without resetting the user's current zoom;
+  // the Y range still needs recomputing by hand since it's otherwise only
+  // ever set once, from the data available at construction time.
+  useEffect(() => {
+    const plot = plotRef.current;
+    if (!plot) return;
+    const data = buildPlotData(lane);
+    plot.setData(data as uPlot.AlignedData, false);
+    const yRange = lane.centerYOnZero ? computeZeroCenteredYRange(data) : computeFixedYRange(data);
+    plot.setScale('y', { min: yRange[0], max: yRange[1] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lane]);
 
   function handleResizeStart(e: ReactMouseEvent) {
     e.preventDefault();
