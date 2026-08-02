@@ -42,6 +42,12 @@ type ColorMode = 'byChannel' | 'byLap';
 interface ChannelLayoutItem {
   type: 'channel';
   name: string;
+  // Only meaningful for a multi-column (4-wheel corner) channel: true splits it
+  // into one separate graph per column instead of the default combined overlay
+  // with fixed corner color/dash — splitting is what lets each wheel become a
+  // normal single-column lane, gaining full compared-lap + colorMode support
+  // that the combined view deliberately doesn't have room for.
+  splitCorners?: boolean;
 }
 interface GroupLayoutItem {
   type: 'group';
@@ -802,17 +808,19 @@ export default function TelemetryViewer() {
     };
   }, [dataSource, effectiveRange]);
 
-  // Compared laps — each resampled onto the reference lap's x-grid, single-value
-  // channels only. In time mode that's elapsed-time alignment; in distance mode
-  // it MUST be aligned by track position instead (each compared lap's own Lap
-  // Dist), or a lap with different pace just shows its value at a mismatched
-  // point on the track.
+  // Compared laps — every value column resampled onto the reference lap's
+  // x-grid (multi-column/4-wheel channels included: each column is fetched and
+  // resampled the same way, the corner-split display just picks out one at a
+  // time — see the lanes builder). In time mode that's elapsed-time alignment;
+  // in distance mode it MUST be aligned by track position instead (each
+  // compared lap's own Lap Dist), or a lap with different pace just shows its
+  // value at a mismatched point on the track.
   useEffect(() => {
     if (!dataSource || selectedLap === 'full' || comparedLaps.length === 0) {
       setComparesByLapId({});
       return;
     }
-    const targets = selectedChannels.filter((name) => seriesByName[name]?.valueColumns.length === 1);
+    const targets = selectedChannels.filter((name) => seriesByName[name]);
     const useDistance = xAxisMode === 'distance';
     let cancelled = false;
 
@@ -840,17 +848,21 @@ export default function TelemetryViewer() {
       const perChannel: Record<string, CompareSeries> = {};
       // A channel missing from the comparison source (different car/track) just
       // resolves to null above and is skipped rather than breaking the whole compare.
+      // Every value column is resampled the same way — a multi-column (4-wheel)
+      // channel just means more than one entry in `values`, all sharing one `t`.
       (results.filter(Boolean) as { name: string; s: ChannelSeries }[]).forEach(({ name, s }) => {
-        const col = s.valueColumns[0];
         const tRel = s.t.map((x) => x - lapOffset);
         const primary = seriesByName[name];
+        const values: Record<string, (number | null)[]> = {};
 
         if (useDistance && lapDistRef) {
           const lapDist = toDistanceX(tRel, lapDistRef);
           if (s.kind === 'continuous') {
             const primaryDist = toDistanceX(primary.t, distRef);
-            const resampled = resampleContinuous(lapDist, s.values[col] as (number | null)[], primaryDist);
-            perChannel[name] = { t: primaryDist, values: { [col]: resampled } };
+            s.valueColumns.forEach((col) => {
+              values[col] = resampleContinuous(lapDist, s.values[col] as (number | null)[], primaryDist);
+            });
+            perChannel[name] = { t: primaryDist, values };
           } else {
             // Event/step channel (Gear, In Pits, ...): only has a sample at each
             // change, on its OWN timing — resampling straight onto the reference
@@ -859,14 +871,22 @@ export default function TelemetryViewer() {
             // change instead. Keep this lap's own timestamps (just axis-converted)
             // and defer the final hold-last-value resample to the lanes builder's
             // alignEventCompares, once every compared lap's own points are known.
-            perChannel[name] = { t: lapDist, values: { [col]: toNumericOrNull(s.values[col]) } };
+            s.valueColumns.forEach((col) => {
+              values[col] = toNumericOrNull(s.values[col]);
+            });
+            perChannel[name] = { t: lapDist, values };
           }
         } else if (s.kind === 'continuous') {
           const grid = primary.t;
-          const resampled = resampleContinuous(tRel, s.values[col] as (number | null)[], grid);
-          perChannel[name] = { t: grid, values: { [col]: resampled } };
+          s.valueColumns.forEach((col) => {
+            values[col] = resampleContinuous(tRel, s.values[col] as (number | null)[], grid);
+          });
+          perChannel[name] = { t: grid, values };
         } else {
-          perChannel[name] = { t: tRel, values: { [col]: toNumericOrNull(s.values[col]) } };
+          s.valueColumns.forEach((col) => {
+            values[col] = toNumericOrNull(s.values[col]);
+          });
+          perChannel[name] = { t: tRel, values };
         }
       });
       return [cl.id, perChannel];
@@ -1019,6 +1039,16 @@ export default function TelemetryViewer() {
       if (cur.type !== 'group') return prev;
       const next = [...prev];
       next[index] = { ...cur, grouped };
+      return next;
+    });
+  }
+
+  function toggleCornerSplit(index: number) {
+    setLayout((prev) => {
+      const cur = prev[index];
+      if (cur.type !== 'channel') return prev;
+      const next = [...prev];
+      next[index] = { ...cur, splitCorners: !cur.splitCorners };
       return next;
     });
   }
@@ -1189,6 +1219,27 @@ export default function TelemetryViewer() {
       return out;
     }
 
+    // Picks a single column out of a multi-column channel's already-fetched
+    // compare data (comparesByLapId is keyed by CHANNEL name, e.g. "Brakes
+    // Force", with one CompareSeries covering all its wheel columns together)
+    // — used when a corner-split lane needs just its own wheel's data, not
+    // buildLaneCompares' "names[0] IS the top-level key" assumption.
+    function buildCornerCompares(channelName: string, col: string): LaneCompare[] {
+      const out: LaneCompare[] = [];
+      comparedLaps.forEach((cl, index) => {
+        const cmp = comparesByLapId[cl.id]?.[channelName];
+        const colValues = cmp?.values[col];
+        if (!cmp || !colValues) return;
+        out.push({
+          id: cl.id,
+          label: comparedLapLabel(cl),
+          color: comparedLapColorAt(index),
+          series: { t: cmp.t, values: { [col]: colValues } },
+        });
+      });
+      return out;
+    }
+
     // Single-column event channels (Gear, In Pits, ...) only have a sample at
     // each change — each compare's own change-point timestamps were preserved
     // as-is (see the compare-fetch effect above), so build the union of the
@@ -1298,13 +1349,43 @@ export default function TelemetryViewer() {
         const series = seriesByName[item.name];
         if (!series) continue;
         const isMulti = series.valueColumns.length > 1;
+        const withAxis = withXAxis(series);
+        if (isMulti && item.splitCorners) {
+          // Split: each wheel becomes a fully normal single-column lane (same
+          // path every other channel goes through), so it gets real compared-
+          // lap overlays and respects colorMode — the combined view's fixed
+          // corner color/dash can't accommodate either without losing the
+          // FL/FR/RL/RR identity it exists for.
+          series.valueColumns.forEach((col, i) => {
+            const colLabel = CORNER_STYLE[i]?.label ?? col;
+            const key = `${item.name}__${col}`;
+            const singleSeries: ChannelSeries = {
+              name: key,
+              kind: series.kind,
+              unit: series.unit,
+              valueColumns: [col],
+              t: withAxis.t,
+              values: { [col]: withAxis.values[col] },
+            };
+            const { series: finalSeries, compares } = alignEventCompares(singleSeries, buildCornerCompares(item.name, col));
+            result.push({
+              key,
+              label: colLabel,
+              series: finalSeries,
+              columnStyles: [{ label: colLabel, color: nextColor(key) }],
+              compares,
+              boxId: item.name,
+              boxLabel: item.name,
+            });
+          });
+          continue;
+        }
         const columnStyles = isMulti
           ? CORNER_STYLE.slice(0, series.valueColumns.length)
           : [{ label: item.name, color: nextColor(item.name) }];
-        const withAxis = withXAxis(series);
-        // 4-wheel channels (isMulti) keep their fixed corner color+dash styling
-        // regardless of compare — overlaying per-lap colors on top of that would
-        // lose the FL/FR/RL/RR identity without gaining a clear lap identity.
+        // 4-wheel channels (isMulti), combined view: fixed corner color/dash
+        // regardless of compare/colorMode — see the split branch above for
+        // the alternative that supports both.
         const { series: finalSeries, compares } = isMulti
           ? { series: withAxis, compares: [] as LaneCompare[] }
           : alignEventCompares(withAxis, buildLaneCompares([item.name], withAxis));
@@ -1855,6 +1936,15 @@ export default function TelemetryViewer() {
                           {item.grouped === false ? '▦' : '▣'}
                         </button>
                       </>
+                    )}
+                    {item.type === 'channel' && (seriesByName[item.name]?.valueColumns.length ?? 0) > 1 && (
+                      <button
+                        className={item.splitCorners ? 'active' : ''}
+                        onClick={() => toggleCornerSplit(i)}
+                        title={t('tv.cornerSplitToggle')}
+                      >
+                        {item.splitCorners ? '▦' : '▣'}
+                      </button>
                     )}
                     {item.type === 'group' && (
                       <button onClick={() => dissolveGroup(i)} title={t('tv.ungroup')}>

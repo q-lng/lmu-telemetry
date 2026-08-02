@@ -210,6 +210,7 @@ export const en = {
   'tv.dragToReorder': 'Drag to reorder',
   'tv.pedalsToggleClutch': 'Show/hide the clutch channel in this group',
   'tv.pedalsToggleGrouped': 'Switch between one combined graph and separate graphs (kept together)',
+  'tv.cornerSplitToggle': 'Split into one graph per wheel — enables compared laps and color mode',
   'tv.ungroup': 'Ungroup',
   'tv.remove': 'Remove',
   'tv.groupButton': (p: { count: number }) => `Group (${p.count}) into a single graph`,
