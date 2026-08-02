@@ -10,6 +10,7 @@ export interface FileRecord {
   visibility: Visibility;
   track: string | null;
   car: string | null;
+  uploadedAt: string;
 }
 
 interface FileRow {
@@ -18,10 +19,18 @@ interface FileRow {
   visibility: Visibility;
   track: string | null;
   car: string | null;
+  uploaded_at: string;
 }
 
 function fromRow(r: FileRow): FileRecord {
-  return { filename: r.filename, ownerId: r.owner_id, visibility: r.visibility, track: r.track, car: r.car };
+  return {
+    filename: r.filename,
+    ownerId: r.owner_id,
+    visibility: r.visibility,
+    track: r.track,
+    car: r.car,
+    uploadedAt: r.uploaded_at,
+  };
 }
 
 export async function getFileRecord(filename: string): Promise<FileRecord | null> {

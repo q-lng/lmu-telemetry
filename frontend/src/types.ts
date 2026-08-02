@@ -2,6 +2,7 @@ export interface SessionSummary {
   file: string;
   ownerId: number | null;
   ownerPseudo: string | null;
+  uploadedAt: string;
   track?: string;
   sessionType?: string;
   driverName?: string;

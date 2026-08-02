@@ -62,6 +62,7 @@ export async function registerFiles(app: FastifyInstance): Promise<void> {
           file: f.filename,
           ownerId: f.ownerId,
           ownerPseudo: f.ownerId !== null ? pseudoById.get(f.ownerId) ?? null : null,
+          uploadedAt: f.uploadedAt,
           track: meta?.info.TrackName,
           sessionType: meta?.info.SessionType,
           driverName: meta?.info.DriverName,

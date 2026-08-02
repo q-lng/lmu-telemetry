@@ -1429,7 +1429,7 @@ body {
 
 .modal-dialog {
   width: 100%;
-  max-width: 700px;
+  max-width: 960px;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
@@ -1510,6 +1510,12 @@ body {
   background: var(--danger, #d14343);
 }
 
+.modal-tabs {
+  flex: 0 0 auto;
+  margin: 14px 20px 0;
+  max-width: 320px;
+}
+
 .modal-filter {
   flex: 0 0 auto;
   margin: 14px 20px;
@@ -1530,12 +1536,13 @@ body {
 .modal-table-wrap {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow: auto;
   padding: 0 20px 16px;
 }
 
 .modal-table {
   width: 100%;
+  min-width: 720px;
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -1550,6 +1557,16 @@ body {
   position: sticky;
   top: 0;
   background: var(--surface-1);
+  white-space: nowrap;
+}
+
+.modal-table-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.modal-table-sortable:hover {
+  color: var(--primary-ink);
 }
 
 .modal-table td {
