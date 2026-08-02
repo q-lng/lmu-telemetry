@@ -170,7 +170,7 @@ export function SessionPickerModal({
                             }
                           }}
                         >
-                          🗑
+                          ✕
                         </button>
                       )}
                     </td>

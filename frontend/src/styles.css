@@ -1587,19 +1587,24 @@ body {
 
 .modal-table-delete {
   background: none;
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
+  color: var(--secondary-ink);
   border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 13px;
+  width: 22px;
+  height: 22px;
   line-height: 1;
-  padding: 4px 6px;
-  opacity: 0.7;
+  cursor: pointer;
+  font-size: 12px;
 }
 
-.modal-table-delete:hover {
-  opacity: 1;
-  border-color: var(--border);
-  background: var(--surface-2);
+.modal-table-delete:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.modal-table-delete:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 
 .lane {
