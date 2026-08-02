@@ -141,6 +141,7 @@ export const en = {
   'tv.sessionPickerCar': 'Car',
   'tv.sessionPickerDuration': 'Duration',
   'tv.sessionPickerLaps': 'Laps',
+  'tv.sessionPickerUploader': 'Uploaded by',
   'tv.sessionPickerEmpty': 'No session matches this filter.',
   'tv.storageUsed': (p: { used: string; quota: string }) => `${p.used} / ${p.quota} used`,
   'tv.storagePlanVip': 'VIP',

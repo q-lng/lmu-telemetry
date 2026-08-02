@@ -75,6 +75,14 @@ export async function findUserById(id: number): Promise<User | null> {
   return rows[0] ? fromRow(rows[0]) : null;
 }
 
+/** Batch lookup for the session picker's "uploaded by" column — one query
+ * regardless of how many distinct owners appear in the session list. */
+export async function findUsersByIds(ids: number[]): Promise<User[]> {
+  if (ids.length === 0) return [];
+  const rows = await pgQuery<UserRow>(`SELECT * FROM users WHERE id = ANY($1)`, [ids]);
+  return rows.map(fromRow);
+}
+
 export async function updatePasswordHash(userId: number, passwordHash: string): Promise<void> {
   await pgQuery(`UPDATE users SET password_hash = $2 WHERE id = $1`, [userId, passwordHash]);
 }

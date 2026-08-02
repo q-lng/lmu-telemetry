@@ -6,6 +6,7 @@ import { listChannels, getChannelSeries, getLaps, evictStartTsCache } from './ch
 import { getSessionMetadata, type SessionMetadata, type SessionSummary } from './metadata.js';
 import { DATA_DIR, evictDb, NotFoundError } from './db.js';
 import { requireAuth } from './auth.js';
+import { findUsersByIds } from './users.js';
 import {
   canViewFile,
   canViewLap,
@@ -48,6 +49,9 @@ export async function registerFiles(app: FastifyInstance): Promise<void> {
       { track: req.query.track, car: req.query.car },
       { publicOnly: req.query.excludeMine === 'true' },
     );
+    const ownerIds = [...new Set(files.map((f) => f.ownerId).filter((id): id is number => id !== null))];
+    const owners = await findUsersByIds(ownerIds);
+    const pseudoById = new Map(owners.map((u) => [u.id, u.pseudo]));
     return Promise.all(
       files.map(async (f): Promise<SessionSummary> => {
         const [meta, laps] = await Promise.all([
@@ -57,6 +61,7 @@ export async function registerFiles(app: FastifyInstance): Promise<void> {
         return {
           file: f.filename,
           ownerId: f.ownerId,
+          ownerPseudo: f.ownerId !== null ? pseudoById.get(f.ownerId) ?? null : null,
           track: meta?.info.TrackName,
           sessionType: meta?.info.SessionType,
           driverName: meta?.info.DriverName,
