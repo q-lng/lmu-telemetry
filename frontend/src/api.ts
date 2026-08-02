@@ -11,6 +11,7 @@ import type {
   SessionMetadata,
   SessionSummary,
   SharedLapResult,
+  StorageUsage,
   Visibility,
 } from './types';
 import { tError } from './i18n';
@@ -195,6 +196,10 @@ export function fetchFollowers(): Promise<PublicUser[]> {
 
 export function fetchMyFiles(): Promise<FileRecord[]> {
   return getJson<{ files: FileRecord[] }>('/api/sessions/mine').then((r) => r.files);
+}
+
+export function fetchStorageUsage(): Promise<StorageUsage> {
+  return getJson('/api/storage');
 }
 
 export function setFileVisibility(filename: string, visibility: Visibility): Promise<void> {

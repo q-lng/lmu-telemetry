@@ -29,16 +29,17 @@ export async function getFileRecord(filename: string): Promise<FileRecord | null
   return rows[0] ? fromRow(rows[0]) : null;
 }
 
-/** Registers (or refreshes track/car for) a file — called after every successful upload. */
+/** Registers (or refreshes track/car/size for) a file — called after every successful upload. */
 export async function upsertFileRecord(
   filename: string,
-  input: { ownerId: number | null; track: string | null; car: string | null },
+  input: { ownerId: number | null; track: string | null; car: string | null; sizeBytes: number },
 ): Promise<void> {
   await pgQuery(
-    `INSERT INTO telemetry_files (filename, owner_id, track, car)
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT (filename) DO UPDATE SET owner_id = EXCLUDED.owner_id, track = EXCLUDED.track, car = EXCLUDED.car`,
-    [filename, input.ownerId, input.track, input.car],
+    `INSERT INTO telemetry_files (filename, owner_id, track, car, size_bytes)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (filename) DO UPDATE SET
+       owner_id = EXCLUDED.owner_id, track = EXCLUDED.track, car = EXCLUDED.car, size_bytes = EXCLUDED.size_bytes`,
+    [filename, input.ownerId, input.track, input.car, input.sizeBytes],
   );
 }
 

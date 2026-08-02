@@ -9,6 +9,14 @@ export interface SessionSummary {
   durationSeconds?: number;
 }
 
+export type Plan = 'free' | 'vip';
+
+export interface StorageUsage {
+  usedBytes: number;
+  quotaBytes: number;
+  plan: Plan;
+}
+
 export interface SessionMetadata {
   info: Record<string, string>;
   carSetup: unknown;

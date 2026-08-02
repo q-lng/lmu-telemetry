@@ -1,11 +1,22 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { SessionSummary } from '../types';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { SessionSummary, StorageUsage } from '../types';
 import { t } from '../i18n';
+import { fetchStorageUsage } from '../api';
+import { useAuth } from '../AuthContext';
+
+interface AsyncActionState {
+  busy: boolean;
+  error: string | null;
+}
 
 interface Props {
   sessions: SessionSummary[];
   onSelect: (file: string) => void;
   onClose: () => void;
+  uploadState: AsyncActionState;
+  onUploadFile: (file: File) => void;
+  guestState: AsyncActionState;
+  onOpenGuestFile: (file: File) => void;
 }
 
 function formatDuration(seconds?: number): string | null {
@@ -15,8 +26,27 @@ function formatDuration(seconds?: number): string | null {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export function SessionPickerModal({ sessions, onSelect, onClose }: Props) {
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  const gb = bytes / (1024 * 1024 * 1024);
+  if (gb >= 1) return `${gb.toFixed(gb >= 10 ? 0 : 1)} GB`;
+  return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
+}
+
+export function SessionPickerModal({
+  sessions,
+  onSelect,
+  onClose,
+  uploadState,
+  onUploadFile,
+  guestState,
+  onOpenGuestFile,
+}: Props) {
   const [filter, setFilter] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const guestFileInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
+  const [storage, setStorage] = useState<StorageUsage | null>(null);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -25,6 +55,13 @@ export function SessionPickerModal({ sessions, onSelect, onClose }: Props) {
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [onClose]);
+
+  useEffect(() => {
+    if (!user) return;
+    fetchStorageUsage()
+      .then(setStorage)
+      .catch(() => setStorage(null));
+  }, [user, uploadState.busy]);
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -41,6 +78,60 @@ export function SessionPickerModal({ sessions, onSelect, onClose }: Props) {
             ✕
           </button>
         </div>
+
+        <div className="modal-load-actions">
+          <button className="upload-btn" disabled={uploadState.busy} onClick={() => fileInputRef.current?.click()}>
+            {uploadState.busy ? t('tv.importing') : t('tv.importFile')}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".duckdb"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onUploadFile(file);
+              e.target.value = '';
+            }}
+          />
+          <button
+            className="upload-btn"
+            disabled={guestState.busy}
+            onClick={() => guestFileInputRef.current?.click()}
+            title={t('tv.openGuestTooltip')}
+          >
+            {guestState.busy ? t('tv.guestLoading') : t('tv.openGuestFile')}
+          </button>
+          <input
+            ref={guestFileInputRef}
+            type="file"
+            accept=".duckdb"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onOpenGuestFile(file);
+              e.target.value = '';
+            }}
+          />
+        </div>
+        {(uploadState.error || guestState.error) && (
+          <div className="upload-error modal-load-error">{uploadState.error || guestState.error}</div>
+        )}
+
+        {storage && (
+          <div className="modal-storage">
+            <span>
+              {t('tv.storageUsed', { used: formatBytes(storage.usedBytes), quota: formatBytes(storage.quotaBytes) })}
+              {storage.plan === 'vip' ? ` · ${t('tv.storagePlanVip')}` : ''}
+            </span>
+            <div className="modal-storage-bar">
+              <div
+                className={`modal-storage-bar-fill${storage.usedBytes >= storage.quotaBytes ? ' modal-storage-bar-full' : ''}`}
+                style={{ width: `${Math.min(100, (storage.usedBytes / storage.quotaBytes) * 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         <input
           className="modal-filter"

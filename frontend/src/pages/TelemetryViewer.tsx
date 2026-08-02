@@ -443,9 +443,6 @@ export default function TelemetryViewer() {
     else if (dx < -60 && sidebarOpen) setSidebarOpen(false);
     touchStartX.current = null;
   }
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const guestFileInputRef = useRef<HTMLInputElement>(null);
-
   // Multi-lap comparison: any number of laps checked against the reference lap,
   // each either from this same (primary) session or from a separately-opened
   // "external source" session (server session or local guest file) — e.g.
@@ -1001,10 +998,10 @@ export default function TelemetryViewer() {
       const { file: savedName } = await uploadSession(file);
       reloadSessions(savedName);
       setUploadState({ busy: false, error: null });
+      setSessionPickerOpen(false);
     } catch (err) {
       setUploadState({ busy: false, error: (err as Error).message });
     }
-    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   async function handlePublish() {
@@ -1346,60 +1343,27 @@ export default function TelemetryViewer() {
               setSessionPickerOpen(false);
             }}
             onClose={() => setSessionPickerOpen(false)}
+            uploadState={uploadState}
+            onUploadFile={handleUpload}
+            guestState={guestState}
+            onOpenGuestFile={(file) => {
+              setGuestFile(file);
+              setSessionPickerOpen(false);
+            }}
           />
         )}
 
-        <div className="field">
-          <button className="upload-btn" disabled={uploadState.busy} onClick={() => fileInputRef.current?.click()}>
-            {uploadState.busy ? t('tv.importing') : t('tv.importFile')}
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".duckdb"
-            style={{ display: 'none' }}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleUpload(file);
-            }}
-          />
-          {uploadState.error && <div className="upload-error">{uploadState.error}</div>}
-        </div>
-
-        <div className="field">
-          {guestFile ? (
-            <>
-              <div className="guest-active">
-                {t('tv.guestModePrefix')}
-                <strong>{guestFile.name}</strong>
-              </div>
-              <button className="upload-btn" onClick={() => setGuestFile(null)}>
-                {t('tv.closeGuestMode')}
-              </button>
-            </>
-          ) : (
-            <button
-              className="upload-btn"
-              disabled={guestState.busy}
-              onClick={() => guestFileInputRef.current?.click()}
-              title={t('tv.openGuestTooltip')}
-            >
-              {guestState.busy ? t('tv.guestLoading') : t('tv.openGuestFile')}
+        {guestFile && (
+          <div className="field">
+            <div className="guest-active">
+              {t('tv.guestModePrefix')}
+              <strong>{guestFile.name}</strong>
+            </div>
+            <button className="upload-btn" onClick={() => setGuestFile(null)}>
+              {t('tv.closeGuestMode')}
             </button>
-          )}
-          <input
-            ref={guestFileInputRef}
-            type="file"
-            accept=".duckdb"
-            style={{ display: 'none' }}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) setGuestFile(file);
-              e.target.value = '';
-            }}
-          />
-          {guestState.error && <div className="upload-error">{guestState.error}</div>}
-        </div>
+          </div>
+        )}
 
         {guestFile && user && (
           <div className="field">
@@ -1840,15 +1804,24 @@ export default function TelemetryViewer() {
           </div>
 
           <div className="graphs-column">
-            <div className="telemetry-block" style={seriesLoading && lanes.length === 0 ? { minHeight: 200 } : undefined}>
-              {seriesLoading && (
-                <div className="loading-overlay">
-                  <span className="spinner" />
-                  {t('tv.loadingData')}
-                </div>
-              )}
-              {laneElements}
-            </div>
+            {!dataSource ? (
+              <div className="telemetry-block no-session-placeholder">
+                <p>{t('tv.noActiveSession')}</p>
+                <button className="upload-btn" onClick={() => setSessionPickerOpen(true)}>
+                  {t('tv.loadSessionButton')}
+                </button>
+              </div>
+            ) : (
+              <div className="telemetry-block" style={seriesLoading && lanes.length === 0 ? { minHeight: 200 } : undefined}>
+                {seriesLoading && (
+                  <div className="loading-overlay">
+                    <span className="spinner" />
+                    {t('tv.loadingData')}
+                  </div>
+                )}
+                {laneElements}
+              </div>
+            )}
           </div>
         </div>
       </main>

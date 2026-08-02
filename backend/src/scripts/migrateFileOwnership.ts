@@ -1,4 +1,6 @@
-import { listSessionFiles } from '../db.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { listSessionFiles, DATA_DIR } from '../db.js';
 import { getSessionMetadata, type SessionMetadata } from '../metadata.js';
 import { findUserByPseudo } from '../users.js';
 import { upsertFileRecord, setFileVisibility } from '../access.js';
@@ -22,7 +24,8 @@ async function main() {
     const meta = await getSessionMetadata(filename).catch((): SessionMetadata => ({ info: {}, carSetup: null }));
     const track = meta.info.TrackName ?? null;
     const car = meta.info.CarName ?? null;
-    await upsertFileRecord(filename, { ownerId: excluded ? null : owner.id, track, car });
+    const sizeBytes = fs.statSync(path.join(DATA_DIR, filename)).size;
+    await upsertFileRecord(filename, { ownerId: excluded ? null : owner.id, track, car, sizeBytes });
     await setFileVisibility(filename, excluded ? 'public' : 'private');
     console.log(
       `${filename} -> owner=${excluded ? 'NULL (orphelin)' : owner.pseudo}, visibility=${excluded ? 'public' : 'private'}`,

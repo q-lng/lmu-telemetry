@@ -8,6 +8,11 @@ CREATE TABLE IF NOT EXISTS users (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Storage plan — 'free' (1GB quota) by default, 'vip' assigned by hand for now
+-- (no admin panel yet). CREATE TABLE IF NOT EXISTS above is a no-op on an
+-- already-existing users table, so this needs its own idempotent migration.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'vip'));
+
 -- Login sessions (not telemetry sessions — named auth_sessions to avoid confusion
 -- with data/*.duckdb "sessions").
 CREATE TABLE IF NOT EXISTS auth_sessions (

@@ -1376,6 +1376,18 @@ body {
   flex-direction: column;
 }
 
+.no-session-placeholder {
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--muted-ink);
+  font-size: 14px;
+}
+
+.no-session-placeholder p {
+  margin: 0;
+}
+
 .loading-overlay {
   position: absolute;
   inset: 0;
@@ -1457,6 +1469,43 @@ body {
 .modal-close:hover {
   color: var(--primary-ink);
   border-color: var(--muted-ink);
+}
+
+.modal-load-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 8px;
+  margin: 14px 20px 0;
+}
+
+.modal-load-error {
+  margin: 6px 20px 0;
+}
+
+.modal-storage {
+  flex: 0 0 auto;
+  margin: 14px 20px 0;
+  font-size: 12px;
+  color: var(--muted-ink);
+}
+
+.modal-storage-bar {
+  margin-top: 4px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.modal-storage-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+}
+
+.modal-storage-bar-fill.modal-storage-bar-full {
+  background: var(--danger, #d14343);
 }
 
 .modal-filter {

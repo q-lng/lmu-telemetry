@@ -158,6 +158,7 @@ export async function registerFiles(app: FastifyInstance): Promise<void> {
       ownerId: req.userId!,
       track: meta.info.TrackName ?? null,
       car: meta.info.CarName ?? null,
+      sizeBytes: fs.statSync(dest).size,
     });
     reply.send({ file: filename });
   });
