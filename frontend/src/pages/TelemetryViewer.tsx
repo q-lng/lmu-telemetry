@@ -17,6 +17,7 @@ import { createServerDataSource, createWasmDataSource, type DataSource } from '.
 import { ChannelPlot } from '../components/ChannelPlot';
 import { TrackMap } from '../components/TrackMap';
 import { TelemetryLegend } from '../components/TelemetryLegend';
+import { SessionPickerModal } from '../components/SessionPickerModal';
 import { channelColor, comparedLapColor, CORNER_STYLE, REFERENCE_UNIFORM_COLOR } from '../palette';
 import { resampleContinuous, resampleStep } from '../resample';
 import { useAuth } from '../AuthContext';
@@ -325,6 +326,7 @@ export default function TelemetryViewer() {
   const preferredComparedLapColors = preferences.comparedLapColors as string[] | undefined;
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [sessionPickerOpen, setSessionPickerOpen] = useState(false);
   // Guest mode: a .duckdb file opened straight in the browser via DuckDB-WASM —
   // no upload, no server round-trip at all. Picking a server session clears it.
   const [guestFile, setGuestFile] = useState<File | null>(null);
@@ -1261,6 +1263,11 @@ export default function TelemetryViewer() {
     color: comparedLapColorAt(index),
   }));
 
+  const currentSession = selectedFile ? sessions.find((s) => s.file === selectedFile) : undefined;
+  const currentSessionLabel = currentSession
+    ? `${currentSession.track ?? currentSession.file} — ${currentSession.sessionType} (${currentSession.recordingTime})`
+    : selectedFile;
+
   function channelPlotFor(lane: Lane, flatIndex: number) {
     return (
       <ChannelPlot
@@ -1319,24 +1326,28 @@ export default function TelemetryViewer() {
         <div className="sidebar-inner">
         <h1>{t('tv.sidebarTitle')}</h1>
 
-        <label className="field">
+        <div className="field">
           {t('tv.session')}
-          <select
-            value={guestFile ? '' : selectedFile ?? ''}
+          <button
+            className="upload-btn"
             disabled={!!guestFile}
-            onChange={(e) => {
-              setGuestFile(null);
-              setSelectedFile(e.target.value || null);
-            }}
+            onClick={() => setSessionPickerOpen(true)}
           >
-            <option value="">{t('tv.chooseSessionPlaceholder')}</option>
-            {sessions.map((s) => (
-              <option key={s.file} value={s.file}>
-                {s.track ?? s.file} — {s.sessionType} ({s.recordingTime})
-              </option>
-            ))}
-          </select>
-        </label>
+            {currentSessionLabel ?? t('tv.loadSessionButton')}
+          </button>
+        </div>
+
+        {sessionPickerOpen && (
+          <SessionPickerModal
+            sessions={sessions}
+            onSelect={(file) => {
+              setGuestFile(null);
+              setSelectedFile(file);
+              setSessionPickerOpen(false);
+            }}
+            onClose={() => setSessionPickerOpen(false)}
+          />
+        )}
 
         <div className="field">
           <button className="upload-btn" disabled={uploadState.busy} onClick={() => fileInputRef.current?.click()}>

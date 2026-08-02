@@ -5,6 +5,8 @@ export interface SessionSummary {
   driverName?: string;
   carName?: string;
   recordingTime?: string;
+  lapCount?: number;
+  durationSeconds?: number;
 }
 
 export interface SessionMetadata {

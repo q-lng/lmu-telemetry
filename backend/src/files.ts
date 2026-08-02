@@ -49,7 +49,10 @@ export async function registerFiles(app: FastifyInstance): Promise<void> {
     );
     return Promise.all(
       files.map(async (f): Promise<SessionSummary> => {
-        const meta = await getSessionMetadata(f.filename).catch(() => null);
+        const [meta, laps] = await Promise.all([
+          getSessionMetadata(f.filename).catch(() => null),
+          getLaps(f.filename).catch(() => []),
+        ]);
         return {
           file: f.filename,
           track: meta?.info.TrackName,
@@ -57,6 +60,8 @@ export async function registerFiles(app: FastifyInstance): Promise<void> {
           driverName: meta?.info.DriverName,
           carName: meta?.info.CarName,
           recordingTime: meta?.info.RecordingTime,
+          lapCount: laps.length,
+          durationSeconds: laps.length > 0 ? laps[laps.length - 1].endTs - laps[0].startTs : undefined,
         };
       }),
     );
