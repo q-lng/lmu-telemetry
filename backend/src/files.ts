@@ -9,6 +9,7 @@ import { requireAuth } from './auth.js';
 import {
   canViewFile,
   canViewLap,
+  deleteFileRecord,
   getFileRecord,
   listLapShares,
   listVisibleFiles,
@@ -55,6 +56,7 @@ export async function registerFiles(app: FastifyInstance): Promise<void> {
         ]);
         return {
           file: f.filename,
+          ownerId: f.ownerId,
           track: meta?.info.TrackName,
           sessionType: meta?.info.SessionType,
           driverName: meta?.info.DriverName,
@@ -89,6 +91,20 @@ export async function registerFiles(app: FastifyInstance): Promise<void> {
       reply.code(204).send();
     },
   );
+
+  app.delete<{ Params: { file: string } }>('/api/sessions/:file', { preHandler: requireAuth }, async (req, reply) => {
+    const record = await getFileRecord(req.params.file);
+    if (!record || record.ownerId !== req.userId) {
+      reply.code(404).send({ error: 'FILE_NOT_FOUND' });
+      return;
+    }
+    await deleteFileRecord(req.params.file);
+    const dest = path.join(DATA_DIR, req.params.file);
+    fs.rmSync(dest, { force: true });
+    evictDb(dest);
+    evictStartTsCache(req.params.file);
+    reply.code(204).send();
+  });
 
   app.get<{ Params: { file: string } }>(
     '/api/sessions/:file/lap-shares',

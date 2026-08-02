@@ -17,6 +17,8 @@ interface Props {
   onUploadFile: (file: File) => void;
   guestState: AsyncActionState;
   onOpenGuestFile: (file: File) => void;
+  deleteState: AsyncActionState;
+  onDeleteSession: (file: string) => void;
 }
 
 function formatDuration(seconds?: number): string | null {
@@ -41,6 +43,8 @@ export function SessionPickerModal({
   onUploadFile,
   guestState,
   onOpenGuestFile,
+  deleteState,
+  onDeleteSession,
 }: Props) {
   const [filter, setFilter] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -61,7 +65,7 @@ export function SessionPickerModal({
     fetchStorageUsage()
       .then(setStorage)
       .catch(() => setStorage(null));
-  }, [user, uploadState.busy]);
+  }, [user, uploadState.busy, deleteState.busy]);
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -114,23 +118,8 @@ export function SessionPickerModal({
             }}
           />
         </div>
-        {(uploadState.error || guestState.error) && (
-          <div className="upload-error modal-load-error">{uploadState.error || guestState.error}</div>
-        )}
-
-        {storage && (
-          <div className="modal-storage">
-            <span>
-              {t('tv.storageUsed', { used: formatBytes(storage.usedBytes), quota: formatBytes(storage.quotaBytes) })}
-              {storage.plan === 'vip' ? ` · ${t('tv.storagePlanVip')}` : ''}
-            </span>
-            <div className="modal-storage-bar">
-              <div
-                className={`modal-storage-bar-fill${storage.usedBytes >= storage.quotaBytes ? ' modal-storage-bar-full' : ''}`}
-                style={{ width: `${Math.min(100, (storage.usedBytes / storage.quotaBytes) * 100)}%` }}
-              />
-            </div>
-          </div>
+        {(uploadState.error || guestState.error || deleteState.error) && (
+          <div className="upload-error modal-load-error">{uploadState.error || guestState.error || deleteState.error}</div>
         )}
 
         <input
@@ -149,11 +138,13 @@ export function SessionPickerModal({
                 <th>{t('tv.sessionPickerCar')}</th>
                 <th>{t('tv.sessionPickerDuration')}</th>
                 <th>{t('tv.sessionPickerLaps')}</th>
+                <th />
               </tr>
             </thead>
             <tbody>
               {filtered.map((s) => {
                 const duration = formatDuration(s.durationSeconds);
+                const canDelete = user && s.ownerId === user.id;
                 return (
                   <tr key={s.file} className="modal-table-row" onClick={() => onSelect(s.file)}>
                     <td>
@@ -166,12 +157,29 @@ export function SessionPickerModal({
                     <td>{s.carName ?? '–'}</td>
                     <td>{duration ?? '–'}</td>
                     <td>{s.lapCount ?? '–'}</td>
+                    <td>
+                      {canDelete && (
+                        <button
+                          className="modal-table-delete"
+                          disabled={deleteState.busy}
+                          title={t('tv.deleteSession')}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(t('tv.confirmDeleteSession', { name: s.track ?? s.file }))) {
+                              onDeleteSession(s.file);
+                            }
+                          }}
+                        >
+                          🗑
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="modal-table-empty">
+                  <td colSpan={5} className="modal-table-empty">
                     {t('tv.sessionPickerEmpty')}
                   </td>
                 </tr>
@@ -179,6 +187,21 @@ export function SessionPickerModal({
             </tbody>
           </table>
         </div>
+
+        {storage && (
+          <div className="modal-storage">
+            <span>
+              {t('tv.storageUsed', { used: formatBytes(storage.usedBytes), quota: formatBytes(storage.quotaBytes) })}
+              {storage.plan === 'vip' ? ` · ${t('tv.storagePlanVip')}` : ''}
+            </span>
+            <div className="modal-storage-bar">
+              <div
+                className={`modal-storage-bar-fill${storage.usedBytes >= storage.quotaBytes ? ' modal-storage-bar-full' : ''}`}
+                style={{ width: `${Math.min(100, (storage.usedBytes / storage.quotaBytes) * 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

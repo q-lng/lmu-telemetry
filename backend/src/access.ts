@@ -47,6 +47,12 @@ export async function setFileVisibility(filename: string, visibility: Visibility
   await pgQuery(`UPDATE telemetry_files SET visibility = $2 WHERE filename = $1`, [filename, visibility]);
 }
 
+/** Removes the file's record (lap_shares cascade) — the caller is responsible
+ * for also removing the .duckdb file from disk and evicting its caches. */
+export async function deleteFileRecord(filename: string): Promise<void> {
+  await pgQuery(`DELETE FROM telemetry_files WHERE filename = $1`, [filename]);
+}
+
 export async function getLapOverride(filename: string, lapNumber: number): Promise<LapVisibility | null> {
   const rows = await pgQuery<{ visibility: LapVisibility }>(
     `SELECT visibility FROM lap_shares WHERE filename = $1 AND lap_number = $2`,

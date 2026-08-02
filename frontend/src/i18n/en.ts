@@ -144,6 +144,8 @@ export const en = {
   'tv.sessionPickerEmpty': 'No session matches this filter.',
   'tv.storageUsed': (p: { used: string; quota: string }) => `${p.used} / ${p.quota} used`,
   'tv.storagePlanVip': 'VIP',
+  'tv.deleteSession': 'Delete this session',
+  'tv.confirmDeleteSession': (p: { name: string }) => `Delete "${p.name}"? This cannot be undone.`,
   'tv.importing': 'Importing…',
   'tv.importFile': '+ Import a .duckdb file',
   'tv.guestModePrefix': 'Guest mode: ',

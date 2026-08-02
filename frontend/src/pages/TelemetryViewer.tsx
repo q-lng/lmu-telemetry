@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, TouchEvent as ReactTouchEvent } from 'react';
-import { fetchSessions, setFileVisibility, setLapVisibility, uploadSession } from '../api';
+import { deleteSession, fetchSessions, setFileVisibility, setLapVisibility, uploadSession } from '../api';
 import type {
   ChannelDescriptor,
   ChannelSeries,
@@ -426,6 +426,7 @@ export default function TelemetryViewer() {
   }
   const [viewRange, setViewRange] = useState<{ min: number; max: number } | null>(null);
   const [uploadState, setUploadState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
+  const [deleteState, setDeleteState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
   const [laneWeights, setLaneWeights] = useState<Record<string, number>>(INITIAL_LANE_WEIGHTS);
   const [presets, setPresets] = useState<Record<string, DisplayPreset>>(() => loadPresets());
   const [selectedPreset, setSelectedPreset] = useState('');
@@ -1004,6 +1005,18 @@ export default function TelemetryViewer() {
     }
   }
 
+  async function handleDeleteSession(file: string) {
+    setDeleteState({ busy: true, error: null });
+    try {
+      await deleteSession(file);
+      if (selectedFile === file) setSelectedFile(null);
+      reloadSessions();
+      setDeleteState({ busy: false, error: null });
+    } catch (err) {
+      setDeleteState({ busy: false, error: (err as Error).message });
+    }
+  }
+
   async function handlePublish() {
     if (!guestFile) return;
     setPublishState({ busy: true, error: null, done: false });
@@ -1350,6 +1363,8 @@ export default function TelemetryViewer() {
               setGuestFile(file);
               setSessionPickerOpen(false);
             }}
+            deleteState={deleteState}
+            onDeleteSession={handleDeleteSession}
           />
         )}
 
@@ -1400,6 +1415,8 @@ export default function TelemetryViewer() {
           </div>
         )}
 
+        {dataSource && (
+        <>
         <div className="field">
           {t('tv.presetLabel')}
           <div className="preset-row">
@@ -1781,6 +1798,8 @@ export default function TelemetryViewer() {
             </label>
           ))}
         </div>
+        </>
+        )}
         </div>
       </aside>
       <button

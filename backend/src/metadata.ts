@@ -25,6 +25,7 @@ export async function getSessionMetadata(file: string): Promise<SessionMetadata>
 
 export interface SessionSummary {
   file: string;
+  ownerId: number | null;
   track?: string;
   sessionType?: string;
   driverName?: string;

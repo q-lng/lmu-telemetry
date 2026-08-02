@@ -206,6 +206,10 @@ export function setFileVisibility(filename: string, visibility: Visibility): Pro
   return postJson(`/api/sessions/${encodeURIComponent(filename)}/visibility`, { visibility });
 }
 
+export function deleteSession(filename: string): Promise<void> {
+  return apiCall(`/api/sessions/${encodeURIComponent(filename)}`, 'DELETE');
+}
+
 export function fetchLapShares(filename: string): Promise<LapShare[]> {
   return getJson<{ shares: LapShare[] }>(`/api/sessions/${encodeURIComponent(filename)}/lap-shares`).then(
     (r) => r.shares,
