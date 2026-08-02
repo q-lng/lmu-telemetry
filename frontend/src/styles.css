@@ -15,14 +15,11 @@
   --axis: #3a3a54;
   --border: rgba(255, 255, 255, 0.1);
   /* Neon accent — user-customizable via the picker in the navbar (see
-     theme.ts's applyAccentColor, which overrides all four together).
-     --accent-border is the tint used on major panel/card edges (sidebar,
-     modal, telemetry blocks, ...) — dimmer than --accent-glow so structural
-     borders read as "lit" without competing with the buttons' own glow. */
+     theme.ts's applyAccentColor). Deliberately confined to buttons — panels/
+     surfaces stay on the neutral --border above. */
   --accent: #00e5ff;
   --accent-ring: rgba(0, 229, 255, 0.18);
   --accent-glow: rgba(0, 229, 255, 0.45);
-  --accent-border: rgba(0, 229, 255, 0.35);
   --danger: #e66767;
 
   /* Shared radius scale — sm for controls/chips, md for panels, lg for
@@ -60,9 +57,7 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible {
   outline: none;
-  box-shadow:
-    0 0 0 3px var(--accent-ring),
-    0 0 14px var(--accent-glow);
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
 html,
@@ -84,11 +79,6 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  /* Subtle ambient glow tying the whole app to the current accent, instead of
-     the accent only showing up on isolated buttons/borders. */
-  background:
-    radial-gradient(ellipse 1000px 500px at 50% -10%, var(--accent-ring), transparent 70%),
-    var(--page-plane);
 }
 
 .navbar {
@@ -99,17 +89,14 @@ body {
   height: 52px;
   padding: 0 20px;
   background: var(--surface-1);
-  border-bottom: 1px solid var(--accent-border);
-  box-shadow:
-    0 1px 0 rgba(0, 0, 0, 0.3),
-    0 1px 12px -4px var(--accent-glow);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
 }
 
 .navbar-brand {
   color: var(--primary-ink);
   font-weight: 600;
   text-decoration: none;
-  text-shadow: 0 0 12px var(--accent-glow);
   transition: opacity 0.15s ease;
 }
 
@@ -140,7 +127,6 @@ body {
 .navbar-login[aria-current='page'] {
   color: var(--primary-ink);
   border-bottom: 2px solid var(--accent);
-  box-shadow: 0 2px 8px -2px var(--accent-glow);
 }
 
 .navbar-spacer {
@@ -316,19 +302,17 @@ body {
 
 .landing-feature-card {
   background: var(--surface-1);
-  border: 1px solid var(--accent-border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 16px;
   transition:
     transform 0.15s ease,
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
+    border-color 0.15s ease;
 }
 
 .landing-feature-card:hover {
   transform: translateY(-2px);
-  border-color: var(--accent);
-  box-shadow: 0 0 24px -10px var(--accent-glow);
+  border-color: var(--muted-ink);
 }
 
 .landing-feature-card h3 {
@@ -357,12 +341,10 @@ body {
   width: 100%;
   max-width: 380px;
   background: var(--surface-1);
-  border: 1px solid var(--accent-border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 32px;
-  box-shadow:
-    0 24px 60px -24px rgba(0, 0, 0, 0.6),
-    0 0 40px -20px var(--accent-glow);
+  box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.6);
 }
 
 .pill-tabs {
@@ -572,12 +554,10 @@ body {
   max-width: 1200px;
   align-self: flex-start;
   background: var(--surface-1);
-  border: 1px solid var(--accent-border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 28px 32px;
-  box-shadow:
-    0 24px 60px -24px rgba(0, 0, 0, 0.6),
-    0 0 40px -20px var(--accent-glow);
+  box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.6);
 }
 
 .profile-card {
@@ -814,15 +794,13 @@ body {
   background: var(--surface-1);
   overflow-y: auto;
   overflow-x: hidden;
-  border-right: 1px solid var(--accent-border);
-  box-shadow: 1px 0 16px -6px var(--accent-glow);
+  border-right: 1px solid var(--border);
   transition: width 0.22s ease;
 }
 
 .sidebar.collapsed {
   width: 0;
   border-right-color: transparent;
-  box-shadow: none;
 }
 
 .sidebar-inner {
@@ -1154,7 +1132,7 @@ body {
 
 .info-panel {
   background: var(--surface-2);
-  border: 1px solid var(--accent-border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 10px;
   margin-bottom: 14px;
@@ -1482,9 +1460,8 @@ body {
   flex: 1;
   min-height: 0;
   background: var(--surface-1);
-  border: 1px solid var(--accent-border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  box-shadow: 0 0 30px -18px var(--accent-glow);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1548,11 +1525,9 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--surface-1);
-  border: 1px solid var(--accent-border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow:
-    0 24px 60px -24px rgba(0, 0, 0, 0.7),
-    0 0 50px -20px var(--accent-glow);
+  box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.7);
   overflow: hidden;
 }
 
@@ -1761,7 +1736,7 @@ body {
   flex-direction: column;
   min-height: 0;
   margin: 4px 0;
-  border: 1px solid var(--accent-border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   overflow: hidden;
 }

@@ -25,10 +25,9 @@ function hexToRgb(hex: string): [number, number, number] | null {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
-/** Applies the chosen accent globally: the base color plus three derived,
- * alpha-blended variants (a soft focus ring, a stronger glow for the neon
- * look, a dimmer tint for structural panel borders) so every element already
- * styled with var(--accent-ring)/var(--accent-glow)/var(--accent-border)
+/** Applies the chosen accent globally: the base color plus two derived,
+ * alpha-blended variants (a soft focus ring, a stronger glow for buttons) so
+ * every element already styled with var(--accent-ring)/var(--accent-glow)
  * picks up the new color with no per-component changes. */
 export function applyAccentColor(hex: string): void {
   const rgb = hexToRgb(hex);
@@ -38,5 +37,4 @@ export function applyAccentColor(hex: string): void {
   root.setProperty('--accent', hex);
   root.setProperty('--accent-ring', `rgba(${r}, ${g}, ${b}, 0.18)`);
   root.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.45)`);
-  root.setProperty('--accent-border', `rgba(${r}, ${g}, ${b}, 0.35)`);
 }
