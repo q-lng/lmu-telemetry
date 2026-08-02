@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { deleteSession, fetchSessions, searchSharedLaps } from '../api';
 import type { SessionSummary, SharedLapResult } from '../types';
 import { t } from '../i18n';
@@ -10,8 +10,16 @@ export function Browse() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [laps, setLaps] = useState<SharedLapResult[]>([]);
   const [searching, setSearching] = useState(false);
-  const [searched, setSearched] = useState(false);
+  const [lapsSearched, setLapsSearched] = useState(false);
   const [deleteState, setDeleteState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
+
+  // Sessions show up front, exactly like the "Load a session" modal — no
+  // search required first. The form below narrows this same list AND (its
+  // real reason to exist) searches shared laps, which have no equivalent
+  // "show everything" fetch.
+  useEffect(() => {
+    fetchSessions().then(setSessions);
+  }, []);
 
   async function runSearch() {
     setSearching(true);
@@ -28,7 +36,7 @@ export function Browse() {
       ]);
       setSessions(s);
       setLaps(l);
-      setSearched(true);
+      setLapsSearched(true);
     } finally {
       setSearching(false);
     }
@@ -67,19 +75,19 @@ export function Browse() {
           </button>
         </form>
 
-        {searched && (
-          <>
-            <h2 className="social-subheading">{t('browse.sessions')}</h2>
-            {deleteState.error && <div className="upload-error">{deleteState.error}</div>}
-            <SessionTable
-              sessions={sessions}
-              onSelect={(file) => {
-                window.location.href = `/telemetry?file=${encodeURIComponent(file)}`;
-              }}
-              deleteState={deleteState}
-              onDeleteSession={handleDeleteSession}
-            />
+        <h2 className="social-subheading">{t('browse.sessions')}</h2>
+        {deleteState.error && <div className="upload-error">{deleteState.error}</div>}
+        <SessionTable
+          sessions={sessions}
+          onSelect={(file) => {
+            window.location.href = `/telemetry?file=${encodeURIComponent(file)}`;
+          }}
+          deleteState={deleteState}
+          onDeleteSession={handleDeleteSession}
+        />
 
+        {lapsSearched && (
+          <>
             <h2 className="social-subheading">{t('browse.sharedLaps')}</h2>
             <div className="user-list">
               {laps.length === 0 && <div className="social-empty">{t('browse.noSharedLapsFound')}</div>}
