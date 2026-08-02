@@ -113,7 +113,6 @@ export const en = {
   'browse.trackPlaceholder': 'Track…',
   'browse.carPlaceholder': 'Car…',
   'browse.sessions': 'Sessions',
-  'browse.noSessionsFound': 'No session found.',
   'browse.sharedLaps': 'Shared laps',
   'browse.noSharedLapsFound': 'No shared lap found.',
 

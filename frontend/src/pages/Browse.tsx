@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { fetchSessions, searchSharedLaps } from '../api';
+import { deleteSession, fetchSessions, searchSharedLaps } from '../api';
 import type { SessionSummary, SharedLapResult } from '../types';
 import { t } from '../i18n';
+import { SessionTable } from '../components/SessionTable';
 
 export function Browse() {
   const [track, setTrack] = useState('');
@@ -10,19 +11,19 @@ export function Browse() {
   const [laps, setLaps] = useState<SharedLapResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [deleteState, setDeleteState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
 
   async function runSearch() {
     setSearching(true);
     try {
       const trackFilter = track.trim() || undefined;
       const carFilter = car.trim() || undefined;
-      // Sessions: excludeMine drops the "it's mine" ownership shortcut so only real
-      // public/friends visibility counts — this still shows the viewer's own
-      // PUBLIC sessions (visibility alone already grants that), just not their
-      // private ones. Shared laps are already public-or-friends-only by
-      // definition, no equivalent flag needed there.
+      // No excludeMine here — SessionTable's own Mine/Public tabs already do
+      // that split precisely (by ownerId), the same way the "Load a session"
+      // modal does, so fetching the same full visible set keeps both places
+      // in sync instead of layering a second, coarser exclusion on top.
       const [s, l] = await Promise.all([
-        fetchSessions({ track: trackFilter, car: carFilter, excludeMine: true }),
+        fetchSessions({ track: trackFilter, car: carFilter }),
         searchSharedLaps({ track: trackFilter, car: carFilter }),
       ]);
       setSessions(s);
@@ -30,6 +31,17 @@ export function Browse() {
       setSearched(true);
     } finally {
       setSearching(false);
+    }
+  }
+
+  async function handleDeleteSession(file: string) {
+    setDeleteState({ busy: true, error: null });
+    try {
+      await deleteSession(file);
+      setSessions((prev) => prev.filter((s) => s.file !== file));
+      setDeleteState({ busy: false, error: null });
+    } catch (err) {
+      setDeleteState({ busy: false, error: (err as Error).message });
     }
   }
 
@@ -58,19 +70,15 @@ export function Browse() {
         {searched && (
           <>
             <h2 className="social-subheading">{t('browse.sessions')}</h2>
-            <div className="user-list">
-              {sessions.length === 0 && <div className="social-empty">{t('browse.noSessionsFound')}</div>}
-              {sessions.map((s) => (
-                <div className="user-row" key={s.file}>
-                  <a href={`/telemetry?file=${encodeURIComponent(s.file)}`} className="user-row-name">
-                    {s.track ?? s.file}
-                    <span className="user-row-fullname">
-                      {s.carName} {s.driverName ? `· ${s.driverName}` : ''}
-                    </span>
-                  </a>
-                </div>
-              ))}
-            </div>
+            {deleteState.error && <div className="upload-error">{deleteState.error}</div>}
+            <SessionTable
+              sessions={sessions}
+              onSelect={(file) => {
+                window.location.href = `/telemetry?file=${encodeURIComponent(file)}`;
+              }}
+              deleteState={deleteState}
+              onDeleteSession={handleDeleteSession}
+            />
 
             <h2 className="social-subheading">{t('browse.sharedLaps')}</h2>
             <div className="user-list">
