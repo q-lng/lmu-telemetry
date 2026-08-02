@@ -856,6 +856,45 @@ body {
   color: var(--primary-ink);
 }
 
+.sidebar-section {
+  margin-bottom: 14px;
+}
+
+.sidebar-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0 0 4px;
+  margin: 0;
+  color: var(--secondary-ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sidebar-section-header:hover {
+  color: var(--primary-ink);
+}
+
+.sidebar-section-chevron {
+  display: inline-block;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.sidebar-section-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+.sidebar-section-body > .field:last-child,
+.sidebar-section-body > label.field:last-child {
+  margin-bottom: 0;
+}
+
 .field {
   display: flex;
   flex-direction: column;

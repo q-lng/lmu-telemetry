@@ -172,6 +172,7 @@ export const en = {
   'tv.presetDelete': 'Delete this preset',
   'tv.presetNamePlaceholder': 'Preset name',
   'tv.presetSave': 'Save',
+  'tv.sessionInfoLabel': 'Session info',
   'tv.infoDriver': 'Driver:',
   'tv.infoTrack': 'Track:',
   'tv.infoCar': 'Car:',

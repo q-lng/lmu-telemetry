@@ -18,6 +18,7 @@ import { ChannelPlot } from '../components/ChannelPlot';
 import { TrackMap } from '../components/TrackMap';
 import { TelemetryLegend } from '../components/TelemetryLegend';
 import { SessionPickerModal } from '../components/SessionPickerModal';
+import { CollapsibleSection } from '../components/CollapsibleSection';
 import { channelColor, comparedLapColor, CORNER_STYLE, REFERENCE_UNIFORM_COLOR } from '../palette';
 import { resampleContinuous, resampleStep } from '../resample';
 import { useAuth } from '../AuthContext';
@@ -377,6 +378,12 @@ export default function TelemetryViewer() {
   const { preferences, setPreference } = usePreferences();
   const preferredReferenceLapColor = preferences.referenceLapColor as string | undefined;
   const preferredComparedLapColors = preferences.comparedLapColors as string[] | undefined;
+  // Per-section sidebar collapse state — backend-stored like every other
+  // preference (never localStorage), keyed by a short section id.
+  const sidebarCollapsed = (preferences.sidebarCollapsed as Record<string, boolean> | undefined) ?? {};
+  function toggleSidebarSection(key: string) {
+    setPreference('sidebarCollapsed', { ...sidebarCollapsed, [key]: !sidebarCollapsed[key] });
+  }
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [sessionPickerOpen, setSessionPickerOpen] = useState(false);
@@ -1570,8 +1577,11 @@ export default function TelemetryViewer() {
 
         {dataSource && (
         <>
-        <div className="field">
-          {t('tv.presetLabel')}
+        <CollapsibleSection
+          title={t('tv.presetLabel')}
+          collapsed={!!sidebarCollapsed.presets}
+          onToggle={() => toggleSidebarSection('presets')}
+        >
           <div className="preset-row">
             <select
               value={selectedPreset}
@@ -1606,9 +1616,14 @@ export default function TelemetryViewer() {
               {t('tv.presetSave')}
             </button>
           </div>
-        </div>
+        </CollapsibleSection>
 
         {metadata && (
+          <CollapsibleSection
+            title={t('tv.sessionInfoLabel')}
+            collapsed={!!sidebarCollapsed.sessionInfo}
+            onToggle={() => toggleSidebarSection('sessionInfo')}
+          >
           <div className="info-panel">
             <div>
               <strong>{t('tv.infoDriver')}</strong> {metadata.info.DriverName}
@@ -1626,10 +1641,15 @@ export default function TelemetryViewer() {
               <strong>{t('tv.infoSession')}</strong> {metadata.info.SessionType} @ {metadata.info.SessionTime}
             </div>
           </div>
+          </CollapsibleSection>
         )}
 
+        <CollapsibleSection
+          title={t('tv.xAxisLabel')}
+          collapsed={!!sidebarCollapsed.xAxis}
+          onToggle={() => toggleSidebarSection('xAxis')}
+        >
         <label className="field">
-          {t('tv.xAxisLabel')}
           <div className="segmented">
             <button className={xAxisMode === 'time' ? 'active' : ''} onClick={() => setXAxisMode('time')}>
               {t('tv.xAxisTime')}
@@ -1645,9 +1665,14 @@ export default function TelemetryViewer() {
           </div>
           {selectedLap === 'full' && <span className="field-hint">{t('tv.xAxisDistanceHint')}</span>}
         </label>
+        </CollapsibleSection>
 
+        <CollapsibleSection
+          title={t('tv.lapsTableLabel')}
+          collapsed={!!sidebarCollapsed.laps}
+          onToggle={() => toggleSidebarSection('laps')}
+        >
         <div className="field">
-          {t('tv.lapsTableLabel')}
           {selectedLap === 'full' && <span className="field-hint">{t('tv.selectReferenceLapHint')}</span>}
           <table className="lap-select-table">
             <thead>
@@ -1706,9 +1731,14 @@ export default function TelemetryViewer() {
             </tbody>
           </table>
         </div>
+        </CollapsibleSection>
 
+        <CollapsibleSection
+          title={t('tv.colorModeLabel')}
+          collapsed={!!sidebarCollapsed.colorMode}
+          onToggle={() => toggleSidebarSection('colorMode')}
+        >
         <label className="field">
-          {t('tv.colorModeLabel')}
           <div className="segmented">
             <button className={colorMode === 'byChannel' ? 'active' : ''} onClick={() => setColorModeAndSave('byChannel')}>
               {t('tv.colorModeByChannel')}
@@ -1757,10 +1787,14 @@ export default function TelemetryViewer() {
             {!user && <span className="field-hint">{t('tv.colorPrefsGuestHint')}</span>}
           </div>
         )}
+        </CollapsibleSection>
 
+        <CollapsibleSection
+          title={t('tv.additionalSessionsLabel')}
+          collapsed={!!sidebarCollapsed.compare}
+          onToggle={() => toggleSidebarSection('compare')}
+        >
         <div className="field">
-          {t('tv.additionalSessionsLabel')}
-
           {externalSources.map((source) => {
             const sourceFastest = fastestLapOf(source.laps);
             return (
@@ -1842,7 +1876,13 @@ export default function TelemetryViewer() {
             </button>
           )}
         </div>
+        </CollapsibleSection>
 
+        <CollapsibleSection
+          title={t('tv.channelsShown')}
+          collapsed={!!sidebarCollapsed.channelsShown}
+          onToggle={() => toggleSidebarSection('channelsShown')}
+        >
         <label className="channel-checkbox">
           <input
             type="checkbox"
@@ -1856,7 +1896,6 @@ export default function TelemetryViewer() {
 
         {layout.length > 0 && (
           <div className="field">
-            {t('tv.channelsShown')}
             <div className="selected-list">
               {displayLayout.map((item, i) => (
                 <div
@@ -1969,9 +2008,14 @@ export default function TelemetryViewer() {
             )}
           </div>
         )}
+        </CollapsibleSection>
 
+        <CollapsibleSection
+          title={t('tv.addChannel')}
+          collapsed={!!sidebarCollapsed.addChannel}
+          onToggle={() => toggleSidebarSection('addChannel')}
+        >
         <label className="field">
-          {t('tv.addChannel')}
           <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t('tv.addChannelPlaceholder')} />
         </label>
 
@@ -1987,6 +2031,7 @@ export default function TelemetryViewer() {
             </label>
           ))}
         </div>
+        </CollapsibleSection>
         </>
         )}
         </div>
