@@ -140,32 +140,56 @@ body {
   gap: 10px;
 }
 
-.accent-picker {
+.accent-picker-wrap {
+  position: relative;
+}
+
+.accent-picker-swatch {
   appearance: none;
-  -webkit-appearance: none;
   width: 22px;
   height: 22px;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 50%;
-  background: var(--accent);
   box-shadow: 0 0 10px var(--accent-glow);
   cursor: pointer;
 }
 
-.accent-picker::-webkit-color-swatch-wrapper {
+.accent-picker-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 10px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.7);
+  z-index: 50;
+}
+
+.accent-picker-option {
+  appearance: none;
+  width: 22px;
+  height: 22px;
   padding: 0;
+  border: 1px solid var(--border);
   border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.1s ease;
 }
 
-.accent-picker::-webkit-color-swatch {
-  border: none;
-  border-radius: 50%;
+.accent-picker-option:hover {
+  transform: scale(1.15);
 }
 
-.accent-picker::-moz-color-swatch {
-  border: none;
-  border-radius: 50%;
+.accent-picker-option.active {
+  border-color: #ffffff;
+  box-shadow:
+    0 0 0 2px var(--surface-1),
+    0 0 10px rgba(255, 255, 255, 0.6);
 }
 
 .navbar-user {
@@ -458,35 +482,41 @@ body {
   justify-content: center;
   gap: 8px;
   width: 100%;
-  background: var(--accent);
-  color: #ffffff;
-  border: none;
+  background: transparent;
+  color: var(--accent);
+  border: 1.5px solid var(--accent);
   border-radius: var(--radius-sm);
   padding: 11px;
   font-size: 14px;
   font-weight: 600;
-  box-shadow: 0 0 18px var(--accent-glow);
+  text-shadow: 0 0 8px var(--accent-glow);
+  box-shadow:
+    0 0 8px var(--accent-glow),
+    0 0 20px var(--accent-glow),
+    inset 0 0 8px var(--accent-glow);
   cursor: pointer;
   margin-top: 4px;
   transition:
     filter 0.15s ease,
+    background-color 0.15s ease,
     opacity 0.15s ease;
 }
 
 .auth-submit:hover:not(:disabled) {
-  filter: brightness(1.08);
+  background: var(--accent-ring);
+  filter: brightness(1.2);
 }
 
 .auth-submit:disabled {
-  opacity: 0.7;
+  opacity: 0.5;
   cursor: default;
 }
 
 .auth-submit .spinner {
   width: 14px;
   height: 14px;
-  border-color: rgba(255, 255, 255, 0.35);
-  border-top-color: #ffffff;
+  border-color: var(--accent-ring);
+  border-top-color: var(--accent);
 }
 
 .auth-forgot-link {
@@ -850,6 +880,10 @@ body {
 .upload-btn:hover:not(:disabled) {
   border-color: var(--accent);
   color: var(--accent);
+  text-shadow: 0 0 6px var(--accent-glow);
+  box-shadow:
+    0 0 8px var(--accent-glow),
+    inset 0 0 8px var(--accent-glow);
 }
 
 .upload-btn:disabled {
@@ -1172,20 +1206,27 @@ body {
 .group-btn {
   margin-top: 6px;
   width: 100%;
-  background: var(--accent);
-  color: #ffffff;
-  border: none;
+  background: transparent;
+  color: var(--accent);
+  border: 1.5px solid var(--accent);
   border-radius: var(--radius-sm);
   padding: 6px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 0 14px var(--accent-glow);
-  transition: filter 0.15s ease;
+  text-shadow: 0 0 6px var(--accent-glow);
+  box-shadow:
+    0 0 6px var(--accent-glow),
+    0 0 14px var(--accent-glow),
+    inset 0 0 6px var(--accent-glow);
+  transition:
+    filter 0.15s ease,
+    background-color 0.15s ease;
 }
 
 .group-btn:hover {
-  filter: brightness(1.08);
+  background: var(--accent-ring);
+  filter: brightness(1.2);
 }
 
 .selected-item button {

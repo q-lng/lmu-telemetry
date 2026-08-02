@@ -1,7 +1,22 @@
+// Curated preset palette for the navbar's accent picker — a plain <input
+// type="color"> would pop the OS's own color dialog, which doesn't fit a
+// neon theme; picking from a small curated set keeps every choice reading
+// as "neon" instead of letting someone land on a dull, low-saturation hue.
+export const NEON_PRESETS = [
+  '#00e5ff', // cyan
+  '#2979ff', // electric blue
+  '#b026ff', // violet
+  '#ff2fd1', // magenta
+  '#ff2d55', // hot pink/red
+  '#ff8c00', // orange
+  '#f5ff00', // yellow
+  '#39ff14', // green
+];
+
 // Default accent for the neon theme — matches the static fallback declared in
 // styles.css's :root, so there's no flash-of-wrong-color before a saved
 // preference (if any) loads.
-export const DEFAULT_ACCENT_COLOR = '#00e5ff';
+export const DEFAULT_ACCENT_COLOR = NEON_PRESETS[0];
 
 function hexToRgb(hex: string): [number, number, number] | null {
   const match = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
