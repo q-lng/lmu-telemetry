@@ -1704,72 +1704,79 @@ export default function TelemetryViewer() {
                 <div
                   className={`selected-item${item.type === 'group' ? ' is-group' : ''}${dragIndex === i ? ' dragging' : ''}`}
                   key={item.type === 'group' ? item.id : item.name}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    if (dragIndex !== null && dragIndex !== i) {
-                      moveItemTo(dragIndex, i);
-                      setDragIndex(i);
-                    }
-                  }}
                 >
-                  <span
-                    className="drag-handle"
-                    draggable
-                    onDragStart={() => setDragIndex(i)}
-                    onDragEnd={() => setDragIndex(null)}
-                    title={t('tv.dragToReorder')}
+                  {/* onDragOver lives on this row only — NOT the outer .selected-item —
+                      so a group's wrapped member-list line (which makes that item much
+                      taller than a plain channel row) isn't part of the drop target.
+                      Otherwise merely passing the mouse over that extra line while
+                      dragging past a group snaps the dragged item into that slot. */}
+                  <div
+                    className="selected-item-row"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (dragIndex !== null && dragIndex !== i) {
+                        moveItemTo(dragIndex, i);
+                        setDragIndex(i);
+                      }
+                    }}
                   >
-                    ⠿
-                  </span>
-                  {item.type === 'channel' ? (
-                    <>
-                      <input
-                        type="checkbox"
-                        checked={validGroupSelection.has(item.name)}
-                        onChange={() => toggleGroupSelection(item.name)}
-                        title={t('tv.selectToGroupTooltip')}
-                      />
-                      <span className="selected-name">{item.name}</span>
-                    </>
-                  ) : (
-                    <>
+                    <span
+                      className="drag-handle"
+                      draggable
+                      onDragStart={() => setDragIndex(i)}
+                      onDragEnd={() => setDragIndex(null)}
+                      title={t('tv.dragToReorder')}
+                    >
+                      ⠿
+                    </span>
+                    {item.type === 'channel' ? (
+                      <>
+                        <input
+                          type="checkbox"
+                          checked={validGroupSelection.has(item.name)}
+                          onChange={() => toggleGroupSelection(item.name)}
+                          title={t('tv.selectToGroupTooltip')}
+                        />
+                        <span className="selected-name">{item.name}</span>
+                      </>
+                    ) : (
                       <input
                         className="group-name-input"
                         value={item.name}
                         onChange={(e) => renameGroup(i, e.target.value)}
                       />
-                      <span className="group-members">{item.channels.join(' + ')}</span>
-                    </>
-                  )}
-                  {item.type === 'group' && item.special === 'pedals' && (
-                    <>
-                      <button
-                        className={item.channels.includes(CLUTCH_CHANNEL) ? 'active' : ''}
-                        onClick={() => togglePedalsClutch(i)}
-                        title={t('tv.pedalsToggleClutch')}
-                      >
-                        C
+                    )}
+                    {item.type === 'group' && item.special === 'pedals' && (
+                      <>
+                        <button
+                          className={item.channels.includes(CLUTCH_CHANNEL) ? 'active' : ''}
+                          onClick={() => togglePedalsClutch(i)}
+                          title={t('tv.pedalsToggleClutch')}
+                        >
+                          C
+                        </button>
+                        <button
+                          className={item.grouped === false ? 'active' : ''}
+                          onClick={() => togglePedalsGrouped(i)}
+                          title={t('tv.pedalsToggleGrouped')}
+                        >
+                          {item.grouped === false ? '▦' : '▣'}
+                        </button>
+                      </>
+                    )}
+                    {item.type === 'group' && (
+                      <button onClick={() => dissolveGroup(i)} title={t('tv.ungroup')}>
+                        ⊟
                       </button>
-                      <button
-                        className={item.grouped === false ? 'active' : ''}
-                        onClick={() => togglePedalsGrouped(i)}
-                        title={t('tv.pedalsToggleGrouped')}
-                      >
-                        {item.grouped === false ? '▦' : '▣'}
-                      </button>
-                    </>
-                  )}
-                  {item.type === 'group' && (
-                    <button onClick={() => dissolveGroup(i)} title={t('tv.ungroup')}>
-                      ⊟
+                    )}
+                    <button
+                      onClick={() => (item.type === 'group' ? removeItem(i) : toggleChannel(item.name))}
+                      title={t('tv.remove')}
+                    >
+                      ✕
                     </button>
-                  )}
-                  <button
-                    onClick={() => (item.type === 'group' ? removeItem(i) : toggleChannel(item.name))}
-                    title={t('tv.remove')}
-                  >
-                    ✕
-                  </button>
+                  </div>
+                  {item.type === 'group' && <span className="group-members">{item.channels.join(' + ')}</span>}
                 </div>
               ))}
             </div>

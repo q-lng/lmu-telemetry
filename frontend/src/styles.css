@@ -1155,8 +1155,8 @@ body {
 
 .selected-item {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  gap: 2px;
   padding: 4px 6px;
   border-radius: var(--radius-sm);
   background: var(--surface-2);
@@ -1164,6 +1164,17 @@ body {
 
 .selected-item.dragging {
   opacity: 0.4;
+}
+
+/* Drag-over target for reordering — deliberately just this row, not the
+   whole .selected-item (a group's wrapped .group-members line below would
+   otherwise make its drop target much taller than a plain channel row, so
+   merely passing the mouse over it while dragging past snaps the dragged
+   item into that slot). */
+.selected-item-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .drag-handle {
@@ -1187,7 +1198,6 @@ body {
 
 .selected-item.is-group {
   border: 1px solid var(--accent);
-  flex-wrap: wrap;
 }
 
 .selected-item .group-name-input {
@@ -1206,12 +1216,12 @@ body {
 }
 
 .selected-item .group-members {
-  flex-basis: 100%;
   color: var(--muted-ink);
   font-size: 10px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  padding-left: 20px;
 }
 
 .group-btn {
