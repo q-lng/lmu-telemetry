@@ -306,10 +306,52 @@ interface DisplayPreset {
 
 const PRESETS_STORAGE_KEY = 'lmu-telemetry-presets';
 
+function isValidLayoutItem(item: unknown): item is LayoutItem {
+  if (typeof item !== 'object' || item === null) return false;
+  const it = item as Record<string, unknown>;
+  if (it.type === 'channel') return typeof it.name === 'string';
+  if (it.type === 'group') {
+    return (
+      typeof it.id === 'string' &&
+      typeof it.name === 'string' &&
+      Array.isArray(it.channels) &&
+      it.channels.every((c) => typeof c === 'string')
+    );
+  }
+  return false;
+}
+
+/** A preset is arbitrary JSON a user saved into localStorage — the app's own
+ * shape for it can (and did) drift across releases, so a stale/corrupt entry
+ * must never be blindly handed to setLayout/setLaneWeights, which downstream
+ * code assumes is well-formed. Invalid entries are dropped (and the cleaned
+ * set re-saved) instead of crashing the whole app the moment they're applied. */
+function isValidPreset(value: unknown): value is DisplayPreset {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    Array.isArray(v.layout) &&
+    v.layout.every(isValidLayoutItem) &&
+    typeof v.laneWeights === 'object' &&
+    v.laneWeights !== null &&
+    (v.xAxisMode === 'time' || v.xAxisMode === 'distance')
+  );
+}
+
 function loadPresets(): Record<string, DisplayPreset> {
   try {
     const raw = localStorage.getItem(PRESETS_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) return {};
+    const valid: Record<string, DisplayPreset> = {};
+    let droppedAny = false;
+    for (const [name, preset] of Object.entries(parsed as Record<string, unknown>)) {
+      if (isValidPreset(preset)) valid[name] = preset;
+      else droppedAny = true;
+    }
+    if (droppedAny) savePresets(valid);
+    return valid;
   } catch {
     return {};
   }
@@ -1704,22 +1746,26 @@ export default function TelemetryViewer() {
                 <div
                   className={`selected-item${item.type === 'group' ? ' is-group' : ''}${dragIndex === i ? ' dragging' : ''}`}
                   key={item.type === 'group' ? item.id : item.name}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (dragIndex === null) return;
+                    // Insert before/after THIS item based on which half of it the
+                    // cursor is over, instead of always snapping to "this exact
+                    // index" the instant the (possibly much taller, for a group)
+                    // item is entered — that made merely passing over a group
+                    // while dragging a channel further down/up feel like the
+                    // group got yanked into the move.
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const isAfter = e.clientY - rect.top > rect.height / 2;
+                    let target = isAfter ? i + 1 : i;
+                    if (target > dragIndex) target -= 1;
+                    if (target !== dragIndex) {
+                      moveItemTo(dragIndex, target);
+                      setDragIndex(target);
+                    }
+                  }}
                 >
-                  {/* onDragOver lives on this row only — NOT the outer .selected-item —
-                      so a group's wrapped member-list line (which makes that item much
-                      taller than a plain channel row) isn't part of the drop target.
-                      Otherwise merely passing the mouse over that extra line while
-                      dragging past a group snaps the dragged item into that slot. */}
-                  <div
-                    className="selected-item-row"
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      if (dragIndex !== null && dragIndex !== i) {
-                        moveItemTo(dragIndex, i);
-                        setDragIndex(i);
-                      }
-                    }}
-                  >
+                  <div className="selected-item-row">
                     <span
                       className="drag-handle"
                       draggable

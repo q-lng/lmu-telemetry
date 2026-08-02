@@ -31,6 +31,8 @@ export const en = {
   'common.search': 'Search',
   'common.searching': 'Searching…',
   'common.cancel': 'Cancel',
+  'errorBoundary.message': 'Something went wrong and the app crashed. Reloading should fix it.',
+  'errorBoundary.reload': 'Reload',
 
   'visibility.private': 'Private',
   'visibility.friends': 'Friends',

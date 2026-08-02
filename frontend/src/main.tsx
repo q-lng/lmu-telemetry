@@ -6,15 +6,18 @@ import './styles.css';
 import App from './App';
 import { AuthProvider } from './AuthContext';
 import { PreferencesProvider } from './PreferencesContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
-      <AuthProvider>
-        <PreferencesProvider>
-          <App />
-        </PreferencesProvider>
-      </AuthProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <PreferencesProvider>
+            <App />
+          </PreferencesProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>,
 );
