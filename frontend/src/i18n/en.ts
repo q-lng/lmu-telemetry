@@ -12,6 +12,7 @@ export const en = {
   'nav.mySessions': 'My sessions',
   'nav.logout': 'Log out',
   'nav.login': 'Login',
+  'nav.accentColor': 'Accent color',
 
   'landing.heroTitle': 'Le Mans Ultimate telemetry, MoTeC i2 style',
   'landing.heroSubtitle': 'Open your .duckdb sessions, visualize every channel, compare your laps.',

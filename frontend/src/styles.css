@@ -12,8 +12,11 @@
   --gridline: #2c2c2a;
   --axis: #383835;
   --border: rgba(255, 255, 255, 0.1);
-  --accent: #e5484d;
-  --accent-ring: rgba(229, 72, 77, 0.18);
+  /* Neon accent — user-customizable via the picker in the navbar (see
+     theme.ts's applyAccentColor, which overrides all three together). */
+  --accent: #00e5ff;
+  --accent-ring: rgba(0, 229, 255, 0.18);
+  --accent-glow: rgba(0, 229, 255, 0.45);
   --danger: #e66767;
 
   /* Shared radius scale — sm for controls/chips, md for panels, lg for
@@ -51,7 +54,9 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--accent-ring);
+  box-shadow:
+    0 0 0 3px var(--accent-ring),
+    0 0 14px var(--accent-glow);
 }
 
 html,
@@ -91,6 +96,7 @@ body {
   color: var(--primary-ink);
   font-weight: 600;
   text-decoration: none;
+  text-shadow: 0 0 12px var(--accent-glow);
   transition: opacity 0.15s ease;
 }
 
@@ -121,6 +127,7 @@ body {
 .navbar-login[aria-current='page'] {
   color: var(--primary-ink);
   border-bottom: 2px solid var(--accent);
+  box-shadow: 0 2px 8px -2px var(--accent-glow);
 }
 
 .navbar-spacer {
@@ -131,6 +138,34 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.accent-picker {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+  cursor: pointer;
+}
+
+.accent-picker::-webkit-color-swatch-wrapper {
+  padding: 0;
+  border-radius: 50%;
+}
+
+.accent-picker::-webkit-color-swatch {
+  border: none;
+  border-radius: 50%;
+}
+
+.accent-picker::-moz-color-swatch {
+  border: none;
+  border-radius: 50%;
 }
 
 .navbar-user {
@@ -430,6 +465,7 @@ body {
   padding: 11px;
   font-size: 14px;
   font-weight: 600;
+  box-shadow: 0 0 18px var(--accent-glow);
   cursor: pointer;
   margin-top: 4px;
   transition:
@@ -868,6 +904,7 @@ body {
 .segmented button.active {
   background: var(--accent);
   color: #ffffff;
+  box-shadow: inset 0 0 10px var(--accent-glow);
 }
 
 .segmented button:disabled {
@@ -1143,6 +1180,7 @@ body {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+  box-shadow: 0 0 14px var(--accent-glow);
   transition: filter 0.15s ease;
 }
 
@@ -1179,6 +1217,7 @@ body {
   color: #ffffff;
   border-color: var(--accent);
   background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
 }
 
 .channel-list {

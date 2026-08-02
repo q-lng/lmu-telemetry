@@ -1,13 +1,26 @@
+import { useEffect } from 'react';
 import { useAuth } from '../AuthContext';
+import { usePreferences } from '../PreferencesContext';
 import { logout } from '../api';
 import { t } from '../i18n';
+import { applyAccentColor, DEFAULT_ACCENT_COLOR } from '../theme';
 
 // Plain <a> tags everywhere in this navbar, deliberately — every navigation is a
 // real full-page load (like a normal website), not a client-side SPA transition
 // that keeps the whole app instance and its state alive across pages.
 export function Navbar() {
   const { user, loading } = useAuth();
+  const { preferences, setPreference } = usePreferences();
   const path = window.location.pathname;
+  const accentColor = (preferences.accentColor as string | undefined) ?? DEFAULT_ACCENT_COLOR;
+
+  // Navbar is mounted on every page (Layout wraps every route with it), so
+  // applying the accent here — rather than once at the app root — is enough
+  // to cover the whole app, guests included (their pick is in-memory only,
+  // see PreferencesContext).
+  useEffect(() => {
+    applyAccentColor(accentColor);
+  }, [accentColor]);
 
   async function handleLogout() {
     await logout();
@@ -41,6 +54,13 @@ export function Navbar() {
         )}
       </div>
       <div className="navbar-spacer" />
+      <input
+        type="color"
+        className="accent-picker"
+        value={accentColor}
+        onChange={(e) => setPreference('accentColor', e.target.value)}
+        title={t('nav.accentColor')}
+      />
       {!loading && (
         user ? (
           <div className="navbar-account">
