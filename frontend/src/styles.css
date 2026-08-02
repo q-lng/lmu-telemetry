@@ -1336,6 +1336,12 @@ body {
   box-shadow: 0 0 8px var(--accent-glow);
 }
 
+.lane-size-buttons {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
 .channel-list {
   display: flex;
   flex-direction: column;

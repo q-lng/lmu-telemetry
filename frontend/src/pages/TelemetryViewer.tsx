@@ -1060,6 +1060,40 @@ export default function TelemetryViewer() {
     });
   }
 
+  // A layout item can render as more than one lane (a split multi-column
+  // channel, an ungrouped-but-boxed group) — mirrors the lanes builder's own
+  // key generation so a size choice applies to every lane that item actually
+  // produces, not just its first one.
+  function laneKeysForItem(item: LayoutItem): string[] {
+    if (item.type === 'channel') {
+      if (item.name === DELTA_CHANNEL_NAME) return [DELTA_CHANNEL_NAME];
+      const series = seriesByName[item.name];
+      if (series && series.valueColumns.length > 1 && item.splitCorners) {
+        return series.valueColumns.map((col) => `${item.name}__${col}`);
+      }
+      return [item.name];
+    }
+    if (item.grouped === false) {
+      return item.channels.map((c) => `${item.id}__${c}`);
+    }
+    return [item.id];
+  }
+
+  function sizeOfItem(item: LayoutItem): number {
+    return laneWeights[laneKeysForItem(item)[0]] ?? LANE_SIZE.medium;
+  }
+
+  function setItemSize(item: LayoutItem, size: number) {
+    const keys = laneKeysForItem(item);
+    setLaneWeights((prev) => {
+      const next = { ...prev };
+      keys.forEach((k) => {
+        next[k] = size;
+      });
+      return next;
+    });
+  }
+
   function toggleDeltaChannel() {
     const isShown = layout.some((it) => it.type === 'channel' && it.name === DELTA_CHANNEL_NAME);
     setPreference('deltaChannelShown', !isShown);
@@ -1990,6 +2024,29 @@ export default function TelemetryViewer() {
                         ⊟
                       </button>
                     )}
+                    <div className="lane-size-buttons">
+                      <button
+                        className={sizeOfItem(item) === LANE_SIZE.small ? 'active' : ''}
+                        onClick={() => setItemSize(item, LANE_SIZE.small)}
+                        title={t('tv.laneSizeSmall')}
+                      >
+                        S
+                      </button>
+                      <button
+                        className={sizeOfItem(item) === LANE_SIZE.medium ? 'active' : ''}
+                        onClick={() => setItemSize(item, LANE_SIZE.medium)}
+                        title={t('tv.laneSizeMedium')}
+                      >
+                        M
+                      </button>
+                      <button
+                        className={sizeOfItem(item) === LANE_SIZE.tall ? 'active' : ''}
+                        onClick={() => setItemSize(item, LANE_SIZE.tall)}
+                        title={t('tv.laneSizeTall')}
+                      >
+                        L
+                      </button>
+                    </div>
                     <button
                       onClick={() => (item.type === 'group' ? removeItem(i) : toggleChannel(item.name))}
                       title={t('tv.remove')}
