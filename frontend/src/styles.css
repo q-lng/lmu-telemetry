@@ -477,7 +477,7 @@ body {
 
 .social-card {
   width: 100%;
-  max-width: 640px;
+  max-width: 1200px;
   align-self: flex-start;
   background: var(--surface-1);
   border: 1px solid var(--border);
