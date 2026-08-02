@@ -168,6 +168,7 @@ export const en = {
   'tv.publishDone': 'Published — find it in "My sessions".',
   'tv.presetLabel': 'Display preset',
   'tv.presetLoadPlaceholder': '— Load —',
+  'tv.presetDefaultName': 'Default',
   'tv.presetDelete': 'Delete this preset',
   'tv.presetNamePlaceholder': 'Preset name',
   'tv.presetSave': 'Save',

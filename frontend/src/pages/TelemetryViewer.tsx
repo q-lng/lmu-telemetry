@@ -306,6 +306,11 @@ interface DisplayPreset {
 
 const PRESETS_STORAGE_KEY = 'lmu-telemetry-presets';
 
+// Reserved dropdown value for the built-in default view (INITIAL_LAYOUT/
+// INITIAL_LANE_WEIGHTS) — always present regardless of what's in `presets`,
+// never stored there, never deletable.
+const DEFAULT_PRESET_VALUE = '__default__';
+
 function isValidLayoutItem(item: unknown): item is LayoutItem {
   if (typeof item !== 'object' || item === null) return false;
   const it = item as Record<string, unknown>;
@@ -442,6 +447,21 @@ export default function TelemetryViewer() {
     if (idx !== -1) setPreference('deltaChannelIndex', idx);
   }, [layout]);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  // Live-reorder preview while a drag is in flight — NOT `layout` itself.
+  // `layout` feeds selectedChannels/the fetch effects/the whole lanes
+  // builder, so committing every single dragover step straight into it (as
+  // the previous implementation did) re-triggered a full channel refetch on
+  // every pixel of mouse movement during a fast drag — overlapping requests,
+  // races, and (once enough piled up) the loading state getting stuck.
+  // `dragLayout` is purely cosmetic for the "channels shown" list; the real
+  // `layout` only updates once, on drop. Mirrored into a ref so onDragEnd
+  // always reads the latest value regardless of React's render timing.
+  const [dragLayout, setDragLayout] = useState<LayoutItem[] | null>(null);
+  const dragLayoutRef = useRef<LayoutItem[] | null>(null);
+  function updateDragLayout(next: LayoutItem[] | null) {
+    dragLayoutRef.current = next;
+    setDragLayout(next);
+  }
   const [groupSelection, setGroupSelection] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState('');
   const [seriesByName, setSeriesByName] = useState<Record<string, ChannelSeries>>({});
@@ -580,6 +600,12 @@ export default function TelemetryViewer() {
   }
 
   function applyPreset(name: string) {
+    if (name === DEFAULT_PRESET_VALUE) {
+      setLayout(INITIAL_LAYOUT);
+      setLaneWeights(INITIAL_LANE_WEIGHTS);
+      setXAxisMode('time');
+      return;
+    }
     const preset = presets[name];
     if (!preset) return;
     setLayout(preset.layout);
@@ -598,6 +624,7 @@ export default function TelemetryViewer() {
   }
 
   function deletePreset(name: string) {
+    if (name === DEFAULT_PRESET_VALUE) return;
     const next = { ...presets };
     delete next[name];
     setPresets(next);
@@ -932,14 +959,14 @@ export default function TelemetryViewer() {
     });
   }
 
-  function moveItemTo(from: number, to: number) {
-    setLayout((prev) => {
-      if (from === to || from < 0 || to < 0 || from >= prev.length || to >= prev.length) return prev;
-      const next = [...prev];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
+  // Pure — used to compute the live drag preview (dragLayout) without
+  // touching the committed `layout` state on every dragover step.
+  function reorderedList(list: LayoutItem[], from: number, to: number): LayoutItem[] {
+    if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return list;
+    const next = [...list];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    return next;
   }
 
   function removeItem(index: number) {
@@ -1096,6 +1123,9 @@ export default function TelemetryViewer() {
     );
   }
   const validGroupSelection = new Set([...groupSelection].filter((n) => layout.some((it) => it.type === 'channel' && it.name === n)));
+  // What the "channels shown" list actually renders — a live preview during
+  // an active drag (see dragLayout above), the committed order otherwise.
+  const displayLayout = dragLayout ?? layout;
 
   // Distance only ever makes sense for a single lap: "Lap Dist" resets to 0 at
   // every start/finish crossing, so across multiple laps it's a sawtooth — which
@@ -1470,13 +1500,18 @@ export default function TelemetryViewer() {
               }}
             >
               <option value="">{t('tv.presetLoadPlaceholder')}</option>
+              <option value={DEFAULT_PRESET_VALUE}>{t('tv.presetDefaultName')}</option>
               {Object.keys(presets).map((name) => (
                 <option key={name} value={name}>
                   {name}
                 </option>
               ))}
             </select>
-            <button disabled={!selectedPreset} onClick={() => deletePreset(selectedPreset)} title={t('tv.presetDelete')}>
+            <button
+              disabled={!selectedPreset || selectedPreset === DEFAULT_PRESET_VALUE}
+              onClick={() => deletePreset(selectedPreset)}
+              title={t('tv.presetDelete')}
+            >
               ✕
             </button>
           </div>
@@ -1742,7 +1777,7 @@ export default function TelemetryViewer() {
           <div className="field">
             {t('tv.channelsShown')}
             <div className="selected-list">
-              {layout.map((item, i) => (
+              {displayLayout.map((item, i) => (
                 <div
                   className={`selected-item${item.type === 'group' ? ' is-group' : ''}${dragIndex === i ? ' dragging' : ''}`}
                   key={item.type === 'group' ? item.id : item.name}
@@ -1760,7 +1795,11 @@ export default function TelemetryViewer() {
                     let target = isAfter ? i + 1 : i;
                     if (target > dragIndex) target -= 1;
                     if (target !== dragIndex) {
-                      moveItemTo(dragIndex, target);
+                      // Reorders the local preview only — NOT the committed
+                      // `layout` (see dragLayout above) — so a fast drag across
+                      // many rows doesn't re-trigger the channel-data fetch
+                      // effect (which depends on layout) on every step.
+                      updateDragLayout(reorderedList(dragLayoutRef.current ?? layout, dragIndex, target));
                       setDragIndex(target);
                     }
                   }}
@@ -1769,8 +1808,15 @@ export default function TelemetryViewer() {
                     <span
                       className="drag-handle"
                       draggable
-                      onDragStart={() => setDragIndex(i)}
-                      onDragEnd={() => setDragIndex(null)}
+                      onDragStart={() => {
+                        setDragIndex(i);
+                        updateDragLayout(layout);
+                      }}
+                      onDragEnd={() => {
+                        setDragIndex(null);
+                        if (dragLayoutRef.current) setLayout(dragLayoutRef.current);
+                        updateDragLayout(null);
+                      }}
                       title={t('tv.dragToReorder')}
                     >
                       ⠿
