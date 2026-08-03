@@ -23,6 +23,17 @@
 
 ## Terminé
 
+### 2026-08-03 — Fix police mono + largeur du badge label/valeurs sur le graphe
+- `.lane-label` (le badge label + valeurs + delta affiché directement sur
+  chaque graphe, distinct de la légende de la sidebar déjà corrigée) n'avait
+  pas la police de données — oublié lors du passage précédent. Ajouté
+  `font-family: var(--font-family-mono, ...)`.
+- Le badge s'étirait sur toute la largeur du canal (`left: 44px; right: 8px`
+  forçait une largeur pleine) au lieu de suivre son contenu. Remplacé
+  `right: 8px` par `max-width: calc(100% - 52px)` — le badge ne prend
+  maintenant que la largeur de son texte (label/valeurs/delta), plafonnée
+  pour ne pas dépasser le bord droit du graphe.
+
 ### 2026-08-03 — Police mono sur le graphe + bibliothèque de polices générales x2 plus large
 - **Police de données appliquée au graphe uPlot** (manquait à l'entrée
   précédente) : uPlot dessine ses labels d'axes sur `<canvas>`, pas en DOM/

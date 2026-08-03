@@ -2495,12 +2495,13 @@ input[type='range']::-moz-range-track {
   position: absolute;
   top: 2px;
   left: 44px;
-  right: 8px;
+  max-width: calc(100% - 52px);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 4px 8px;
   font-size: calc(1rem * 10 / 16);
+  font-family: var(--font-family-mono, ui-monospace, 'SF Mono', Consolas, monospace);
   color: var(--secondary-ink);
   background: rgba(26, 26, 25, 0.75);
   padding: 1px 5px;
