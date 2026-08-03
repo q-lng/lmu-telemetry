@@ -22,7 +22,18 @@ backend/        API Fastify+TS
 frontend/       app Vite+React+TS
 docs/SCHEMA.md  schéma DuckDB des fichiers de télémétrie (référence technique)
 CONTEXT.md      décisions de projet et état d'avancement
+TASKS.md        suivi continu : tâches en cours / terminées (à tenir à jour à
+                chaque session, pas seulement en mémoire Claude — survit aux
+                nouvelles conversations)
 ```
+
+## Suivi de l'avancement
+
+**Tenir `TASKS.md` à jour au fil de l'eau** (pas juste en fin de session) : ce qui
+vient d'être terminé, ce qui est en cours, ce qui reste à faire. C'est le fichier de
+référence pour reprendre le contexte dans une nouvelle conversation Claude Code —
+la mémoire Claude (feedback/préférences/roadmap) complète mais ne remplace pas ce
+suivi opérationnel.
 
 ## Schéma des données
 

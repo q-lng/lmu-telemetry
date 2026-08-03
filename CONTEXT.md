@@ -25,10 +25,19 @@ tous les canaux disponibles, graphes, avec à terme un export vers MoTeC.
 
 ## État d'avancement
 
-Voir la liste de tâches en cours de session pour le détail. Le schéma DuckDB a été
-entièrement documenté dans `docs/SCHEMA.md` à partir d'un vrai fichier fourni par
-Quentin (`data/Sebring International Raceway_R_2026-07-28T22_42_15Z.duckdb`,
+**Voir [TASKS.md](TASKS.md) pour le détail à jour** (terminé / en cours / à faire) —
+tenu à jour en continu, y compris entre deux conversations Claude Code différentes.
+
+Le schéma DuckDB a été entièrement documenté dans `docs/SCHEMA.md` à partir d'un
+vrai fichier fourni par Quentin (`data/Sebring International Raceway_R_2026-07-28T22_42_15Z.duckdb`,
 session Race Sebring LMP3).
+
+Grandes lignes de ce qui existe déjà (voir TASKS.md pour le détail) : lecture/
+visualisation de télémétrie avec graphes synchronisés uPlot, comparaison de tours
+(même session ou fichier externe), canal de delta-time, carte du circuit, comptes
+utilisateurs (amis/follows, partage de tours/sessions publics ou entre amis), modal
+de chargement de session avec quota de stockage (plans free/vip), thème néon
+personnalisable, panel admin en cours de construction.
 
 ## Notes diverses
 
