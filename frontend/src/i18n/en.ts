@@ -13,6 +13,7 @@ export const en = {
   'nav.logout': 'Log out',
   'nav.login': 'Login',
   'nav.accentColor': 'Accent color',
+  'nav.pendingRequestBadge': 'You have a pending friend request',
   'nav.vipBadge': 'VIP member',
   'nav.adminBadge': 'Site administrator',
   'nav.myProfile': 'My profile',

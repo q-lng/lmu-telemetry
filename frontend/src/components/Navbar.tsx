@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
+import { fetchFriendRequests } from '../api';
 import { t } from '../i18n';
 import { AccentPicker } from './AccentPicker';
 import { AccountMenu } from './AccountMenu';
@@ -11,6 +13,27 @@ import { AccountMenu } from './AccountMenu';
 export function Navbar() {
   const { user, loading } = useAuth();
   const { pathname } = useLocation();
+  const [hasPendingRequest, setHasPendingRequest] = useState(false);
+
+  // Re-checked on every navigation (not just once) — cheaply keeps the badge
+  // in sync with accepting/declining requests on /friends, without a whole
+  // separate polling/websocket mechanism for what's still a small, personal-
+  // scale app.
+  useEffect(() => {
+    if (!user) {
+      setHasPendingRequest(false);
+      return;
+    }
+    let cancelled = false;
+    fetchFriendRequests()
+      .then((r) => {
+        if (!cancelled) setHasPendingRequest(r.incoming.length > 0);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user, pathname]);
 
   return (
     <nav className="navbar">
@@ -29,8 +52,9 @@ export function Navbar() {
         </Link>
         {user && (
           <>
-            <Link to="/friends" aria-current={pathname === '/friends' ? 'page' : undefined}>
+            <Link to="/friends" className="navbar-link-with-badge" aria-current={pathname === '/friends' ? 'page' : undefined}>
               {t('nav.friends')}
+              {hasPendingRequest && <span className="navbar-badge" title={t('nav.pendingRequestBadge')} />}
             </Link>
             <Link to="/my-sessions" aria-current={pathname === '/my-sessions' ? 'page' : undefined}>
               {t('nav.mySessions')}

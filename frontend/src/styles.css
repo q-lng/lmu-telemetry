@@ -129,6 +129,21 @@ body {
   border-bottom: 2px solid var(--accent);
 }
 
+.navbar-link-with-badge {
+  position: relative;
+}
+
+.navbar-badge {
+  position: absolute;
+  top: -1px;
+  right: -8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+}
+
 .navbar-spacer {
   flex: 1;
 }
