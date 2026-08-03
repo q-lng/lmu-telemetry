@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import uPlot from 'uplot';
 import type { Lane } from '../types';
@@ -230,10 +230,13 @@ interface Props {
    * always fills exactly the available vertical space, so lanes are sized purely
    * by their weight relative to each other, never by an absolute pixel height. */
   weight: number;
-  /** The full lane-weights record (not just this lane's own `weight`) — flex-grow
-   * redistributes ALL lanes' pixel heights whenever ANY one of them changes, so
-   * the resize-on-weight-change effect below needs to fire for every lane when
-   * any weight changes, not just the one whose own value happened to change. */
+  /** The full lane-weights record (not just this lane's own `weight`) — purely a
+   * rebuild trigger: flex-grow redistributes ALL lanes' pixel heights whenever
+   * ANY one of them changes, and incremental resize (setSize on the existing
+   * uPlot instance) proved unreliable in practice. Including this in the
+   * rebuild effect's deps below makes a size change go through the exact same
+   * destroy-and-reconstruct path that already reliably resizes every lane on
+   * an x-axis-mode switch, instead of trying to patch one in place. */
   allWeights?: Record<string, number>;
   /** Shared default X range across every lane (from a dense reference channel) —
    * without this, a sparse event channel (Gear, ...) would auto-range to just its
@@ -488,7 +491,7 @@ export function ChannelPlot({
       plotRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [structuralSignature, syncKey, showXAxis, xAxisMode, xDomain]);
+  }, [structuralSignature, syncKey, showXAxis, xAxisMode, xDomain, allWeights]);
 
   // Cheap path for a lane whose structure didn't change (see
   // structuralSignature above) but whose actual values did — a new fetch
@@ -505,24 +508,6 @@ export function ChannelPlot({
     plot.setScale('y', { min: yRange[0], max: yRange[1] });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lane]);
-
-  // Flex-grow redistributes every lane's pixel height whenever ANY one lane's
-  // weight changes (one growing shrinks all its siblings too) — so this has
-  // to resize whenever `allWeights` changes at all, not just when THIS lane's
-  // own `weight` value does; depending on `weight` alone left every other
-  // lane's canvas at its stale size until something else forced a full
-  // rebuild (e.g. switching x-axis mode). The ResizeObserver above is meant
-  // to catch this too, but relying on it alone across several lanes resizing
-  // in the same batch has proven unreliable.
-  // useLayoutEffect (not useEffect) deliberately — this runs synchronously
-  // right after the flexGrow style change is committed to the DOM, before
-  // the browser paints, so reading clientWidth/clientHeight here can't race
-  // against a deferred layout/paint pass the way a plain useEffect could.
-  useLayoutEffect(() => {
-    const plot = plotRef.current;
-    if (!plot || !containerRef.current) return;
-    plot.setSize({ width: containerRef.current.clientWidth, height: containerRef.current.clientHeight });
-  }, [weight, allWeights]);
 
   function handleResizeStart(e: ReactMouseEvent) {
     e.preventDefault();
