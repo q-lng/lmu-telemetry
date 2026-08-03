@@ -1,7 +1,16 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import cookiePlugin from '@fastify/cookie';
 import { hashPassword, verifyPassword } from './passwords.js';
-import { createUser, findUserByEmail, findUserByPseudo, findUserById, toPublicUser, updatePasswordHash } from './users.js';
+import {
+  createUser,
+  findUserByEmail,
+  findUserByPseudo,
+  findUserById,
+  toPublicUser,
+  updatePasswordHash,
+  updateProfileVisibility,
+  type ProfileVisibility,
+} from './users.js';
 import {
   SESSION_COOKIE_NAME,
   createSession,
@@ -111,6 +120,10 @@ export async function registerAuth(app: FastifyInstance): Promise<void> {
       reply.code(401).send({ error: 'INVALID_CREDENTIALS' });
       return;
     }
+    if (!user.isActive) {
+      reply.code(403).send({ error: 'ACCOUNT_DISABLED' });
+      return;
+    }
     await setSessionCookie(reply, user.id, { userAgent: req.headers['user-agent'], ip: req.ip });
     reply.send({ user: toPublicUser(user) });
   });
@@ -136,6 +149,21 @@ export async function registerAuth(app: FastifyInstance): Promise<void> {
       return;
     }
     reply.send({ user: toPublicUser(user) });
+  });
+
+  app.put<{ Body: { visibility?: string } }>('/api/auth/profile-visibility', async (req, reply) => {
+    if (!req.userId) {
+      reply.code(401).send({ error: 'NOT_AUTHENTICATED' });
+      return;
+    }
+    const visibility = req.body?.visibility;
+    if (visibility !== 'public' && visibility !== 'private') {
+      reply.code(400).send({ error: 'INVALID_VISIBILITY' });
+      return;
+    }
+    await updateProfileVisibility(req.userId, visibility as ProfileVisibility);
+    const user = await findUserById(req.userId);
+    reply.send({ user: toPublicUser(user!) });
   });
 
   app.post<{ Body: { email?: string } }>('/api/auth/forgot-password', async (req, reply) => {

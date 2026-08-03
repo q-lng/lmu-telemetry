@@ -1,3 +1,6 @@
+import { dataFontStack, fontStack } from './fonts';
+import type { DataFont, SiteFont } from './types';
+
 // Curated preset palette for the navbar's accent picker — a plain <input
 // type="color"> would pop the OS's own color dialog, which doesn't fit a
 // neon theme; picking from a small curated set keeps every choice reading
@@ -13,9 +16,9 @@ export const NEON_PRESETS = [
   '#39ff14', // green
 ];
 
-// Default accent for the neon theme — matches the static fallback declared in
-// styles.css's :root, so there's no flash-of-wrong-color before a saved
-// preference (if any) loads.
+// Fallback if the site-settings fetch hasn't resolved yet (or fails) — kept
+// in sync with the DB's own DEFAULT, so there's no flash-of-wrong-color before
+// either a saved user preference or the admin-configured default loads.
 export const DEFAULT_ACCENT_COLOR = NEON_PRESETS[0];
 
 function hexToRgb(hex: string): [number, number, number] | null {
@@ -28,13 +31,37 @@ function hexToRgb(hex: string): [number, number, number] | null {
 /** Applies the chosen accent globally: the base color plus two derived,
  * alpha-blended variants (a soft focus ring, a stronger glow for buttons) so
  * every element already styled with var(--accent-ring)/var(--accent-glow)
- * picks up the new color with no per-component changes. */
-export function applyAccentColor(hex: string): void {
+ * picks up the new color with no per-component changes. `glowEnabled` is the
+ * site-wide admin toggle — false zeroes out the glow variable everywhere at
+ * once instead of touching every box-shadow rule individually. */
+export function applyAccentColor(hex: string, glowEnabled = true): void {
   const rgb = hexToRgb(hex);
   if (!rgb) return;
   const [r, g, b] = rgb;
   const root = document.documentElement.style;
   root.setProperty('--accent', hex);
   root.setProperty('--accent-ring', `rgba(${r}, ${g}, ${b}, 0.18)`);
-  root.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.45)`);
+  root.setProperty('--accent-glow', glowEnabled ? `rgba(${r}, ${g}, ${b}, 0.45)` : 'transparent');
+}
+
+/** Same "just set the custom property" approach as the accent color — the
+ * font stacks themselves (and the @fontsource imports that back them) live
+ * in fonts.ts, the single source of truth shared with the admin font picker. */
+export function applyFontFamily(font: SiteFont): void {
+  document.documentElement.style.setProperty('--font-family', fontStack(font));
+}
+
+/** Separate from the general site font — used wherever telemetry data is
+ * displayed (tables, numeric readouts) via var(--font-family-mono), so
+ * columns/digits line up regardless of which monospace face is picked. */
+export function applyDataFontFamily(font: DataFont): void {
+  document.documentElement.style.setProperty('--font-family-mono', dataFontStack(font));
+}
+
+/** Scales text only — every `font-size` in styles.css is written as
+ * `calc(1rem * N / 16)`, and this drives the root `font-size` those are all
+ * relative to (see the `html` rule), so icons/padding/layout stay put and
+ * only text grows or shrinks. */
+export function applyFontSizeScale(scale: number): void {
+  document.documentElement.style.setProperty('--text-scale', String(scale));
 }

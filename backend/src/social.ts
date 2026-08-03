@@ -13,6 +13,7 @@ import {
   removeFriendship,
 } from './friends.js';
 import { follow, unfollow, isFollowing, listFollowing, listFollowers } from './follows.js';
+import { listNotifications, markNotificationsSeen } from './notifications.js';
 
 interface ProfileSummary extends PublicUser {
   isFriend: boolean;
@@ -80,6 +81,10 @@ export async function registerSocial(app: FastifyInstance): Promise<void> {
         reply.code(400).send({ error: 'CANNOT_ADD_SELF' });
         return;
       }
+      if (target.profileVisibility === 'private') {
+        reply.code(403).send({ error: 'PROFILE_IS_PRIVATE' });
+        return;
+      }
       const status = await sendFriendRequest(req.userId!, target.id);
       reply.send({ status });
     },
@@ -145,6 +150,10 @@ export async function registerSocial(app: FastifyInstance): Promise<void> {
         reply.code(400).send({ error: 'CANNOT_FOLLOW_SELF' });
         return;
       }
+      if (target.profileVisibility === 'private') {
+        reply.code(403).send({ error: 'PROFILE_IS_PRIVATE' });
+        return;
+      }
       await follow(req.userId!, target.id);
       reply.code(204).send();
     },
@@ -170,5 +179,14 @@ export async function registerSocial(app: FastifyInstance): Promise<void> {
 
   app.get('/api/follows/followers', { preHandler: requireAuth }, async (req, reply) => {
     reply.send({ users: await listFollowers(req.userId!) });
+  });
+
+  app.get('/api/notifications', { preHandler: requireAuth }, async (req, reply) => {
+    reply.send(await listNotifications(req.userId!));
+  });
+
+  app.post('/api/notifications/seen', { preHandler: requireAuth }, async (req, reply) => {
+    await markNotificationsSeen(req.userId!);
+    reply.code(204).send();
   });
 }

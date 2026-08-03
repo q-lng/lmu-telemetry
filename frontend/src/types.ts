@@ -13,6 +13,53 @@ export interface SessionSummary {
 }
 
 export type Plan = 'free' | 'vip';
+export type ProfileVisibility = 'public' | 'private';
+// Keys map 1:1 to frontend/src/fonts.ts's FONT_CATALOG and backend/src/siteSettings.ts's SITE_FONTS.
+export type SiteFont =
+  | 'system'
+  | 'inter'
+  | 'roboto'
+  | 'poppins'
+  | 'montserrat'
+  | 'work-sans'
+  | 'space-grotesk'
+  | 'manrope'
+  | 'oswald'
+  | 'orbitron'
+  | 'rajdhani'
+  | 'bebas-neue'
+  | 'playfair-display'
+  | 'nunito'
+  | 'outfit'
+  | 'lexend'
+  | 'barlow-condensed'
+  | 'merriweather'
+  | 'lora'
+  | 'roboto-slab'
+  | 'caveat';
+
+// Keys map 1:1 to frontend/src/fonts.ts's DATA_FONT_CATALOG and backend/src/siteSettings.ts's DATA_FONTS.
+// Monospace only — used for telemetry data displays (tables, numeric
+// readouts) so columns/digits stay aligned regardless of which one is picked.
+export type DataFont =
+  | 'system-mono'
+  | 'jetbrains-mono'
+  | 'ibm-plex-mono'
+  | 'space-mono'
+  | 'roboto-mono'
+  | 'fira-code'
+  | 'source-code-pro'
+  | 'dm-mono';
+
+export interface SiteSettings {
+  siteName: string;
+  font: SiteFont;
+  dataFont: DataFont;
+  fontSizeScale: number;
+  defaultAccentColor: string;
+  accentPresets: string[];
+  neonGlowEnabled: boolean;
+}
 
 export interface StorageUsage {
   usedBytes: number;
@@ -53,6 +100,12 @@ export interface PublicUser {
   prenom: string;
   plan: Plan;
   isAdmin: boolean;
+  isActive: boolean;
+  profileVisibility: ProfileVisibility;
+}
+
+export interface AdminUserSummary extends PublicUser {
+  storage: StorageUsage;
 }
 
 export interface ProfileSummary extends PublicUser {
@@ -66,6 +119,16 @@ export interface FriendRequestSummary {
   id: number;
   user: PublicUser;
   createdAt: string;
+}
+
+export type NotificationType = 'friend_request' | 'follow';
+
+export interface Notification {
+  type: NotificationType;
+  id: string;
+  user: PublicUser;
+  createdAt: string;
+  read: boolean;
 }
 
 export interface LapInfo {

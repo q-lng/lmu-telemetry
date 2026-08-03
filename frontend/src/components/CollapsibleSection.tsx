@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { ChevronIcon } from './icons';
 
 interface Props {
   title: string;
@@ -14,7 +15,9 @@ export function CollapsibleSection({ title, collapsed, onToggle, children }: Pro
   return (
     <div className="sidebar-section">
       <button type="button" className="sidebar-section-header" onClick={onToggle} aria-expanded={!collapsed}>
-        <span className={`sidebar-section-chevron${collapsed ? ' collapsed' : ''}`}>▾</span>
+        <span className={`sidebar-section-chevron${collapsed ? ' collapsed' : ''}`}>
+          <ChevronIcon />
+        </span>
         <span className="sidebar-section-title">{title}</span>
       </button>
       {!collapsed && <div className="sidebar-section-body">{children}</div>}

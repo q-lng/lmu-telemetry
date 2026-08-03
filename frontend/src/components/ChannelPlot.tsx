@@ -24,6 +24,16 @@ function formatDelta(v: number): string {
   return `${sign}${Number.isInteger(abs) ? String(abs) : abs.toFixed(2)}`;
 }
 
+// uPlot draws axis text on a <canvas>, not the DOM — CSS font-family rules
+// never reach it, so the chosen data font (see theme.ts's applyDataFontFamily,
+// var(--font-family-mono)) has to be read and handed to uPlot explicitly as a
+// canvas font string. Re-read at every chart (re)build rather than cached,
+// so switching the admin's data font is picked up next time a lane redraws.
+function axisFont(): string {
+  const family = getComputedStyle(document.documentElement).getPropertyValue('--font-family-mono').trim();
+  return `11px ${family || "ui-monospace, 'SF Mono', Consolas, monospace"}`;
+}
+
 function formatValue(v: number | boolean | null): string {
   if (v === null || v === undefined) return '–';
   if (typeof v === 'boolean') return v ? t('telemetryLegend.on') : t('telemetryLegend.off');
@@ -393,11 +403,13 @@ export function ChannelPlot({
           size: showXAxis ? 26 : 8,
           ticks: { show: showXAxis, stroke: CHART_CHROME.axis },
           values: showXAxis ? (_u, vals) => vals.map(xAxisMode === 'distance' ? formatDistance : formatTime) : () => [],
+          font: axisFont(),
         },
         {
           stroke: CHART_CHROME.mutedInk,
           grid: { stroke: CHART_CHROME.gridline },
           size: Y_AXIS_SIZE,
+          font: axisFont(),
         },
       ],
       series: seriesOpts,

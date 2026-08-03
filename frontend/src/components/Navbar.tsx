@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
+import { useSiteSettings } from '../SiteSettingsContext';
 import { fetchFriendRequests } from '../api';
 import { t } from '../i18n';
 import { AccentPicker } from './AccentPicker';
 import { AccountMenu } from './AccountMenu';
+import { NotificationsBell } from './NotificationsBell';
 
 // Client-side navigation (Link/useLocation) — the app used to force a real
 // full-page load on every navigation; that's what caused the white flash and
@@ -12,8 +14,14 @@ import { AccountMenu } from './AccountMenu';
 // link/redirect in the app) switched to React Router's own navigation.
 export function Navbar() {
   const { user, loading } = useAuth();
+  const { settings: siteSettings } = useSiteSettings();
   const { pathname } = useLocation();
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
+  const siteName = siteSettings?.siteName ?? t('brand');
+
+  useEffect(() => {
+    document.title = siteName;
+  }, [siteName]);
 
   // Re-checked on every navigation (not just once) — cheaply keeps the badge
   // in sync with accepting/declining requests on /friends, without a whole
@@ -38,7 +46,7 @@ export function Navbar() {
   return (
     <nav className="navbar">
       <Link to="/" className="navbar-brand">
-        {t('brand')}
+        {siteName}
       </Link>
       <div className="navbar-links">
         <Link to="/" aria-current={pathname === '/' ? 'page' : undefined}>
@@ -66,7 +74,10 @@ export function Navbar() {
       <AccentPicker />
       {!loading &&
         (user ? (
-          <AccountMenu />
+          <>
+            <NotificationsBell />
+            <AccountMenu />
+          </>
         ) : (
           <Link to="/login" className="navbar-login" aria-current={pathname === '/login' ? 'page' : undefined}>
             {t('nav.login')}

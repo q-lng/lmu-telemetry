@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import type { SessionSummary } from '../types';
 import { useAuth } from '../AuthContext';
 import { t } from '../i18n';
+import { ChevronIcon } from './icons';
 
 interface AsyncActionState {
   busy: boolean;
@@ -70,9 +71,13 @@ export function SessionTable({ sessions, onSelect, deleteState, onDeleteSession 
     }
   }
 
-  function sortIndicator(key: SortKey): string {
-    if (sortKey !== key) return '';
-    return sortDir === 'asc' ? ' ▲' : ' ▼';
+  function sortIndicator(key: SortKey): ReactNode {
+    if (sortKey !== key) return null;
+    return (
+      <span className="sort-icon">
+        <ChevronIcon size={10} direction={sortDir === 'asc' ? 'up' : 'down'} />
+      </span>
+    );
   }
 
   const tabFiltered = useMemo(() => {

@@ -4,6 +4,7 @@ import { t } from '../i18n';
 import { fetchStorageUsage } from '../api';
 import { useAuth } from '../AuthContext';
 import { SessionTable } from './SessionTable';
+import { CloseIcon } from './icons';
 
 interface AsyncActionState {
   busy: boolean;
@@ -66,7 +67,7 @@ export function SessionPickerModal({
         <div className="modal-header">
           <h2>{t('tv.sessionPickerTitle')}</h2>
           <button className="modal-close" onClick={onClose} title={t('tv.sessionPickerClose')}>
-            ✕
+            <CloseIcon />
           </button>
         </div>
 

@@ -3,11 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { logout } from '../api';
 import { t } from '../i18n';
+import { UserIcon } from './icons';
+import { VipBadge } from './VipBadge';
 
 /** Pseudo → dropdown in the navbar's top-right corner — same click-outside/
- * Escape-to-close popover pattern as AccentPicker. Plan/admin badges sit next
- * to the trigger; there's no UI yet to assign either (see the admin panel
- * roadmap), they just render once the backend says so. */
+ * Escape-to-close popover pattern as AccentPicker. The avatar is a plain
+ * placeholder (no profile picture upload feature exists yet). */
 export function AccountMenu() {
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
@@ -43,17 +44,11 @@ export function AccountMenu() {
   return (
     <div className="account-menu" ref={wrapRef}>
       <button type="button" className="account-menu-trigger" onClick={() => setOpen((o) => !o)}>
-        {user.plan === 'vip' && (
-          <span className="account-badge account-badge-vip" title={t('nav.vipBadge')}>
-            ♛
-          </span>
-        )}
-        {user.isAdmin && (
-          <span className="account-badge account-badge-admin" title={t('nav.adminBadge')}>
-            ⚙
-          </span>
-        )}
+        <span className="navbar-avatar" aria-hidden="true">
+          <UserIcon />
+        </span>
         <span className="account-menu-name">{user.pseudo}</span>
+        <VipBadge plan={user.plan} />
       </button>
       {open && (
         <div className="account-menu-popover">
@@ -71,7 +66,7 @@ export function AccountMenu() {
               {t('nav.administration')}
             </Link>
           )}
-          <button type="button" onClick={handleLogout}>
+          <button type="button" className="account-menu-logout" onClick={handleLogout}>
             {t('nav.logout')}
           </button>
         </div>

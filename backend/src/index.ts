@@ -1,12 +1,21 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
-import { initAuthSchema, initSocialSchema, initFilesSchema, initMailSchema, initPreferencesSchema } from './pg.js';
+import {
+  initAuthSchema,
+  initSocialSchema,
+  initFilesSchema,
+  initMailSchema,
+  initPreferencesSchema,
+  initSiteSettingsSchema,
+} from './pg.js';
 import { registerAuth } from './auth.js';
 import { registerSocial } from './social.js';
 import { registerFiles } from './files.js';
 import { registerPreferences } from './preferences.js';
 import { registerStorage, backfillMissingFileSizes } from './storage.js';
+import { registerAdmin } from './admin.js';
+import { registerSiteSettings } from './siteSettings.js';
 
 const app = Fastify({ logger: true });
 await app.register(cors, { origin: true });
@@ -17,12 +26,15 @@ await initSocialSchema();
 await initFilesSchema();
 await initMailSchema();
 await initPreferencesSchema();
+await initSiteSettingsSchema();
 await backfillMissingFileSizes();
 await registerAuth(app);
 await registerSocial(app);
 await registerFiles(app);
 await registerPreferences(app);
 await registerStorage(app);
+await registerAdmin(app);
+await registerSiteSettings(app);
 
 app.get('/api/health', async () => ({ ok: true }));
 

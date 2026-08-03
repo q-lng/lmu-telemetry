@@ -4,6 +4,7 @@ import { fetchProfile } from '../api';
 import type { ProfileSummary } from '../types';
 import { useAuth } from '../AuthContext';
 import { RelationActions } from '../components/RelationActions';
+import { VipBadge } from '../components/VipBadge';
 import { t } from '../i18n';
 
 export function Profile() {
@@ -45,7 +46,9 @@ export function Profile() {
     <div className="social-page">
       <div className="social-card profile-card">
         <div className="profile-heading">
-          <h1>{profile.pseudo}</h1>
+          <h1>
+            {profile.pseudo} <VipBadge plan={profile.plan} />
+          </h1>
           <p>
             {profile.prenom} {profile.nom}
           </p>

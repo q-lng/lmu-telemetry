@@ -44,6 +44,11 @@ export async function initPreferencesSchema(): Promise<void> {
   await runSchemaFile('preferencesSchema.sql');
 }
 
+/** Runs the idempotent site-settings schema DDL (singleton row) at startup. */
+export async function initSiteSettingsSchema(): Promise<void> {
+  await runSchemaFile('siteSettingsSchema.sql');
+}
+
 /** Runs `fn` inside a single client transaction, committing on success and rolling
  * back on any thrown error — needed for multi-statement mutations (e.g. accepting a
  * friend request: delete the request row + insert the friendship row atomically). */

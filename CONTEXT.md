@@ -6,6 +6,14 @@ Quentin (pilote sim, LMU) veut une webapp légère pour ouvrir ses fichiers de
 télémétrie Le Mans Ultimate (.duckdb) et les visualiser comme dans MoTeC i2 :
 tous les canaux disponibles, graphes, avec à terme un export vers MoTeC.
 
+**Pivot (2026-08-03)** : le projet évolue vers un **hub communautaire LMU** —
+tracking des sessions/pilotes à l'échelle de la communauté, import de
+télémétrie (la base actuelle), bot Discord publiant les résultats de course
+d'un joueur, etc. Hébergement dédié + nom de domaine prévus (actuellement
+Docker local uniquement). Implique un chantier réglementaire (RGPD, mentions
+légales, copyright/marques) — voir TASKS.md et mémoire Claude
+`project_hub_pivot` pour le détail et la liste à débriefer.
+
 ## Décisions prises
 
 - **Stack** : Node.js/TypeScript de bout en bout (Fastify + package `duckdb` côté

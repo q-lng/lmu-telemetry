@@ -20,6 +20,8 @@ import { TelemetryLegend } from '../components/TelemetryLegend';
 import { SessionPickerModal } from '../components/SessionPickerModal';
 import { CollapsibleSection } from '../components/CollapsibleSection';
 import { LaneSizeMenu } from '../components/LaneSizeMenu';
+import { ChevronIcon, CloseIcon, DragHandleIcon, GearIcon, GridIcon, SquareIcon, UngroupIcon } from '../components/icons';
+import { ColorPicker } from '../components/ColorPicker';
 import { channelColor, comparedLapColor, CORNER_STYLE, REFERENCE_UNIFORM_COLOR } from '../palette';
 import { resampleContinuous, resampleStep } from '../resample';
 import { useAuth } from '../AuthContext';
@@ -317,8 +319,6 @@ interface DisplayPreset {
   xAxisMode: 'time' | 'distance';
 }
 
-const PRESETS_STORAGE_KEY = 'lmu-telemetry-presets';
-
 // Reserved dropdown value for the built-in default view (INITIAL_LAYOUT/
 // INITIAL_LANE_WEIGHTS) — always present regardless of what's in `presets`,
 // never stored there, never deletable.
@@ -339,11 +339,12 @@ function isValidLayoutItem(item: unknown): item is LayoutItem {
   return false;
 }
 
-/** A preset is arbitrary JSON a user saved into localStorage — the app's own
- * shape for it can (and did) drift across releases, so a stale/corrupt entry
- * must never be blindly handed to setLayout/setLaneWeights, which downstream
- * code assumes is well-formed. Invalid entries are dropped (and the cleaned
- * set re-saved) instead of crashing the whole app the moment they're applied. */
+/** A preset is arbitrary JSON stored in the backend's per-user preferences
+ * (never localStorage — presets must follow the account across devices, not
+ * stay stuck on whichever browser saved them). The app's own shape for it
+ * can (and did) drift across releases, so a stale/corrupt entry must never
+ * be blindly handed to setLayout/setLaneWeights, which downstream code
+ * assumes is well-formed — invalid entries are just dropped from the read side. */
 function isValidPreset(value: unknown): value is DisplayPreset {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
@@ -356,27 +357,13 @@ function isValidPreset(value: unknown): value is DisplayPreset {
   );
 }
 
-function loadPresets(): Record<string, DisplayPreset> {
-  try {
-    const raw = localStorage.getItem(PRESETS_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) return {};
-    const valid: Record<string, DisplayPreset> = {};
-    let droppedAny = false;
-    for (const [name, preset] of Object.entries(parsed as Record<string, unknown>)) {
-      if (isValidPreset(preset)) valid[name] = preset;
-      else droppedAny = true;
-    }
-    if (droppedAny) savePresets(valid);
-    return valid;
-  } catch {
-    return {};
+function parsePresets(raw: unknown): Record<string, DisplayPreset> {
+  if (typeof raw !== 'object' || raw === null) return {};
+  const valid: Record<string, DisplayPreset> = {};
+  for (const [name, preset] of Object.entries(raw as Record<string, unknown>)) {
+    if (isValidPreset(preset)) valid[name] = preset;
   }
-}
-
-function savePresets(presets: Record<string, DisplayPreset>) {
-  localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(presets));
+  return valid;
 }
 
 export default function TelemetryViewer() {
@@ -390,6 +377,9 @@ export default function TelemetryViewer() {
   function toggleSidebarSection(key: string) {
     setPreference('sidebarCollapsed', { ...sidebarCollapsed, [key]: !sidebarCollapsed[key] });
   }
+  // Display presets — same backend-preferences mechanism as everything else
+  // here, never localStorage, so they follow the account across devices.
+  const presets = useMemo(() => parsePresets(preferences.displayPresets), [preferences.displayPresets]);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [sessionPickerOpen, setSessionPickerOpen] = useState(false);
@@ -509,7 +499,6 @@ export default function TelemetryViewer() {
   const [uploadState, setUploadState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
   const [deleteState, setDeleteState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
   const [laneWeights, setLaneWeights] = useState<Record<string, number>>(INITIAL_LANE_WEIGHTS);
-  const [presets, setPresets] = useState<Record<string, DisplayPreset>>(() => loadPresets());
   const [selectedPreset, setSelectedPreset] = useState('');
   const [presetName, setPresetName] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -635,21 +624,36 @@ export default function TelemetryViewer() {
   function saveCurrentAsPreset() {
     const name = presetName.trim();
     if (!name) return;
-    const next = { ...presets, [name]: { layout, laneWeights, xAxisMode } };
-    setPresets(next);
-    savePresets(next);
+    setPreference('displayPresets', { ...presets, [name]: { layout, laneWeights, xAxisMode } });
     setSelectedPreset(name);
     setPresetName('');
+  }
+
+  /** Overwrites the currently-selected preset with whatever's been changed
+   * since it was loaded — see selectedPresetDirty below for when this is
+   * actually offered (only once there's something to update). */
+  function updateSelectedPreset() {
+    if (!selectedPreset || selectedPreset === DEFAULT_PRESET_VALUE) return;
+    setPreference('displayPresets', { ...presets, [selectedPreset]: { layout, laneWeights, xAxisMode } });
   }
 
   function deletePreset(name: string) {
     if (name === DEFAULT_PRESET_VALUE) return;
     const next = { ...presets };
     delete next[name];
-    setPresets(next);
-    savePresets(next);
+    setPreference('displayPresets', next);
     if (selectedPreset === name) setSelectedPreset('');
   }
+
+  // Whether the loaded preset's saved layout differs from the current one —
+  // drives whether "Update" is offered, per "if you modify it after
+  // selecting it, you should be able to save that back".
+  const selectedPresetDirty = useMemo(() => {
+    if (!selectedPreset || selectedPreset === DEFAULT_PRESET_VALUE) return false;
+    const saved = presets[selectedPreset];
+    if (!saved) return false;
+    return JSON.stringify({ layout, laneWeights, xAxisMode }) !== JSON.stringify(saved);
+  }, [selectedPreset, presets, layout, laneWeights, xAxisMode]);
 
   const selectedChannels = useMemo(
     () =>
@@ -967,8 +971,8 @@ export default function TelemetryViewer() {
 
   function toggleChannel(name: string) {
     // Keep the "shown" preference in sync regardless of which UI affordance
-    // removes/adds it (the dedicated checkbox, or the generic "✕" in the
-    // "Channels shown" list) — delegate to the same function either way.
+    // removes/adds it (the dedicated checkbox, or the generic close button in
+    // the "Channels shown" list) — delegate to the same function either way.
     if (name === DELTA_CHANNEL_NAME) {
       toggleDeltaChannel();
       return;
@@ -1644,9 +1648,16 @@ export default function TelemetryViewer() {
               onClick={() => deletePreset(selectedPreset)}
               title={t('tv.presetDelete')}
             >
-              ✕
+              <CloseIcon />
             </button>
           </div>
+          {selectedPresetDirty && (
+            <div className="preset-row">
+              <button className="upload-btn" onClick={updateSelectedPreset}>
+                {t('tv.presetUpdate', { name: selectedPreset })}
+              </button>
+            </div>
+          )}
           <div className="preset-row">
             <input
               placeholder={t('tv.presetNamePlaceholder')}
@@ -1794,7 +1805,7 @@ export default function TelemetryViewer() {
               onClick={() => setColorPrefsOpen((o) => !o)}
               title={t('tv.colorPrefsToggle')}
             >
-              ⚙
+              <GearIcon />
             </button>
           </div>
         </label>
@@ -1802,28 +1813,28 @@ export default function TelemetryViewer() {
         {colorPrefsOpen && (
           <div className="field color-prefs">
             {colorMode === 'byLap' && (
-              <label className="color-pref-row">
-                <input
-                  type="color"
-                  value={preferredReferenceLapColor ?? REFERENCE_UNIFORM_COLOR}
-                  onChange={(e) => setPreference('referenceLapColor', e.target.value)}
+              <div className="color-pref-row">
+                <ColorPicker
+                  color={preferredReferenceLapColor ?? REFERENCE_UNIFORM_COLOR}
+                  onChange={(hex) => setPreference('referenceLapColor', hex)}
+                  label={t('tv.referenceLapColorLabel')}
                 />
                 {t('tv.referenceLapColorLabel')}
-              </label>
+              </div>
             )}
             {Array.from({ length: COMPARED_LAP_COLOR_SLOTS }, (_, i) => (
-              <label key={i} className="color-pref-row">
-                <input
-                  type="color"
-                  value={preferredComparedLapColors?.[i] ?? comparedLapColor(i)}
-                  onChange={(e) => {
+              <div key={i} className="color-pref-row">
+                <ColorPicker
+                  color={preferredComparedLapColors?.[i] ?? comparedLapColor(i)}
+                  onChange={(hex) => {
                     const next = [...(preferredComparedLapColors ?? [])];
-                    next[i] = e.target.value;
+                    next[i] = hex;
                     setPreference('comparedLapColors', next);
                   }}
+                  label={t('tv.comparedLapColorLabel', { n: i + 1 })}
                 />
                 {t('tv.comparedLapColorLabel', { n: i + 1 })}
-              </label>
+              </div>
             ))}
             {!user && <span className="field-hint">{t('tv.colorPrefsGuestHint')}</span>}
           </div>
@@ -1843,7 +1854,7 @@ export default function TelemetryViewer() {
                 <div className="compare-external-source-header">
                   <strong>{source.label}</strong>
                   <button onClick={() => removeExternalSource(source.id)} title={t('tv.removeSource')}>
-                    ✕
+                    <CloseIcon />
                   </button>
                 </div>
                 {trackMismatchFor(source.metadata) && (
@@ -1980,7 +1991,7 @@ export default function TelemetryViewer() {
                       }}
                       title={t('tv.dragToReorder')}
                     >
-                      ⠿
+                      <DragHandleIcon />
                     </span>
                     {item.type === 'channel' ? (
                       <>
@@ -2013,7 +2024,7 @@ export default function TelemetryViewer() {
                           onClick={() => togglePedalsGrouped(i)}
                           title={t('tv.pedalsToggleGrouped')}
                         >
-                          {item.grouped === false ? '▦' : '▣'}
+                          {item.grouped === false ? <GridIcon /> : <SquareIcon />}
                         </button>
                       </>
                     )}
@@ -2023,12 +2034,12 @@ export default function TelemetryViewer() {
                         onClick={() => toggleCornerSplit(i)}
                         title={t('tv.cornerSplitToggle')}
                       >
-                        {item.splitCorners ? '▦' : '▣'}
+                        {item.splitCorners ? <GridIcon /> : <SquareIcon />}
                       </button>
                     )}
                     {item.type === 'group' && (
                       <button onClick={() => dissolveGroup(i)} title={t('tv.ungroup')}>
-                        ⊟
+                        <UngroupIcon />
                       </button>
                     )}
                     <LaneSizeMenu
@@ -2040,7 +2051,7 @@ export default function TelemetryViewer() {
                       onClick={() => (item.type === 'group' ? removeItem(i) : toggleChannel(item.name))}
                       title={t('tv.remove')}
                     >
-                      ✕
+                      <CloseIcon />
                     </button>
                   </div>
                   {item.type === 'group' && <span className="group-members">{item.channels.join(' + ')}</span>}
@@ -2087,7 +2098,7 @@ export default function TelemetryViewer() {
         onClick={() => setSidebarOpen((o) => !o)}
         title={sidebarOpen ? t('tv.collapsePanel') : t('tv.showPanel')}
       >
-        {sidebarOpen ? '‹' : '›'}
+        <ChevronIcon direction={sidebarOpen ? 'left' : 'right'} />
       </button>
 
       <main className="main">

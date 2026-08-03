@@ -34,6 +34,13 @@ export function RelationActions({ profile, onChange }: Props) {
     }
   }
 
+  // A private profile only blocks brand-new friend requests/follows — an
+  // existing friendship, pending request, or follow (from before the profile
+  // went private) still shows its normal action (remove/cancel/unfollow...).
+  const isPrivate = profile.profileVisibility === 'private';
+  const canSendFriendRequest = !isPrivate && profile.requestState === 'none' && !profile.isFriend;
+  const canFollow = !isPrivate && !profile.isFollowing;
+
   return (
     <div className="relation-actions">
       <div className="relation-actions-row">
@@ -54,16 +61,21 @@ export function RelationActions({ profile, onChange }: Props) {
               {t('friends.decline')}
             </button>
           </>
-        ) : (
+        ) : canSendFriendRequest ? (
           <button disabled={busy} onClick={() => run(() => sendFriendRequest(profile.pseudo))}>
             {t('friends.add')}
           </button>
-        )}
+        ) : null}
 
-        <button disabled={busy} onClick={() => run(() => (profile.isFollowing ? unfollowUser(profile.pseudo) : followUser(profile.pseudo)))}>
-          {profile.isFollowing ? t('follows.unfollow') : t('follows.follow')}
-        </button>
+        {(canFollow || profile.isFollowing) && (
+          <button disabled={busy} onClick={() => run(() => (profile.isFollowing ? unfollowUser(profile.pseudo) : followUser(profile.pseudo)))}>
+            {profile.isFollowing ? t('follows.unfollow') : t('follows.follow')}
+          </button>
+        )}
       </div>
+      {isPrivate && !profile.isFriend && profile.requestState === 'none' && !profile.isFollowing && (
+        <p className="field-hint">{t('friends.profileIsPrivate')}</p>
+      )}
       {error && <div className="auth-error">{error}</div>}
     </div>
   );

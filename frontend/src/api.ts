@@ -1,4 +1,5 @@
 import type {
+  AdminUserSummary,
   ChannelDescriptor,
   ChannelSeries,
   FileRecord,
@@ -6,11 +7,15 @@ import type {
   LapInfo,
   LapShare,
   LapVisibility,
+  Notification,
+  Plan,
   ProfileSummary,
+  ProfileVisibility,
   PublicUser,
   SessionMetadata,
   SessionSummary,
   SharedLapResult,
+  SiteSettings,
   StorageUsage,
   Visibility,
 } from './types';
@@ -49,6 +54,20 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 async function putJson<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
     method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const parsed = await res.json().catch(() => ({}));
+    throw new Error(tError((parsed as { error?: string }).error));
+  }
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
+async function patchJson<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
@@ -101,6 +120,10 @@ export function requestPasswordReset(email: string): Promise<void> {
 
 export function resetPassword(token: string, password: string): Promise<void> {
   return postJson('/api/auth/reset-password', { token, password });
+}
+
+export function updateProfileVisibility(visibility: ProfileVisibility): Promise<PublicUser> {
+  return putJson<{ user: PublicUser }>('/api/auth/profile-visibility', { visibility }).then((r) => r.user);
 }
 
 export function fetchSessions(
@@ -194,6 +217,14 @@ export function fetchFollowers(): Promise<PublicUser[]> {
   return getJson<{ users: PublicUser[] }>('/api/follows/followers').then((r) => r.users);
 }
 
+export function fetchNotifications(): Promise<{ items: Notification[]; unreadCount: number }> {
+  return getJson('/api/notifications');
+}
+
+export function markNotificationsSeen(): Promise<void> {
+  return apiCall('/api/notifications/seen', 'POST');
+}
+
 export function fetchMyFiles(): Promise<FileRecord[]> {
   return getJson<{ files: FileRecord[] }>('/api/sessions/mine').then((r) => r.files);
 }
@@ -253,4 +284,31 @@ export function fetchPreferences(): Promise<Record<string, unknown>> {
 
 export function updatePreferences(patch: Record<string, unknown>): Promise<Record<string, unknown>> {
   return putJson<{ data: Record<string, unknown> }>('/api/preferences', { data: patch }).then((r) => r.data);
+}
+
+export function fetchAdminUsers(): Promise<AdminUserSummary[]> {
+  return getJson<{ users: AdminUserSummary[] }>('/api/admin/users').then((r) => r.users);
+}
+
+export function updateAdminUser(
+  id: number,
+  patch: { pseudo?: string; plan?: Plan; isAdmin?: boolean; isActive?: boolean },
+): Promise<PublicUser> {
+  return patchJson<{ user: PublicUser }>(`/api/admin/users/${id}`, patch).then((r) => r.user);
+}
+
+export function sendAdminPasswordReset(id: number): Promise<void> {
+  return apiCall(`/api/admin/users/${id}/send-password-reset`, 'POST');
+}
+
+export function deleteAdminUser(id: number): Promise<void> {
+  return apiCall(`/api/admin/users/${id}`, 'DELETE');
+}
+
+export function fetchSiteSettings(): Promise<SiteSettings> {
+  return getJson('/api/site-settings');
+}
+
+export function updateSiteSettings(patch: Partial<SiteSettings>): Promise<SiteSettings> {
+  return patchJson('/api/admin/site-settings', patch);
 }

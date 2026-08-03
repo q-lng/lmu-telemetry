@@ -1,6 +1,7 @@
 import { pgQuery } from './pg.js';
 
 export type Plan = 'free' | 'vip';
+export type ProfileVisibility = 'public' | 'private';
 
 export interface User {
   id: number;
@@ -12,6 +13,8 @@ export interface User {
   createdAt: string;
   plan: Plan;
   isAdmin: boolean;
+  isActive: boolean;
+  profileVisibility: ProfileVisibility;
 }
 
 export interface PublicUser {
@@ -22,6 +25,8 @@ export interface PublicUser {
   prenom: string;
   plan: Plan;
   isAdmin: boolean;
+  isActive: boolean;
+  profileVisibility: ProfileVisibility;
 }
 
 interface UserRow {
@@ -34,6 +39,8 @@ interface UserRow {
   created_at: string;
   plan: Plan;
   is_admin: boolean;
+  is_active: boolean;
+  profile_visibility: ProfileVisibility;
 }
 
 function fromRow(r: UserRow): User {
@@ -47,11 +54,23 @@ function fromRow(r: UserRow): User {
     createdAt: r.created_at,
     plan: r.plan,
     isAdmin: r.is_admin,
+    isActive: r.is_active,
+    profileVisibility: r.profile_visibility,
   };
 }
 
 export function toPublicUser(u: User): PublicUser {
-  return { id: u.id, email: u.email, pseudo: u.pseudo, nom: u.nom, prenom: u.prenom, plan: u.plan, isAdmin: u.isAdmin };
+  return {
+    id: u.id,
+    email: u.email,
+    pseudo: u.pseudo,
+    nom: u.nom,
+    prenom: u.prenom,
+    plan: u.plan,
+    isAdmin: u.isAdmin,
+    isActive: u.isActive,
+    profileVisibility: u.profileVisibility,
+  };
 }
 
 export async function createUser(input: {
@@ -64,10 +83,58 @@ export async function createUser(input: {
   const rows = await pgQuery<UserRow>(
     `INSERT INTO users (email, pseudo, nom, prenom, password_hash)
      VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, email, pseudo, nom, prenom, password_hash, created_at, plan, is_admin`,
+     RETURNING id, email, pseudo, nom, prenom, password_hash, created_at, plan, is_admin, is_active, profile_visibility`,
     [input.email, input.pseudo, input.nom, input.prenom, input.passwordHash],
   );
   return fromRow(rows[0]);
+}
+
+export async function updateProfileVisibility(userId: number, visibility: ProfileVisibility): Promise<void> {
+  await pgQuery(`UPDATE users SET profile_visibility = $2 WHERE id = $1`, [userId, visibility]);
+}
+
+/** Full user list for the admin panel — small personal-scale app, no paging. */
+export async function listAllUsers(): Promise<User[]> {
+  const rows = await pgQuery<UserRow>(`SELECT * FROM users ORDER BY id`);
+  return rows.map(fromRow);
+}
+
+export interface AdminUserPatch {
+  pseudo?: string;
+  plan?: Plan;
+  isAdmin?: boolean;
+  isActive?: boolean;
+}
+
+/** Builds the SET clause from whichever fields are present — admin.ts only
+ * passes fields that actually changed, so a request touching one field never
+ * rewrites the others. */
+export async function updateUserByAdmin(userId: number, patch: AdminUserPatch): Promise<User | null> {
+  const sets: string[] = [];
+  const params: unknown[] = [userId];
+  if (patch.pseudo !== undefined) {
+    params.push(patch.pseudo);
+    sets.push(`pseudo = $${params.length}`);
+  }
+  if (patch.plan !== undefined) {
+    params.push(patch.plan);
+    sets.push(`plan = $${params.length}`);
+  }
+  if (patch.isAdmin !== undefined) {
+    params.push(patch.isAdmin);
+    sets.push(`is_admin = $${params.length}`);
+  }
+  if (patch.isActive !== undefined) {
+    params.push(patch.isActive);
+    sets.push(`is_active = $${params.length}`);
+  }
+  if (sets.length === 0) return findUserById(userId);
+  const rows = await pgQuery<UserRow>(`UPDATE users SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, params);
+  return rows[0] ? fromRow(rows[0]) : null;
+}
+
+export async function deleteUser(userId: number): Promise<void> {
+  await pgQuery(`DELETE FROM users WHERE id = $1`, [userId]);
 }
 
 export async function findUserByEmail(email: string): Promise<User | null> {
