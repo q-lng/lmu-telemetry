@@ -2,7 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { usePreferences } from '../PreferencesContext';
 import { useSiteSettings } from '../SiteSettingsContext';
 import { t } from '../i18n';
-import { applyAccentColor, applyDataFontFamily, applyFontFamily, applyFontSizeScale, DEFAULT_ACCENT_COLOR, NEON_PRESETS } from '../theme';
+import {
+  applyAccentColor,
+  applyDataFontFamily,
+  applyFontFamily,
+  applyFontSizeScale,
+  applyTelemetryFont,
+  DEFAULT_ACCENT_COLOR,
+  NEON_PRESETS,
+} from '../theme';
 
 /** Top-right navbar swatch + preset popover for the neon accent color — no
  * native <input type="color"> here, that would pop the OS's own picker,
@@ -31,6 +39,10 @@ export function AccentPicker() {
   useEffect(() => {
     applyDataFontFamily(siteSettings?.dataFont ?? 'system-mono');
   }, [siteSettings?.dataFont]);
+
+  useEffect(() => {
+    applyTelemetryFont(siteSettings?.telemetryFont ?? 'mono');
+  }, [siteSettings?.telemetryFont]);
 
   useEffect(() => {
     applyFontSizeScale(siteSettings?.fontSizeScale ?? 1);

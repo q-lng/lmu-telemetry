@@ -1059,6 +1059,10 @@ body {
   flex: 1;
   min-height: 0;
   position: relative;
+  /* Whole telemetry page (sidebar + graph) follows one admin choice — see
+     theme.ts's applyTelemetryFont — instead of specific spots being
+     hardcoded to the data font while the rest stayed on the site font. */
+  font-family: var(--telemetry-font-family, var(--font-family));
 }
 
 .sidebar {
@@ -1325,7 +1329,6 @@ body {
   width: 100%;
   border-collapse: collapse;
   font-size: calc(1rem * 11 / 16);
-  font-family: var(--font-family-mono, ui-monospace, 'SF Mono', Consolas, monospace);
   margin-top: 4px;
   display: block;
   max-height: 220px;
@@ -1768,7 +1771,6 @@ body {
   width: 100%;
   border-collapse: collapse;
   font-size: calc(1rem * 10 / 16);
-  font-family: var(--font-family-mono, ui-monospace, 'SF Mono', Consolas, monospace);
 }
 
 .telemetry-legend-table th,
@@ -2501,7 +2503,6 @@ input[type='range']::-moz-range-track {
   flex-wrap: wrap;
   gap: 4px 8px;
   font-size: calc(1rem * 10 / 16);
-  font-family: var(--font-family-mono, ui-monospace, 'SF Mono', Consolas, monospace);
   color: var(--secondary-ink);
   background: rgba(26, 26, 25, 0.75);
   padding: 1px 5px;
@@ -2572,6 +2573,9 @@ input[type='range']::-moz-range-track {
   max-width: 900px;
   margin: 0 auto;
   padding: 40px 24px;
+  /* Reuses ChannelPlot/TelemetryLegend from the main telemetry app — same
+     admin font choice applies here too (see .app above). */
+  font-family: var(--telemetry-font-family, var(--font-family));
 }
 
 .shared-lap-header {

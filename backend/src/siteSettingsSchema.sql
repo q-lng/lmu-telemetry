@@ -62,3 +62,10 @@ ALTER TABLE site_settings ADD CONSTRAINT site_settings_font_check CHECK (
   )
 ) NOT VALID;
 ALTER TABLE site_settings VALIDATE CONSTRAINT site_settings_font_check;
+
+-- Which of the two fonts above the telemetry viewer page (sidebar + graph)
+-- uses, as a whole — previously a handful of specific spots (legend table,
+-- laps table, in-graph label) were hardcoded to always use the data font
+-- while the rest of the sidebar stayed on the site font; this replaces that
+-- fixed split with one explicit choice covering the entire page.
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS telemetry_font TEXT NOT NULL DEFAULT 'mono' CHECK (telemetry_font IN ('site', 'mono'));

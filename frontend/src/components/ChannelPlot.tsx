@@ -25,12 +25,14 @@ function formatDelta(v: number): string {
 }
 
 // uPlot draws axis text on a <canvas>, not the DOM — CSS font-family rules
-// never reach it, so the chosen data font (see theme.ts's applyDataFontFamily,
-// var(--font-family-mono)) has to be read and handed to uPlot explicitly as a
-// canvas font string. Re-read at every chart (re)build rather than cached,
-// so switching the admin's data font is picked up next time a lane redraws.
+// never reach it, so the resolved telemetry-page font (see theme.ts's
+// applyTelemetryFont, var(--telemetry-font-family) — whichever of the site
+// font or data font the admin picked for the whole page) has to be read and
+// handed to uPlot explicitly as a canvas font string. Re-read at every chart
+// (re)build rather than cached, so switching the admin's choice is picked up
+// next time a lane redraws.
 function axisFont(): string {
-  const family = getComputedStyle(document.documentElement).getPropertyValue('--font-family-mono').trim();
+  const family = getComputedStyle(document.documentElement).getPropertyValue('--telemetry-font-family').trim();
   return `11px ${family || "ui-monospace, 'SF Mono', Consolas, monospace"}`;
 }
 

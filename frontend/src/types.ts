@@ -51,10 +51,15 @@ export type DataFont =
   | 'source-code-pro'
   | 'dm-mono';
 
+// Which of font/dataFont above the whole telemetry viewer page (sidebar +
+// graph) uses, as one choice — see backend/src/siteSettings.ts.
+export type TelemetryFontMode = 'site' | 'mono';
+
 export interface SiteSettings {
   siteName: string;
   font: SiteFont;
   dataFont: DataFont;
+  telemetryFont: TelemetryFontMode;
   fontSizeScale: number;
   defaultAccentColor: string;
   accentPresets: string[];

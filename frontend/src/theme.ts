@@ -1,5 +1,5 @@
 import { dataFontStack, fontStack } from './fonts';
-import type { DataFont, SiteFont } from './types';
+import type { DataFont, SiteFont, TelemetryFontMode } from './types';
 
 // Curated preset palette for the navbar's accent picker — a plain <input
 // type="color"> would pop the OS's own color dialog, which doesn't fit a
@@ -56,6 +56,19 @@ export function applyFontFamily(font: SiteFont): void {
  * columns/digits line up regardless of which monospace face is picked. */
 export function applyDataFontFamily(font: DataFont): void {
   document.documentElement.style.setProperty('--font-family-mono', dataFontStack(font));
+}
+
+/** The telemetry viewer page (sidebar + graph) as a whole follows this
+ * instead of the general site font directly — it resolves to whichever of
+ * --font-family/--font-family-mono is currently chosen, so the previous fixed
+ * split (legend/laps table/in-graph label always mono, rest always site font)
+ * becomes one explicit admin choice covering the entire page. Setting it to a
+ * nested var() is valid CSS — it resolves transitively at computed-value time. */
+export function applyTelemetryFont(mode: TelemetryFontMode): void {
+  document.documentElement.style.setProperty(
+    '--telemetry-font-family',
+    mode === 'mono' ? 'var(--font-family-mono)' : 'var(--font-family)',
+  );
 }
 
 /** Scales text only — every `font-size` in styles.css is written as

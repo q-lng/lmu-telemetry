@@ -23,6 +23,26 @@
 
 ## Terminé
 
+### 2026-08-03 — Choix unique "police du site" / "police mono" pour toute la page télémétrie
+- Nouveau réglage `telemetryFont` ('site' | 'mono') dans `/admin` >
+  Affichage : remplace le mix précédent où seuls le tableau des tours, la
+  légende de canal et le badge label/valeurs sur le graphe étaient forcés en
+  police mono, alors que le reste de la sidebar restait en police du site.
+  Maintenant un seul choix s'applique à **toute** la page télémétrie
+  (sidebar + graphe), site font ou mono au choix.
+- Implémenté via une nouvelle variable CSS `--telemetry-font-family`
+  (`theme.ts`'s `applyTelemetryFont`) qui pointe vers `var(--font-family)`
+  ou `var(--font-family-mono)` selon le choix — appliquée sur `.app` (la
+  page télémétrie) et `.shared-lap-page` (qui réutilise les mêmes
+  composants de graphe/légende hors de `.app`). Les surcharges codées en dur
+  sur `.telemetry-legend-table`/`.lap-select-table`/`.lane-label` supprimées
+  (elles héritent maintenant normalement).
+  - Le graphe uPlot (rendu canvas, pas DOM) lit maintenant
+    `--telemetry-font-family` au lieu de `--font-family-mono` directement,
+    donc il suit vraiment le choix au lieu d'être toujours en mono.
+- Migration DB : colonne `telemetry_font`, défaut `'mono'` (préserve le
+  rendu déjà en place pour les 3 zones qui étaient forcées en mono).
+
 ### 2026-08-03 — Fix police mono + largeur du badge label/valeurs sur le graphe
 - `.lane-label` (le badge label + valeurs + delta affiché directement sur
   chaque graphe, distinct de la légende de la sidebar déjà corrigée) n'avait

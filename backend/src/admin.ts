@@ -17,8 +17,10 @@ import {
   updateSiteSettings,
   SITE_FONTS,
   DATA_FONTS,
+  TELEMETRY_FONT_MODES,
   type SiteFont,
   type DataFont,
+  type TelemetryFontMode,
   type SiteSettingsPatch,
 } from './siteSettings.js';
 
@@ -150,13 +152,15 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
       siteName?: string;
       font?: string;
       dataFont?: string;
+      telemetryFont?: string;
       fontSizeScale?: number;
       defaultAccentColor?: string;
       accentPresets?: string[];
       neonGlowEnabled?: boolean;
     };
   }>('/api/admin/site-settings', { preHandler: requireAdmin }, async (req, reply) => {
-    const { siteName, font, dataFont, fontSizeScale, defaultAccentColor, accentPresets, neonGlowEnabled } = req.body ?? {};
+    const { siteName, font, dataFont, telemetryFont, fontSizeScale, defaultAccentColor, accentPresets, neonGlowEnabled } =
+      req.body ?? {};
     const patch: SiteSettingsPatch = {};
 
     if (siteName !== undefined) {
@@ -180,6 +184,13 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
         return;
       }
       patch.dataFont = dataFont as DataFont;
+    }
+    if (telemetryFont !== undefined) {
+      if (!TELEMETRY_FONT_MODES.includes(telemetryFont as TelemetryFontMode)) {
+        reply.code(400).send({ error: 'INVALID_TELEMETRY_FONT' });
+        return;
+      }
+      patch.telemetryFont = telemetryFont as TelemetryFontMode;
     }
     if (fontSizeScale !== undefined) {
       if (typeof fontSizeScale !== 'number' || !Number.isFinite(fontSizeScale) || fontSizeScale < 0.8 || fontSizeScale > 2.0) {

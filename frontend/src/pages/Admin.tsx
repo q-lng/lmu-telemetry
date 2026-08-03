@@ -247,6 +247,19 @@ function DisplaySettingsSection() {
       </div>
 
       <div className="field">
+        <strong>{t('admin.telemetryFont')}</strong>
+        <div className="segmented">
+          <button className={draft.telemetryFont === 'site' ? 'active' : ''} onClick={() => update('telemetryFont', 'site')}>
+            {t('admin.telemetryFontSite')}
+          </button>
+          <button className={draft.telemetryFont === 'mono' ? 'active' : ''} onClick={() => update('telemetryFont', 'mono')}>
+            {t('admin.telemetryFontMono')}
+          </button>
+        </div>
+        <p className="field-hint">{t('admin.telemetryFontHint')}</p>
+      </div>
+
+      <div className="field">
         <strong>{t('admin.fontSizeScale')}</strong>
         <div className="admin-scale-row">
           <input

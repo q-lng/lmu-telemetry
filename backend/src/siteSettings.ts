@@ -72,10 +72,17 @@ export const DATA_FONTS: DataFont[] = [
   'dm-mono',
 ];
 
+// Which of `font`/`dataFont` above the whole telemetry viewer page (sidebar +
+// graph) uses — replaces the earlier fixed split where only the legend
+// table/laps table/in-graph label were hardcoded to the data font.
+export type TelemetryFontMode = 'site' | 'mono';
+export const TELEMETRY_FONT_MODES: TelemetryFontMode[] = ['site', 'mono'];
+
 export interface SiteSettings {
   siteName: string;
   font: SiteFont;
   dataFont: DataFont;
+  telemetryFont: TelemetryFontMode;
   fontSizeScale: number;
   defaultAccentColor: string;
   accentPresets: string[];
@@ -86,6 +93,7 @@ interface SiteSettingsRow {
   site_name: string;
   font: SiteFont;
   data_font: DataFont;
+  telemetry_font: TelemetryFontMode;
   font_size_scale: number;
   default_accent_color: string;
   accent_presets: string[];
@@ -97,6 +105,7 @@ function fromRow(r: SiteSettingsRow): SiteSettings {
     siteName: r.site_name,
     font: r.font,
     dataFont: r.data_font,
+    telemetryFont: r.telemetry_font,
     fontSizeScale: r.font_size_scale,
     defaultAccentColor: r.default_accent_color,
     accentPresets: r.accent_presets,
@@ -113,6 +122,7 @@ export interface SiteSettingsPatch {
   siteName?: string;
   font?: SiteFont;
   dataFont?: DataFont;
+  telemetryFont?: TelemetryFontMode;
   fontSizeScale?: number;
   defaultAccentColor?: string;
   accentPresets?: string[];
@@ -133,6 +143,10 @@ export async function updateSiteSettings(patch: SiteSettingsPatch): Promise<Site
   if (patch.dataFont !== undefined) {
     params.push(patch.dataFont);
     sets.push(`data_font = $${params.length}`);
+  }
+  if (patch.telemetryFont !== undefined) {
+    params.push(patch.telemetryFont);
+    sets.push(`telemetry_font = $${params.length}`);
   }
   if (patch.fontSizeScale !== undefined) {
     params.push(patch.fontSizeScale);
