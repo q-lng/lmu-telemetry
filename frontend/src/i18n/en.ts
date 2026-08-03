@@ -212,6 +212,7 @@ export const en = {
   'tv.pedalsToggleClutch': 'Show/hide the clutch channel in this group',
   'tv.pedalsToggleGrouped': 'Switch between one combined graph and separate graphs (kept together)',
   'tv.cornerSplitToggle': 'Split into one graph per wheel — enables compared laps and color mode',
+  'tv.laneSizeToggle': 'Graph size',
   'tv.laneSizeSmall': 'Small',
   'tv.laneSizeMedium': 'Medium',
   'tv.laneSizeTall': 'Tall',

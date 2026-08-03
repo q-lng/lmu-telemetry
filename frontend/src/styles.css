@@ -1336,10 +1336,33 @@ body {
   box-shadow: 0 0 8px var(--accent-glow);
 }
 
-.lane-size-buttons {
-  display: flex;
-  gap: 2px;
+.lane-size-menu {
+  position: relative;
   flex-shrink: 0;
+}
+
+.lane-size-menu-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 20px -8px rgba(0, 0, 0, 0.7);
+  z-index: 50;
+}
+
+.lane-size-menu-popover button {
+  width: auto;
+  height: auto;
+  padding: 5px 12px;
+  white-space: nowrap;
+  text-align: left;
+  font-size: 11px;
 }
 
 .channel-list {

@@ -500,6 +500,20 @@ export function ChannelPlot({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lane]);
 
+  // A changed `weight` prop resizes this lane's flex-grow share of the
+  // graphs column, which the ResizeObserver above is meant to pick up — but
+  // that observer fires on the *container's* own next layout pass, and
+  // sibling lanes resizing at the same time (e.g. a size choice up top
+  // shrinking everything below it) is exactly the kind of batched layout
+  // change that's been unreliable to depend on alone. Forcing setSize here,
+  // synchronized to the prop itself, makes the resize immediate and certain
+  // regardless of observer timing.
+  useEffect(() => {
+    const plot = plotRef.current;
+    if (!plot || !containerRef.current) return;
+    plot.setSize({ width: containerRef.current.clientWidth, height: containerRef.current.clientHeight });
+  }, [weight]);
+
   function handleResizeStart(e: ReactMouseEvent) {
     e.preventDefault();
     const plot = plotRef.current;

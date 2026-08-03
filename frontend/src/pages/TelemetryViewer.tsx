@@ -19,6 +19,7 @@ import { TrackMap } from '../components/TrackMap';
 import { TelemetryLegend } from '../components/TelemetryLegend';
 import { SessionPickerModal } from '../components/SessionPickerModal';
 import { CollapsibleSection } from '../components/CollapsibleSection';
+import { LaneSizeMenu } from '../components/LaneSizeMenu';
 import { channelColor, comparedLapColor, CORNER_STYLE, REFERENCE_UNIFORM_COLOR } from '../palette';
 import { resampleContinuous, resampleStep } from '../resample';
 import { useAuth } from '../AuthContext';
@@ -106,6 +107,11 @@ const INITIAL_LAYOUT: LayoutItem[] = [
 // Relative flex-grow weights, not pixels — the graphs block always fills exactly
 // the available height, so "all Tall" still fits the screen, evenly split.
 const LANE_SIZE = { small: 1, medium: 1.5, tall: 2.5 };
+const LANE_SIZE_OPTIONS = [
+  { value: LANE_SIZE.small, label: t('tv.laneSizeSmall'), key: 'S' },
+  { value: LANE_SIZE.medium, label: t('tv.laneSizeMedium'), key: 'M' },
+  { value: LANE_SIZE.tall, label: t('tv.laneSizeTall'), key: 'L' },
+];
 
 const INITIAL_LANE_WEIGHTS: Record<string, number> = {
   'Ground Speed': LANE_SIZE.tall,
@@ -2024,29 +2030,11 @@ export default function TelemetryViewer() {
                         ⊟
                       </button>
                     )}
-                    <div className="lane-size-buttons">
-                      <button
-                        className={sizeOfItem(item) === LANE_SIZE.small ? 'active' : ''}
-                        onClick={() => setItemSize(item, LANE_SIZE.small)}
-                        title={t('tv.laneSizeSmall')}
-                      >
-                        S
-                      </button>
-                      <button
-                        className={sizeOfItem(item) === LANE_SIZE.medium ? 'active' : ''}
-                        onClick={() => setItemSize(item, LANE_SIZE.medium)}
-                        title={t('tv.laneSizeMedium')}
-                      >
-                        M
-                      </button>
-                      <button
-                        className={sizeOfItem(item) === LANE_SIZE.tall ? 'active' : ''}
-                        onClick={() => setItemSize(item, LANE_SIZE.tall)}
-                        title={t('tv.laneSizeTall')}
-                      >
-                        L
-                      </button>
-                    </div>
+                    <LaneSizeMenu
+                      size={sizeOfItem(item)}
+                      sizes={LANE_SIZE_OPTIONS}
+                      onSelect={(size) => setItemSize(item, size)}
+                    />
                     <button
                       onClick={() => (item.type === 'group' ? removeItem(i) : toggleChannel(item.name))}
                       title={t('tv.remove')}
