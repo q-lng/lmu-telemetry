@@ -1487,6 +1487,7 @@ export default function TelemetryViewer() {
         showXAxis={flatIndex === lanes.length - 1}
         xAxisMode={effectiveXAxisMode}
         weight={laneWeights[lane.key] ?? LANE_SIZE.medium}
+        allWeights={laneWeights}
         xDomain={xDomain}
         viewRange={viewRange}
         cursorT={cursorT}

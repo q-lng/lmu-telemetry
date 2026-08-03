@@ -230,6 +230,11 @@ interface Props {
    * always fills exactly the available vertical space, so lanes are sized purely
    * by their weight relative to each other, never by an absolute pixel height. */
   weight: number;
+  /** The full lane-weights record (not just this lane's own `weight`) — flex-grow
+   * redistributes ALL lanes' pixel heights whenever ANY one of them changes, so
+   * the resize-on-weight-change effect below needs to fire for every lane when
+   * any weight changes, not just the one whose own value happened to change. */
+  allWeights?: Record<string, number>;
   /** Shared default X range across every lane (from a dense reference channel) —
    * without this, a sparse event channel (Gear, ...) would auto-range to just its
    * own data span, narrower than dense channels, throwing off cursor.sync until a
@@ -260,6 +265,7 @@ export function ChannelPlot({
   showXAxis,
   xAxisMode,
   weight,
+  allWeights,
   xDomain,
   viewRange,
   cursorT,
@@ -500,19 +506,20 @@ export function ChannelPlot({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lane]);
 
-  // A changed `weight` prop resizes this lane's flex-grow share of the
-  // graphs column, which the ResizeObserver above is meant to pick up — but
-  // that observer fires on the *container's* own next layout pass, and
-  // sibling lanes resizing at the same time (e.g. a size choice up top
-  // shrinking everything below it) is exactly the kind of batched layout
-  // change that's been unreliable to depend on alone. Forcing setSize here,
-  // synchronized to the prop itself, makes the resize immediate and certain
-  // regardless of observer timing.
+  // Flex-grow redistributes every lane's pixel height whenever ANY one lane's
+  // weight changes (one growing shrinks all its siblings too) — so this has
+  // to resize whenever `allWeights` changes at all, not just when THIS lane's
+  // own `weight` value does; depending on `weight` alone left every other
+  // lane's canvas at its stale size until something else forced a full
+  // rebuild (e.g. switching x-axis mode). The ResizeObserver above is meant
+  // to catch this too, but relying on it alone across several lanes resizing
+  // in the same batch has proven unreliable — this makes it immediate and
+  // certain regardless of observer timing.
   useEffect(() => {
     const plot = plotRef.current;
     if (!plot || !containerRef.current) return;
     plot.setSize({ width: containerRef.current.clientWidth, height: containerRef.current.clientHeight });
-  }, [weight]);
+  }, [weight, allWeights]);
 
   function handleResizeStart(e: ReactMouseEvent) {
     e.preventDefault();
