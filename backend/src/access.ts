@@ -10,6 +10,7 @@ export interface FileRecord {
   visibility: Visibility;
   track: string | null;
   car: string | null;
+  uploadedAt: string;
 }
 
 interface FileRow {
@@ -18,10 +19,18 @@ interface FileRow {
   visibility: Visibility;
   track: string | null;
   car: string | null;
+  uploaded_at: string;
 }
 
 function fromRow(r: FileRow): FileRecord {
-  return { filename: r.filename, ownerId: r.owner_id, visibility: r.visibility, track: r.track, car: r.car };
+  return {
+    filename: r.filename,
+    ownerId: r.owner_id,
+    visibility: r.visibility,
+    track: r.track,
+    car: r.car,
+    uploadedAt: r.uploaded_at,
+  };
 }
 
 export async function getFileRecord(filename: string): Promise<FileRecord | null> {
@@ -29,21 +38,28 @@ export async function getFileRecord(filename: string): Promise<FileRecord | null
   return rows[0] ? fromRow(rows[0]) : null;
 }
 
-/** Registers (or refreshes track/car for) a file — called after every successful upload. */
+/** Registers (or refreshes track/car/size for) a file — called after every successful upload. */
 export async function upsertFileRecord(
   filename: string,
-  input: { ownerId: number | null; track: string | null; car: string | null },
+  input: { ownerId: number | null; track: string | null; car: string | null; sizeBytes: number },
 ): Promise<void> {
   await pgQuery(
-    `INSERT INTO telemetry_files (filename, owner_id, track, car)
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT (filename) DO UPDATE SET owner_id = EXCLUDED.owner_id, track = EXCLUDED.track, car = EXCLUDED.car`,
-    [filename, input.ownerId, input.track, input.car],
+    `INSERT INTO telemetry_files (filename, owner_id, track, car, size_bytes)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (filename) DO UPDATE SET
+       owner_id = EXCLUDED.owner_id, track = EXCLUDED.track, car = EXCLUDED.car, size_bytes = EXCLUDED.size_bytes`,
+    [filename, input.ownerId, input.track, input.car, input.sizeBytes],
   );
 }
 
 export async function setFileVisibility(filename: string, visibility: Visibility): Promise<void> {
   await pgQuery(`UPDATE telemetry_files SET visibility = $2 WHERE filename = $1`, [filename, visibility]);
+}
+
+/** Removes the file's record (lap_shares cascade) — the caller is responsible
+ * for also removing the .duckdb file from disk and evicting its caches. */
+export async function deleteFileRecord(filename: string): Promise<void> {
+  await pgQuery(`DELETE FROM telemetry_files WHERE filename = $1`, [filename]);
 }
 
 export async function getLapOverride(filename: string, lapNumber: number): Promise<LapVisibility | null> {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, TouchEvent as ReactTouchEvent } from 'react';
-import { fetchSessions, setFileVisibility, setLapVisibility, uploadSession } from '../api';
+import { deleteSession, fetchSessions, setFileVisibility, setLapVisibility, uploadSession } from '../api';
 import type {
   ChannelDescriptor,
   ChannelSeries,
@@ -17,6 +17,9 @@ import { createServerDataSource, createWasmDataSource, type DataSource } from '.
 import { ChannelPlot } from '../components/ChannelPlot';
 import { TrackMap } from '../components/TrackMap';
 import { TelemetryLegend } from '../components/TelemetryLegend';
+import { SessionPickerModal } from '../components/SessionPickerModal';
+import { CollapsibleSection } from '../components/CollapsibleSection';
+import { LaneSizeMenu } from '../components/LaneSizeMenu';
 import { channelColor, comparedLapColor, CORNER_STYLE, REFERENCE_UNIFORM_COLOR } from '../palette';
 import { resampleContinuous, resampleStep } from '../resample';
 import { useAuth } from '../AuthContext';
@@ -41,6 +44,12 @@ type ColorMode = 'byChannel' | 'byLap';
 interface ChannelLayoutItem {
   type: 'channel';
   name: string;
+  // Only meaningful for a multi-column (4-wheel corner) channel: true splits it
+  // into one separate graph per column instead of the default combined overlay
+  // with fixed corner color/dash — splitting is what lets each wheel become a
+  // normal single-column lane, gaining full compared-lap + colorMode support
+  // that the combined view deliberately doesn't have room for.
+  splitCorners?: boolean;
 }
 interface GroupLayoutItem {
   type: 'group';
@@ -98,6 +107,11 @@ const INITIAL_LAYOUT: LayoutItem[] = [
 // Relative flex-grow weights, not pixels — the graphs block always fills exactly
 // the available height, so "all Tall" still fits the screen, evenly split.
 const LANE_SIZE = { small: 1, medium: 1.5, tall: 2.5 };
+const LANE_SIZE_OPTIONS = [
+  { value: LANE_SIZE.small, label: t('tv.laneSizeSmall'), key: 'S' },
+  { value: LANE_SIZE.medium, label: t('tv.laneSizeMedium'), key: 'M' },
+  { value: LANE_SIZE.tall, label: t('tv.laneSizeTall'), key: 'L' },
+];
 
 const INITIAL_LANE_WEIGHTS: Record<string, number> = {
   'Ground Speed': LANE_SIZE.tall,
@@ -305,10 +319,57 @@ interface DisplayPreset {
 
 const PRESETS_STORAGE_KEY = 'lmu-telemetry-presets';
 
+// Reserved dropdown value for the built-in default view (INITIAL_LAYOUT/
+// INITIAL_LANE_WEIGHTS) — always present regardless of what's in `presets`,
+// never stored there, never deletable.
+const DEFAULT_PRESET_VALUE = '__default__';
+
+function isValidLayoutItem(item: unknown): item is LayoutItem {
+  if (typeof item !== 'object' || item === null) return false;
+  const it = item as Record<string, unknown>;
+  if (it.type === 'channel') return typeof it.name === 'string';
+  if (it.type === 'group') {
+    return (
+      typeof it.id === 'string' &&
+      typeof it.name === 'string' &&
+      Array.isArray(it.channels) &&
+      it.channels.every((c) => typeof c === 'string')
+    );
+  }
+  return false;
+}
+
+/** A preset is arbitrary JSON a user saved into localStorage — the app's own
+ * shape for it can (and did) drift across releases, so a stale/corrupt entry
+ * must never be blindly handed to setLayout/setLaneWeights, which downstream
+ * code assumes is well-formed. Invalid entries are dropped (and the cleaned
+ * set re-saved) instead of crashing the whole app the moment they're applied. */
+function isValidPreset(value: unknown): value is DisplayPreset {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    Array.isArray(v.layout) &&
+    v.layout.every(isValidLayoutItem) &&
+    typeof v.laneWeights === 'object' &&
+    v.laneWeights !== null &&
+    (v.xAxisMode === 'time' || v.xAxisMode === 'distance')
+  );
+}
+
 function loadPresets(): Record<string, DisplayPreset> {
   try {
     const raw = localStorage.getItem(PRESETS_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) return {};
+    const valid: Record<string, DisplayPreset> = {};
+    let droppedAny = false;
+    for (const [name, preset] of Object.entries(parsed as Record<string, unknown>)) {
+      if (isValidPreset(preset)) valid[name] = preset;
+      else droppedAny = true;
+    }
+    if (droppedAny) savePresets(valid);
+    return valid;
   } catch {
     return {};
   }
@@ -323,8 +384,15 @@ export default function TelemetryViewer() {
   const { preferences, setPreference } = usePreferences();
   const preferredReferenceLapColor = preferences.referenceLapColor as string | undefined;
   const preferredComparedLapColors = preferences.comparedLapColors as string[] | undefined;
+  // Per-section sidebar collapse state — backend-stored like every other
+  // preference (never localStorage), keyed by a short section id.
+  const sidebarCollapsed = (preferences.sidebarCollapsed as Record<string, boolean> | undefined) ?? {};
+  function toggleSidebarSection(key: string) {
+    setPreference('sidebarCollapsed', { ...sidebarCollapsed, [key]: !sidebarCollapsed[key] });
+  }
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [sessionPickerOpen, setSessionPickerOpen] = useState(false);
   // Guest mode: a .duckdb file opened straight in the browser via DuckDB-WASM —
   // no upload, no server round-trip at all. Picking a server session clears it.
   const [guestFile, setGuestFile] = useState<File | null>(null);
@@ -398,6 +466,21 @@ export default function TelemetryViewer() {
     if (idx !== -1) setPreference('deltaChannelIndex', idx);
   }, [layout]);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  // Live-reorder preview while a drag is in flight — NOT `layout` itself.
+  // `layout` feeds selectedChannels/the fetch effects/the whole lanes
+  // builder, so committing every single dragover step straight into it (as
+  // the previous implementation did) re-triggered a full channel refetch on
+  // every pixel of mouse movement during a fast drag — overlapping requests,
+  // races, and (once enough piled up) the loading state getting stuck.
+  // `dragLayout` is purely cosmetic for the "channels shown" list; the real
+  // `layout` only updates once, on drop. Mirrored into a ref so onDragEnd
+  // always reads the latest value regardless of React's render timing.
+  const [dragLayout, setDragLayout] = useState<LayoutItem[] | null>(null);
+  const dragLayoutRef = useRef<LayoutItem[] | null>(null);
+  function updateDragLayout(next: LayoutItem[] | null) {
+    dragLayoutRef.current = next;
+    setDragLayout(next);
+  }
   const [groupSelection, setGroupSelection] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState('');
   const [seriesByName, setSeriesByName] = useState<Record<string, ChannelSeries>>({});
@@ -424,6 +507,7 @@ export default function TelemetryViewer() {
   }
   const [viewRange, setViewRange] = useState<{ min: number; max: number } | null>(null);
   const [uploadState, setUploadState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
+  const [deleteState, setDeleteState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
   const [laneWeights, setLaneWeights] = useState<Record<string, number>>(INITIAL_LANE_WEIGHTS);
   const [presets, setPresets] = useState<Record<string, DisplayPreset>>(() => loadPresets());
   const [selectedPreset, setSelectedPreset] = useState('');
@@ -441,9 +525,6 @@ export default function TelemetryViewer() {
     else if (dx < -60 && sidebarOpen) setSidebarOpen(false);
     touchStartX.current = null;
   }
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const guestFileInputRef = useRef<HTMLInputElement>(null);
-
   // Multi-lap comparison: any number of laps checked against the reference lap,
   // each either from this same (primary) session or from a separately-opened
   // "external source" session (server session or local guest file) — e.g.
@@ -538,6 +619,12 @@ export default function TelemetryViewer() {
   }
 
   function applyPreset(name: string) {
+    if (name === DEFAULT_PRESET_VALUE) {
+      setLayout(INITIAL_LAYOUT);
+      setLaneWeights(INITIAL_LANE_WEIGHTS);
+      setXAxisMode('time');
+      return;
+    }
     const preset = presets[name];
     if (!preset) return;
     setLayout(preset.layout);
@@ -556,6 +643,7 @@ export default function TelemetryViewer() {
   }
 
   function deletePreset(name: string) {
+    if (name === DEFAULT_PRESET_VALUE) return;
     const next = { ...presets };
     delete next[name];
     setPresets(next);
@@ -733,17 +821,19 @@ export default function TelemetryViewer() {
     };
   }, [dataSource, effectiveRange]);
 
-  // Compared laps — each resampled onto the reference lap's x-grid, single-value
-  // channels only. In time mode that's elapsed-time alignment; in distance mode
-  // it MUST be aligned by track position instead (each compared lap's own Lap
-  // Dist), or a lap with different pace just shows its value at a mismatched
-  // point on the track.
+  // Compared laps — every value column resampled onto the reference lap's
+  // x-grid (multi-column/4-wheel channels included: each column is fetched and
+  // resampled the same way, the corner-split display just picks out one at a
+  // time — see the lanes builder). In time mode that's elapsed-time alignment;
+  // in distance mode it MUST be aligned by track position instead (each
+  // compared lap's own Lap Dist), or a lap with different pace just shows its
+  // value at a mismatched point on the track.
   useEffect(() => {
     if (!dataSource || selectedLap === 'full' || comparedLaps.length === 0) {
       setComparesByLapId({});
       return;
     }
-    const targets = selectedChannels.filter((name) => seriesByName[name]?.valueColumns.length === 1);
+    const targets = selectedChannels.filter((name) => seriesByName[name]);
     const useDistance = xAxisMode === 'distance';
     let cancelled = false;
 
@@ -771,17 +861,21 @@ export default function TelemetryViewer() {
       const perChannel: Record<string, CompareSeries> = {};
       // A channel missing from the comparison source (different car/track) just
       // resolves to null above and is skipped rather than breaking the whole compare.
+      // Every value column is resampled the same way — a multi-column (4-wheel)
+      // channel just means more than one entry in `values`, all sharing one `t`.
       (results.filter(Boolean) as { name: string; s: ChannelSeries }[]).forEach(({ name, s }) => {
-        const col = s.valueColumns[0];
         const tRel = s.t.map((x) => x - lapOffset);
         const primary = seriesByName[name];
+        const values: Record<string, (number | null)[]> = {};
 
         if (useDistance && lapDistRef) {
           const lapDist = toDistanceX(tRel, lapDistRef);
           if (s.kind === 'continuous') {
             const primaryDist = toDistanceX(primary.t, distRef);
-            const resampled = resampleContinuous(lapDist, s.values[col] as (number | null)[], primaryDist);
-            perChannel[name] = { t: primaryDist, values: { [col]: resampled } };
+            s.valueColumns.forEach((col) => {
+              values[col] = resampleContinuous(lapDist, s.values[col] as (number | null)[], primaryDist);
+            });
+            perChannel[name] = { t: primaryDist, values };
           } else {
             // Event/step channel (Gear, In Pits, ...): only has a sample at each
             // change, on its OWN timing — resampling straight onto the reference
@@ -790,14 +884,22 @@ export default function TelemetryViewer() {
             // change instead. Keep this lap's own timestamps (just axis-converted)
             // and defer the final hold-last-value resample to the lanes builder's
             // alignEventCompares, once every compared lap's own points are known.
-            perChannel[name] = { t: lapDist, values: { [col]: toNumericOrNull(s.values[col]) } };
+            s.valueColumns.forEach((col) => {
+              values[col] = toNumericOrNull(s.values[col]);
+            });
+            perChannel[name] = { t: lapDist, values };
           }
         } else if (s.kind === 'continuous') {
           const grid = primary.t;
-          const resampled = resampleContinuous(tRel, s.values[col] as (number | null)[], grid);
-          perChannel[name] = { t: grid, values: { [col]: resampled } };
+          s.valueColumns.forEach((col) => {
+            values[col] = resampleContinuous(tRel, s.values[col] as (number | null)[], grid);
+          });
+          perChannel[name] = { t: grid, values };
         } else {
-          perChannel[name] = { t: tRel, values: { [col]: toNumericOrNull(s.values[col]) } };
+          s.valueColumns.forEach((col) => {
+            values[col] = toNumericOrNull(s.values[col]);
+          });
+          perChannel[name] = { t: tRel, values };
         }
       });
       return [cl.id, perChannel];
@@ -890,14 +992,14 @@ export default function TelemetryViewer() {
     });
   }
 
-  function moveItemTo(from: number, to: number) {
-    setLayout((prev) => {
-      if (from === to || from < 0 || to < 0 || from >= prev.length || to >= prev.length) return prev;
-      const next = [...prev];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
+  // Pure — used to compute the live drag preview (dragLayout) without
+  // touching the committed `layout` state on every dragover step.
+  function reorderedList(list: LayoutItem[], from: number, to: number): LayoutItem[] {
+    if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return list;
+    const next = [...list];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    return next;
   }
 
   function removeItem(index: number) {
@@ -954,6 +1056,50 @@ export default function TelemetryViewer() {
     });
   }
 
+  function toggleCornerSplit(index: number) {
+    setLayout((prev) => {
+      const cur = prev[index];
+      if (cur.type !== 'channel') return prev;
+      const next = [...prev];
+      next[index] = { ...cur, splitCorners: !cur.splitCorners };
+      return next;
+    });
+  }
+
+  // A layout item can render as more than one lane (a split multi-column
+  // channel, an ungrouped-but-boxed group) — mirrors the lanes builder's own
+  // key generation so a size choice applies to every lane that item actually
+  // produces, not just its first one.
+  function laneKeysForItem(item: LayoutItem): string[] {
+    if (item.type === 'channel') {
+      if (item.name === DELTA_CHANNEL_NAME) return [DELTA_CHANNEL_NAME];
+      const series = seriesByName[item.name];
+      if (series && series.valueColumns.length > 1 && item.splitCorners) {
+        return series.valueColumns.map((col) => `${item.name}__${col}`);
+      }
+      return [item.name];
+    }
+    if (item.grouped === false) {
+      return item.channels.map((c) => `${item.id}__${c}`);
+    }
+    return [item.id];
+  }
+
+  function sizeOfItem(item: LayoutItem): number {
+    return laneWeights[laneKeysForItem(item)[0]] ?? LANE_SIZE.medium;
+  }
+
+  function setItemSize(item: LayoutItem, size: number) {
+    const keys = laneKeysForItem(item);
+    setLaneWeights((prev) => {
+      const next = { ...prev };
+      keys.forEach((k) => {
+        next[k] = size;
+      });
+      return next;
+    });
+  }
+
   function toggleDeltaChannel() {
     const isShown = layout.some((it) => it.type === 'channel' && it.name === DELTA_CHANNEL_NAME);
     setPreference('deltaChannelShown', !isShown);
@@ -999,10 +1145,22 @@ export default function TelemetryViewer() {
       const { file: savedName } = await uploadSession(file);
       reloadSessions(savedName);
       setUploadState({ busy: false, error: null });
+      setSessionPickerOpen(false);
     } catch (err) {
       setUploadState({ busy: false, error: (err as Error).message });
     }
-    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  async function handleDeleteSession(file: string) {
+    setDeleteState({ busy: true, error: null });
+    try {
+      await deleteSession(file);
+      if (selectedFile === file) setSelectedFile(null);
+      reloadSessions();
+      setDeleteState({ busy: false, error: null });
+    } catch (err) {
+      setDeleteState({ busy: false, error: (err as Error).message });
+    }
   }
 
   async function handlePublish() {
@@ -1042,6 +1200,9 @@ export default function TelemetryViewer() {
     );
   }
   const validGroupSelection = new Set([...groupSelection].filter((n) => layout.some((it) => it.type === 'channel' && it.name === n)));
+  // What the "channels shown" list actually renders — a live preview during
+  // an active drag (see dragLayout above), the committed order otherwise.
+  const displayLayout = dragLayout ?? layout;
 
   // Distance only ever makes sense for a single lap: "Lap Dist" resets to 0 at
   // every start/finish crossing, so across multiple laps it's a sawtooth — which
@@ -1101,6 +1262,27 @@ export default function TelemetryViewer() {
           : buildCombinedCompare(names, perChannel, seriesByName, targetSeries.t);
         if (!series) return;
         out.push({ id: cl.id, label: comparedLapLabel(cl), color: comparedLapColorAt(index), series });
+      });
+      return out;
+    }
+
+    // Picks a single column out of a multi-column channel's already-fetched
+    // compare data (comparesByLapId is keyed by CHANNEL name, e.g. "Brakes
+    // Force", with one CompareSeries covering all its wheel columns together)
+    // — used when a corner-split lane needs just its own wheel's data, not
+    // buildLaneCompares' "names[0] IS the top-level key" assumption.
+    function buildCornerCompares(channelName: string, col: string): LaneCompare[] {
+      const out: LaneCompare[] = [];
+      comparedLaps.forEach((cl, index) => {
+        const cmp = comparesByLapId[cl.id]?.[channelName];
+        const colValues = cmp?.values[col];
+        if (!cmp || !colValues) return;
+        out.push({
+          id: cl.id,
+          label: comparedLapLabel(cl),
+          color: comparedLapColorAt(index),
+          series: { t: cmp.t, values: { [col]: colValues } },
+        });
       });
       return out;
     }
@@ -1214,13 +1396,43 @@ export default function TelemetryViewer() {
         const series = seriesByName[item.name];
         if (!series) continue;
         const isMulti = series.valueColumns.length > 1;
+        const withAxis = withXAxis(series);
+        if (isMulti && item.splitCorners) {
+          // Split: each wheel becomes a fully normal single-column lane (same
+          // path every other channel goes through), so it gets real compared-
+          // lap overlays and respects colorMode — the combined view's fixed
+          // corner color/dash can't accommodate either without losing the
+          // FL/FR/RL/RR identity it exists for.
+          series.valueColumns.forEach((col, i) => {
+            const colLabel = CORNER_STYLE[i]?.label ?? col;
+            const key = `${item.name}__${col}`;
+            const singleSeries: ChannelSeries = {
+              name: key,
+              kind: series.kind,
+              unit: series.unit,
+              valueColumns: [col],
+              t: withAxis.t,
+              values: { [col]: withAxis.values[col] },
+            };
+            const { series: finalSeries, compares } = alignEventCompares(singleSeries, buildCornerCompares(item.name, col));
+            result.push({
+              key,
+              label: colLabel,
+              series: finalSeries,
+              columnStyles: [{ label: colLabel, color: nextColor(key) }],
+              compares,
+              boxId: item.name,
+              boxLabel: item.name,
+            });
+          });
+          continue;
+        }
         const columnStyles = isMulti
           ? CORNER_STYLE.slice(0, series.valueColumns.length)
           : [{ label: item.name, color: nextColor(item.name) }];
-        const withAxis = withXAxis(series);
-        // 4-wheel channels (isMulti) keep their fixed corner color+dash styling
-        // regardless of compare — overlaying per-lap colors on top of that would
-        // lose the FL/FR/RL/RR identity without gaining a clear lap identity.
+        // 4-wheel channels (isMulti), combined view: fixed corner color/dash
+        // regardless of compare/colorMode — see the split branch above for
+        // the alternative that supports both.
         const { series: finalSeries, compares } = isMulti
           ? { series: withAxis, compares: [] as LaneCompare[] }
           : alignEventCompares(withAxis, buildLaneCompares([item.name], withAxis));
@@ -1261,6 +1473,11 @@ export default function TelemetryViewer() {
     color: comparedLapColorAt(index),
   }));
 
+  const currentSession = selectedFile ? sessions.find((s) => s.file === selectedFile) : undefined;
+  const currentSessionLabel = currentSession
+    ? `${currentSession.track ?? currentSession.file} — ${currentSession.sessionType} (${currentSession.recordingTime})`
+    : selectedFile;
+
   function channelPlotFor(lane: Lane, flatIndex: number) {
     return (
       <ChannelPlot
@@ -1270,6 +1487,7 @@ export default function TelemetryViewer() {
         showXAxis={flatIndex === lanes.length - 1}
         xAxisMode={effectiveXAxisMode}
         weight={laneWeights[lane.key] ?? LANE_SIZE.medium}
+        allWeights={laneWeights}
         xDomain={xDomain}
         viewRange={viewRange}
         cursorT={cursorT}
@@ -1319,76 +1537,49 @@ export default function TelemetryViewer() {
         <div className="sidebar-inner">
         <h1>{t('tv.sidebarTitle')}</h1>
 
-        <label className="field">
+        <div className="field">
           {t('tv.session')}
-          <select
-            value={guestFile ? '' : selectedFile ?? ''}
+          <button
+            className="upload-btn"
             disabled={!!guestFile}
-            onChange={(e) => {
-              setGuestFile(null);
-              setSelectedFile(e.target.value || null);
-            }}
+            onClick={() => setSessionPickerOpen(true)}
           >
-            <option value="">{t('tv.chooseSessionPlaceholder')}</option>
-            {sessions.map((s) => (
-              <option key={s.file} value={s.file}>
-                {s.track ?? s.file} — {s.sessionType} ({s.recordingTime})
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className="field">
-          <button className="upload-btn" disabled={uploadState.busy} onClick={() => fileInputRef.current?.click()}>
-            {uploadState.busy ? t('tv.importing') : t('tv.importFile')}
+            {currentSessionLabel ?? t('tv.loadSessionButton')}
           </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".duckdb"
-            style={{ display: 'none' }}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleUpload(file);
-            }}
-          />
-          {uploadState.error && <div className="upload-error">{uploadState.error}</div>}
         </div>
 
-        <div className="field">
-          {guestFile ? (
-            <>
-              <div className="guest-active">
-                {t('tv.guestModePrefix')}
-                <strong>{guestFile.name}</strong>
-              </div>
-              <button className="upload-btn" onClick={() => setGuestFile(null)}>
-                {t('tv.closeGuestMode')}
-              </button>
-            </>
-          ) : (
-            <button
-              className="upload-btn"
-              disabled={guestState.busy}
-              onClick={() => guestFileInputRef.current?.click()}
-              title={t('tv.openGuestTooltip')}
-            >
-              {guestState.busy ? t('tv.guestLoading') : t('tv.openGuestFile')}
-            </button>
-          )}
-          <input
-            ref={guestFileInputRef}
-            type="file"
-            accept=".duckdb"
-            style={{ display: 'none' }}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) setGuestFile(file);
-              e.target.value = '';
+        {sessionPickerOpen && (
+          <SessionPickerModal
+            sessions={sessions}
+            onSelect={(file) => {
+              setGuestFile(null);
+              setSelectedFile(file);
+              setSessionPickerOpen(false);
             }}
+            onClose={() => setSessionPickerOpen(false)}
+            uploadState={uploadState}
+            onUploadFile={handleUpload}
+            guestState={guestState}
+            onOpenGuestFile={(file) => {
+              setGuestFile(file);
+              setSessionPickerOpen(false);
+            }}
+            deleteState={deleteState}
+            onDeleteSession={handleDeleteSession}
           />
-          {guestState.error && <div className="upload-error">{guestState.error}</div>}
-        </div>
+        )}
+
+        {guestFile && (
+          <div className="field">
+            <div className="guest-active">
+              {t('tv.guestModePrefix')}
+              <strong>{guestFile.name}</strong>
+            </div>
+            <button className="upload-btn" onClick={() => setGuestFile(null)}>
+              {t('tv.closeGuestMode')}
+            </button>
+          </div>
+        )}
 
         {guestFile && user && (
           <div className="field">
@@ -1425,8 +1616,13 @@ export default function TelemetryViewer() {
           </div>
         )}
 
-        <div className="field">
-          {t('tv.presetLabel')}
+        {dataSource && (
+        <>
+        <CollapsibleSection
+          title={t('tv.presetLabel')}
+          collapsed={!!sidebarCollapsed.presets}
+          onToggle={() => toggleSidebarSection('presets')}
+        >
           <div className="preset-row">
             <select
               value={selectedPreset}
@@ -1436,13 +1632,18 @@ export default function TelemetryViewer() {
               }}
             >
               <option value="">{t('tv.presetLoadPlaceholder')}</option>
+              <option value={DEFAULT_PRESET_VALUE}>{t('tv.presetDefaultName')}</option>
               {Object.keys(presets).map((name) => (
                 <option key={name} value={name}>
                   {name}
                 </option>
               ))}
             </select>
-            <button disabled={!selectedPreset} onClick={() => deletePreset(selectedPreset)} title={t('tv.presetDelete')}>
+            <button
+              disabled={!selectedPreset || selectedPreset === DEFAULT_PRESET_VALUE}
+              onClick={() => deletePreset(selectedPreset)}
+              title={t('tv.presetDelete')}
+            >
               ✕
             </button>
           </div>
@@ -1456,9 +1657,14 @@ export default function TelemetryViewer() {
               {t('tv.presetSave')}
             </button>
           </div>
-        </div>
+        </CollapsibleSection>
 
         {metadata && (
+          <CollapsibleSection
+            title={t('tv.sessionInfoLabel')}
+            collapsed={!!sidebarCollapsed.sessionInfo}
+            onToggle={() => toggleSidebarSection('sessionInfo')}
+          >
           <div className="info-panel">
             <div>
               <strong>{t('tv.infoDriver')}</strong> {metadata.info.DriverName}
@@ -1476,10 +1682,15 @@ export default function TelemetryViewer() {
               <strong>{t('tv.infoSession')}</strong> {metadata.info.SessionType} @ {metadata.info.SessionTime}
             </div>
           </div>
+          </CollapsibleSection>
         )}
 
+        <CollapsibleSection
+          title={t('tv.xAxisLabel')}
+          collapsed={!!sidebarCollapsed.xAxis}
+          onToggle={() => toggleSidebarSection('xAxis')}
+        >
         <label className="field">
-          {t('tv.xAxisLabel')}
           <div className="segmented">
             <button className={xAxisMode === 'time' ? 'active' : ''} onClick={() => setXAxisMode('time')}>
               {t('tv.xAxisTime')}
@@ -1495,9 +1706,14 @@ export default function TelemetryViewer() {
           </div>
           {selectedLap === 'full' && <span className="field-hint">{t('tv.xAxisDistanceHint')}</span>}
         </label>
+        </CollapsibleSection>
 
+        <CollapsibleSection
+          title={t('tv.lapsTableLabel')}
+          collapsed={!!sidebarCollapsed.laps}
+          onToggle={() => toggleSidebarSection('laps')}
+        >
         <div className="field">
-          {t('tv.lapsTableLabel')}
           {selectedLap === 'full' && <span className="field-hint">{t('tv.selectReferenceLapHint')}</span>}
           <table className="lap-select-table">
             <thead>
@@ -1556,9 +1772,14 @@ export default function TelemetryViewer() {
             </tbody>
           </table>
         </div>
+        </CollapsibleSection>
 
+        <CollapsibleSection
+          title={t('tv.colorModeLabel')}
+          collapsed={!!sidebarCollapsed.colorMode}
+          onToggle={() => toggleSidebarSection('colorMode')}
+        >
         <label className="field">
-          {t('tv.colorModeLabel')}
           <div className="segmented">
             <button className={colorMode === 'byChannel' ? 'active' : ''} onClick={() => setColorModeAndSave('byChannel')}>
               {t('tv.colorModeByChannel')}
@@ -1607,10 +1828,14 @@ export default function TelemetryViewer() {
             {!user && <span className="field-hint">{t('tv.colorPrefsGuestHint')}</span>}
           </div>
         )}
+        </CollapsibleSection>
 
+        <CollapsibleSection
+          title={t('tv.additionalSessionsLabel')}
+          collapsed={!!sidebarCollapsed.compare}
+          onToggle={() => toggleSidebarSection('compare')}
+        >
         <div className="field">
-          {t('tv.additionalSessionsLabel')}
-
           {externalSources.map((source) => {
             const sourceFastest = fastestLapOf(source.laps);
             return (
@@ -1692,7 +1917,13 @@ export default function TelemetryViewer() {
             </button>
           )}
         </div>
+        </CollapsibleSection>
 
+        <CollapsibleSection
+          title={t('tv.channelsShown')}
+          collapsed={!!sidebarCollapsed.channelsShown}
+          onToggle={() => toggleSidebarSection('channelsShown')}
+        >
         <label className="channel-checkbox">
           <input
             type="checkbox"
@@ -1706,78 +1937,113 @@ export default function TelemetryViewer() {
 
         {layout.length > 0 && (
           <div className="field">
-            {t('tv.channelsShown')}
             <div className="selected-list">
-              {layout.map((item, i) => (
+              {displayLayout.map((item, i) => (
                 <div
                   className={`selected-item${item.type === 'group' ? ' is-group' : ''}${dragIndex === i ? ' dragging' : ''}`}
                   key={item.type === 'group' ? item.id : item.name}
                   onDragOver={(e) => {
                     e.preventDefault();
-                    if (dragIndex !== null && dragIndex !== i) {
-                      moveItemTo(dragIndex, i);
-                      setDragIndex(i);
+                    if (dragIndex === null) return;
+                    // Insert before/after THIS item based on which half of it the
+                    // cursor is over, instead of always snapping to "this exact
+                    // index" the instant the (possibly much taller, for a group)
+                    // item is entered — that made merely passing over a group
+                    // while dragging a channel further down/up feel like the
+                    // group got yanked into the move.
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const isAfter = e.clientY - rect.top > rect.height / 2;
+                    let target = isAfter ? i + 1 : i;
+                    if (target > dragIndex) target -= 1;
+                    if (target !== dragIndex) {
+                      // Reorders the local preview only — NOT the committed
+                      // `layout` (see dragLayout above) — so a fast drag across
+                      // many rows doesn't re-trigger the channel-data fetch
+                      // effect (which depends on layout) on every step.
+                      updateDragLayout(reorderedList(dragLayoutRef.current ?? layout, dragIndex, target));
+                      setDragIndex(target);
                     }
                   }}
                 >
-                  <span
-                    className="drag-handle"
-                    draggable
-                    onDragStart={() => setDragIndex(i)}
-                    onDragEnd={() => setDragIndex(null)}
-                    title={t('tv.dragToReorder')}
-                  >
-                    ⠿
-                  </span>
-                  {item.type === 'channel' ? (
-                    <>
-                      <input
-                        type="checkbox"
-                        checked={validGroupSelection.has(item.name)}
-                        onChange={() => toggleGroupSelection(item.name)}
-                        title={t('tv.selectToGroupTooltip')}
-                      />
-                      <span className="selected-name">{item.name}</span>
-                    </>
-                  ) : (
-                    <>
+                  <div className="selected-item-row">
+                    <span
+                      className="drag-handle"
+                      draggable
+                      onDragStart={() => {
+                        setDragIndex(i);
+                        updateDragLayout(layout);
+                      }}
+                      onDragEnd={() => {
+                        setDragIndex(null);
+                        if (dragLayoutRef.current) setLayout(dragLayoutRef.current);
+                        updateDragLayout(null);
+                      }}
+                      title={t('tv.dragToReorder')}
+                    >
+                      ⠿
+                    </span>
+                    {item.type === 'channel' ? (
+                      <>
+                        <input
+                          type="checkbox"
+                          checked={validGroupSelection.has(item.name)}
+                          onChange={() => toggleGroupSelection(item.name)}
+                          title={t('tv.selectToGroupTooltip')}
+                        />
+                        <span className="selected-name">{item.name}</span>
+                      </>
+                    ) : (
                       <input
                         className="group-name-input"
                         value={item.name}
                         onChange={(e) => renameGroup(i, e.target.value)}
                       />
-                      <span className="group-members">{item.channels.join(' + ')}</span>
-                    </>
-                  )}
-                  {item.type === 'group' && item.special === 'pedals' && (
-                    <>
+                    )}
+                    {item.type === 'group' && item.special === 'pedals' && (
+                      <>
+                        <button
+                          className={item.channels.includes(CLUTCH_CHANNEL) ? 'active' : ''}
+                          onClick={() => togglePedalsClutch(i)}
+                          title={t('tv.pedalsToggleClutch')}
+                        >
+                          C
+                        </button>
+                        <button
+                          className={item.grouped === false ? 'active' : ''}
+                          onClick={() => togglePedalsGrouped(i)}
+                          title={t('tv.pedalsToggleGrouped')}
+                        >
+                          {item.grouped === false ? '▦' : '▣'}
+                        </button>
+                      </>
+                    )}
+                    {item.type === 'channel' && (seriesByName[item.name]?.valueColumns.length ?? 0) > 1 && (
                       <button
-                        className={item.channels.includes(CLUTCH_CHANNEL) ? 'active' : ''}
-                        onClick={() => togglePedalsClutch(i)}
-                        title={t('tv.pedalsToggleClutch')}
+                        className={item.splitCorners ? 'active' : ''}
+                        onClick={() => toggleCornerSplit(i)}
+                        title={t('tv.cornerSplitToggle')}
                       >
-                        C
+                        {item.splitCorners ? '▦' : '▣'}
                       </button>
-                      <button
-                        className={item.grouped === false ? 'active' : ''}
-                        onClick={() => togglePedalsGrouped(i)}
-                        title={t('tv.pedalsToggleGrouped')}
-                      >
-                        {item.grouped === false ? '▦' : '▣'}
+                    )}
+                    {item.type === 'group' && (
+                      <button onClick={() => dissolveGroup(i)} title={t('tv.ungroup')}>
+                        ⊟
                       </button>
-                    </>
-                  )}
-                  {item.type === 'group' && (
-                    <button onClick={() => dissolveGroup(i)} title={t('tv.ungroup')}>
-                      ⊟
+                    )}
+                    <LaneSizeMenu
+                      size={sizeOfItem(item)}
+                      sizes={LANE_SIZE_OPTIONS}
+                      onSelect={(size) => setItemSize(item, size)}
+                    />
+                    <button
+                      onClick={() => (item.type === 'group' ? removeItem(i) : toggleChannel(item.name))}
+                      title={t('tv.remove')}
+                    >
+                      ✕
                     </button>
-                  )}
-                  <button
-                    onClick={() => (item.type === 'group' ? removeItem(i) : toggleChannel(item.name))}
-                    title={t('tv.remove')}
-                  >
-                    ✕
-                  </button>
+                  </div>
+                  {item.type === 'group' && <span className="group-members">{item.channels.join(' + ')}</span>}
                 </div>
               ))}
             </div>
@@ -1788,9 +2054,14 @@ export default function TelemetryViewer() {
             )}
           </div>
         )}
+        </CollapsibleSection>
 
+        <CollapsibleSection
+          title={t('tv.addChannel')}
+          collapsed={!!sidebarCollapsed.addChannel}
+          onToggle={() => toggleSidebarSection('addChannel')}
+        >
         <label className="field">
-          {t('tv.addChannel')}
           <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t('tv.addChannelPlaceholder')} />
         </label>
 
@@ -1806,6 +2077,9 @@ export default function TelemetryViewer() {
             </label>
           ))}
         </div>
+        </CollapsibleSection>
+        </>
+        )}
         </div>
       </aside>
       <button
@@ -1829,15 +2103,24 @@ export default function TelemetryViewer() {
           </div>
 
           <div className="graphs-column">
-            <div className="telemetry-block" style={seriesLoading && lanes.length === 0 ? { minHeight: 200 } : undefined}>
-              {seriesLoading && (
-                <div className="loading-overlay">
-                  <span className="spinner" />
-                  {t('tv.loadingData')}
-                </div>
-              )}
-              {laneElements}
-            </div>
+            {!dataSource ? (
+              <div className="telemetry-block no-session-placeholder">
+                <p>{t('tv.noActiveSession')}</p>
+                <button className="upload-btn" onClick={() => setSessionPickerOpen(true)}>
+                  {t('tv.loadSessionButton')}
+                </button>
+              </div>
+            ) : (
+              <div className="telemetry-block" style={seriesLoading && lanes.length === 0 ? { minHeight: 200 } : undefined}>
+                {seriesLoading && (
+                  <div className="loading-overlay">
+                    <span className="spinner" />
+                    {t('tv.loadingData')}
+                  </div>
+                )}
+                {laneElements}
+              </div>
+            )}
           </div>
         </div>
       </main>

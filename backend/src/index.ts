@@ -6,6 +6,7 @@ import { registerAuth } from './auth.js';
 import { registerSocial } from './social.js';
 import { registerFiles } from './files.js';
 import { registerPreferences } from './preferences.js';
+import { registerStorage, backfillMissingFileSizes } from './storage.js';
 
 const app = Fastify({ logger: true });
 await app.register(cors, { origin: true });
@@ -16,10 +17,12 @@ await initSocialSchema();
 await initFilesSchema();
 await initMailSchema();
 await initPreferencesSchema();
+await backfillMissingFileSizes();
 await registerAuth(app);
 await registerSocial(app);
 await registerFiles(app);
 await registerPreferences(app);
+await registerStorage(app);
 
 app.get('/api/health', async () => ({ ok: true }));
 

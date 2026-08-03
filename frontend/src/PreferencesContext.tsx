@@ -6,6 +6,12 @@ import { useAuth } from './AuthContext';
 interface PreferencesState {
   preferences: Record<string, unknown>;
   setPreference: (key: string, value: unknown) => void;
+  // True until we know whether there's a saved preference set to apply (auth
+  // still resolving, or — for a logged-in user — the preferences fetch still
+  // in flight). Lets consumers that render something preference-dependent
+  // (the accent color, notably) hold off instead of painting a default that
+  // then gets corrected a moment later.
+  loading: boolean;
 }
 
 const PreferencesContext = createContext<PreferencesState | null>(null);
@@ -15,20 +21,25 @@ const PreferencesContext = createContext<PreferencesState | null>(null);
 const SAVE_DEBOUNCE_MS = 500;
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [preferences, setPreferences] = useState<Record<string, unknown>>({});
+  const [loaded, setLoaded] = useState(false);
   const pendingPatch = useRef<Record<string, unknown>>({});
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) {
       setPreferences({});
+      setLoaded(true);
       return;
     }
+    setLoaded(false);
     fetchPreferences()
       .then(setPreferences)
-      .catch(() => {});
-  }, [user]);
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, [user, authLoading]);
 
   function flush() {
     const patch = pendingPatch.current;
@@ -47,7 +58,11 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     saveTimer.current = setTimeout(flush, SAVE_DEBOUNCE_MS);
   }
 
-  return <PreferencesContext.Provider value={{ preferences, setPreference }}>{children}</PreferencesContext.Provider>;
+  return (
+    <PreferencesContext.Provider value={{ preferences, setPreference, loading: authLoading || !loaded }}>
+      {children}
+    </PreferencesContext.Provider>
+  );
 }
 
 export function usePreferences(): PreferencesState {

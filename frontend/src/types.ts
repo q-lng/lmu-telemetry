@@ -1,10 +1,23 @@
 export interface SessionSummary {
   file: string;
+  ownerId: number | null;
+  ownerPseudo: string | null;
+  uploadedAt: string;
   track?: string;
   sessionType?: string;
   driverName?: string;
   carName?: string;
   recordingTime?: string;
+  lapCount?: number;
+  durationSeconds?: number;
+}
+
+export type Plan = 'free' | 'vip';
+
+export interface StorageUsage {
+  usedBytes: number;
+  quotaBytes: number;
+  plan: Plan;
 }
 
 export interface SessionMetadata {
@@ -38,6 +51,8 @@ export interface PublicUser {
   pseudo: string;
   nom: string;
   prenom: string;
+  plan: Plan;
+  isAdmin: boolean;
 }
 
 export interface ProfileSummary extends PublicUser {
