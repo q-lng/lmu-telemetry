@@ -13,6 +13,10 @@ CREATE TABLE IF NOT EXISTS users (
 -- already-existing users table, so this needs its own idempotent migration.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'vip'));
 
+-- Site administrator flag — assigned by hand for now, same as plan above
+-- (no admin panel to self-serve this yet).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
+
 -- Login sessions (not telemetry sessions — named auth_sessions to avoid confusion
 -- with data/*.duckdb "sessions").
 CREATE TABLE IF NOT EXISTS auth_sessions (

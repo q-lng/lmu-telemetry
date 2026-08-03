@@ -51,6 +51,8 @@ export interface PublicUser {
   pseudo: string;
   nom: string;
   prenom: string;
+  plan: Plan;
+  isAdmin: boolean;
 }
 
 export interface ProfileSummary extends PublicUser {

@@ -1,5 +1,7 @@
 import { pgQuery } from './pg.js';
 
+export type Plan = 'free' | 'vip';
+
 export interface User {
   id: number;
   email: string;
@@ -8,6 +10,8 @@ export interface User {
   prenom: string;
   passwordHash: string;
   createdAt: string;
+  plan: Plan;
+  isAdmin: boolean;
 }
 
 export interface PublicUser {
@@ -16,6 +20,8 @@ export interface PublicUser {
   pseudo: string;
   nom: string;
   prenom: string;
+  plan: Plan;
+  isAdmin: boolean;
 }
 
 interface UserRow {
@@ -26,6 +32,8 @@ interface UserRow {
   prenom: string;
   password_hash: string;
   created_at: string;
+  plan: Plan;
+  is_admin: boolean;
 }
 
 function fromRow(r: UserRow): User {
@@ -37,11 +45,13 @@ function fromRow(r: UserRow): User {
     prenom: r.prenom,
     passwordHash: r.password_hash,
     createdAt: r.created_at,
+    plan: r.plan,
+    isAdmin: r.is_admin,
   };
 }
 
 export function toPublicUser(u: User): PublicUser {
-  return { id: u.id, email: u.email, pseudo: u.pseudo, nom: u.nom, prenom: u.prenom };
+  return { id: u.id, email: u.email, pseudo: u.pseudo, nom: u.nom, prenom: u.prenom, plan: u.plan, isAdmin: u.isAdmin };
 }
 
 export async function createUser(input: {
@@ -54,7 +64,7 @@ export async function createUser(input: {
   const rows = await pgQuery<UserRow>(
     `INSERT INTO users (email, pseudo, nom, prenom, password_hash)
      VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, email, pseudo, nom, prenom, password_hash, created_at`,
+     RETURNING id, email, pseudo, nom, prenom, password_hash, created_at, plan, is_admin`,
     [input.email, input.pseudo, input.nom, input.prenom, input.passwordHash],
   );
   return fromRow(rows[0]);

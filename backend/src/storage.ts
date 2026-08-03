@@ -4,8 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { pgQuery } from './pg.js';
 import { DATA_DIR } from './db.js';
 import { requireAuth } from './auth.js';
-
-export type Plan = 'free' | 'vip';
+import type { Plan } from './users.js';
 
 // VIP's number is a placeholder until real subscription tiers/pricing exist —
 // only the 'free' quota (1GB) was given a concrete spec so far.

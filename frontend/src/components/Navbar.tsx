@@ -1,7 +1,7 @@
 import { useAuth } from '../AuthContext';
-import { logout } from '../api';
 import { t } from '../i18n';
 import { AccentPicker } from './AccentPicker';
+import { AccountMenu } from './AccountMenu';
 
 // Plain <a> tags everywhere in this navbar, deliberately — every navigation is a
 // real full-page load (like a normal website), not a client-side SPA transition
@@ -9,11 +9,6 @@ import { AccentPicker } from './AccentPicker';
 export function Navbar() {
   const { user, loading } = useAuth();
   const path = window.location.pathname;
-
-  async function handleLogout() {
-    await logout();
-    window.location.href = '/';
-  }
 
   return (
     <nav className="navbar">
@@ -45,14 +40,7 @@ export function Navbar() {
       <AccentPicker />
       {!loading && (
         user ? (
-          <div className="navbar-account">
-            <a href={`/u/${encodeURIComponent(user.pseudo)}`} className="navbar-user">
-              {user.pseudo}
-            </a>
-            <button className="navbar-logout" onClick={handleLogout}>
-              {t('nav.logout')}
-            </button>
-          </div>
+          <AccountMenu />
         ) : (
           <a href="/login" className="navbar-login" aria-current={path === '/login' ? 'page' : undefined}>
             {t('nav.login')}

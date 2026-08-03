@@ -16,6 +16,9 @@ const Browse = lazy(() => import('./pages/Browse').then((m) => ({ default: m.Bro
 const SharedLap = lazy(() => import('./pages/SharedLap').then((m) => ({ default: m.SharedLap })));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword').then((m) => ({ default: m.ForgotPassword })));
 const ResetPassword = lazy(() => import('./pages/ResetPassword').then((m) => ({ default: m.ResetPassword })));
+const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m.Settings })));
+const Subscription = lazy(() => import('./pages/Subscription').then((m) => ({ default: m.Subscription })));
+const Admin = lazy(() => import('./pages/Admin').then((m) => ({ default: m.Admin })));
 
 function NotFoundRedirect() {
   // Full page navigation, not a client-side redirect — consistent with the rest
@@ -58,6 +61,30 @@ export default function App() {
           element={
             <RequireAuth>
               <MesSessions />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="settings"
+          element={
+            <RequireAuth>
+              <Settings />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="subscription"
+          element={
+            <RequireAuth>
+              <Subscription />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="admin"
+          element={
+            <RequireAuth>
+              <Admin />
             </RequireAuth>
           }
         />
