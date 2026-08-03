@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { t } from '../i18n';
 
 const FEATURE_KEYS = [
@@ -13,9 +14,9 @@ export function LandingPage() {
       <section className="landing-hero">
         <h1>{t('landing.heroTitle')}</h1>
         <p>{t('landing.heroSubtitle')}</p>
-        <a href="/telemetry" className="landing-cta">
+        <Link to="/telemetry" className="landing-cta">
           {t('landing.cta')}
-        </a>
+        </Link>
       </section>
       <section className="landing-features">
         {FEATURE_KEYS.map((f) => (

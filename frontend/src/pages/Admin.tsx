@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { t } from '../i18n';
 
@@ -8,12 +8,8 @@ import { t } from '../i18n';
 export function Admin() {
   const { user, loading } = useAuth();
 
-  // Full page navigation, consistent with RequireAuth's own redirect below it.
-  useEffect(() => {
-    if (!loading && user && !user.isAdmin) window.location.replace('/');
-  }, [loading, user]);
-
-  if (loading || !user || !user.isAdmin) return null;
+  if (loading) return null;
+  if (!user || !user.isAdmin) return <Navigate to="/" replace />;
 
   return (
     <div className="social-page">

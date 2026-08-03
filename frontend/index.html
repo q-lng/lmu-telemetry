@@ -13,6 +13,16 @@
       content="Télémétrie Le Mans Ultimate façon MoTeC i2 : canaux synchronisés, carte du circuit, comparaison de tours."
     />
     <title>LMU Telemetry</title>
+    <!-- Painted before styles.css loads (and on a real reload — F5, the error
+         boundary's reload button — which still goes through a genuine fresh
+         load) so the browser's default white background never shows even for
+         that first instant. Kept in sync with --page-plane in styles.css. -->
+    <style>
+      html,
+      body {
+        background: #08080f;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

@@ -1,5 +1,5 @@
-import { lazy, useEffect } from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { lazy } from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { RequireAuth } from './components/RequireAuth';
 
@@ -19,15 +19,6 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword').then((m) => ({ 
 const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m.Settings })));
 const Subscription = lazy(() => import('./pages/Subscription').then((m) => ({ default: m.Subscription })));
 const Admin = lazy(() => import('./pages/Admin').then((m) => ({ default: m.Admin })));
-
-function NotFoundRedirect() {
-  // Full page navigation, not a client-side redirect — consistent with the rest
-  // of the app's real-website-style navigation.
-  useEffect(() => {
-    window.location.replace('/');
-  }, []);
-  return null;
-}
 
 export default function App() {
   return (
@@ -88,7 +79,7 @@ export default function App() {
             </RequireAuth>
           }
         />
-        <Route path="*" element={<NotFoundRedirect />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
   );

@@ -31,7 +31,13 @@ export function Profile() {
     );
   }
 
-  if (!profile) return null;
+  if (!profile) {
+    return (
+      <div className="page-loading">
+        <span className="spinner" />
+      </div>
+    );
+  }
 
   const isSelf = user?.pseudo === profile.pseudo;
 

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { deleteSession, fetchSessions, searchSharedLaps } from '../api';
 import type { SessionSummary, SharedLapResult } from '../types';
 import { t } from '../i18n';
 import { SessionTable } from '../components/SessionTable';
 
 export function Browse() {
+  const navigate = useNavigate();
   const [track, setTrack] = useState('');
   const [car, setCar] = useState('');
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -80,7 +82,7 @@ export function Browse() {
         <SessionTable
           sessions={sessions}
           onSelect={(file) => {
-            window.location.href = `/telemetry?file=${encodeURIComponent(file)}`;
+            navigate(`/telemetry?file=${encodeURIComponent(file)}`);
           }}
           deleteState={deleteState}
           onDeleteSession={handleDeleteSession}
@@ -93,10 +95,10 @@ export function Browse() {
               {laps.length === 0 && <div className="social-empty">{t('browse.noSharedLapsFound')}</div>}
               {laps.map((l) => (
                 <div className="user-row" key={`${l.filename}-${l.lapNumber}`}>
-                  <a href={`/shared/${encodeURIComponent(l.filename)}/${l.lapNumber}`} className="user-row-name">
+                  <Link to={`/shared/${encodeURIComponent(l.filename)}/${l.lapNumber}`} className="user-row-name">
                     {l.track ?? l.filename} — {t('lap.number', { n: l.lapNumber })}
                     <span className="user-row-fullname">{l.car}</span>
-                  </a>
+                  </Link>
                 </div>
               ))}
             </div>

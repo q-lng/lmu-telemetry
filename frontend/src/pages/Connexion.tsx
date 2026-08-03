@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { login, signup } from '../api';
 import { useAuth } from '../AuthContext';
 import { t } from '../i18n';
@@ -24,7 +25,8 @@ function EyeIcon({ off }: { off: boolean }) {
 }
 
 export function Connexion() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
+  const navigate = useNavigate();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,21 +37,19 @@ export function Connexion() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Full page navigation (not a client-side redirect) — the fresh load of
-  // /telemetry re-fetches auth state itself, no need to carry it over via context.
-  useEffect(() => {
-    if (user) window.location.replace('/telemetry');
-  }, [user]);
-
-  if (user) return null;
+  if (user) return <Navigate to="/telemetry" replace />;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
     try {
-      mode === 'login' ? await login({ email, password }) : await signup({ email, pseudo, nom, prenom, password });
-      window.location.href = '/telemetry';
+      const loggedInUser =
+        mode === 'login' ? await login({ email, password }) : await signup({ email, pseudo, nom, prenom, password });
+      // No full page reload anymore to pick up auth state implicitly — both
+      // calls already return the fresh user, so just apply it directly.
+      setUser(loggedInUser);
+      navigate('/telemetry');
     } catch (err) {
       setError((err as Error).message);
       setSubmitting(false);
@@ -129,9 +129,9 @@ export function Connexion() {
           </button>
 
           {mode === 'login' && (
-            <a href="/forgot-password" className="auth-forgot-link">
+            <Link to="/forgot-password" className="auth-forgot-link">
               {t('auth.forgotPassword')}
-            </a>
+            </Link>
           )}
         </form>
       </div>

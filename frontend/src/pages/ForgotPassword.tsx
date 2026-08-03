@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { requestPasswordReset } from '../api';
 import { t } from '../i18n';
 
@@ -43,9 +44,9 @@ export function ForgotPassword() {
               {submitting ? t('forgotPassword.sending') : t('forgotPassword.submit')}
             </button>
 
-            <a href="/login" className="auth-forgot-link">
+            <Link to="/login" className="auth-forgot-link">
               {t('forgotPassword.backToLogin')}
-            </a>
+            </Link>
           </form>
         )}
       </div>

@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { resetPassword } from '../api';
 import { t } from '../i18n';
 
 export function ResetPassword() {
+  const navigate = useNavigate();
   const token = new URLSearchParams(window.location.search).get('token') ?? '';
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -20,7 +22,7 @@ export function ResetPassword() {
     setSubmitting(true);
     try {
       await resetPassword(token, password);
-      window.location.href = '/login';
+      navigate('/login');
     } catch (err) {
       setError((err as Error).message);
       setSubmitting(false);

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { logout } from '../api';
 import { t } from '../i18n';
@@ -8,7 +9,8 @@ import { t } from '../i18n';
  * to the trigger; there's no UI yet to assign either (see the admin panel
  * roadmap), they just render once the backend says so. */
 export function AccountMenu() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -32,7 +34,10 @@ export function AccountMenu() {
 
   async function handleLogout() {
     await logout();
-    window.location.href = '/';
+    // No full page reload anymore to reset auth state implicitly — clear it
+    // ourselves before navigating away.
+    setUser(null);
+    navigate('/');
   }
 
   return (
@@ -52,10 +57,20 @@ export function AccountMenu() {
       </button>
       {open && (
         <div className="account-menu-popover">
-          <a href={`/u/${encodeURIComponent(user.pseudo)}`}>{t('nav.myProfile')}</a>
-          <a href="/settings">{t('nav.settings')}</a>
-          <a href="/subscription">{t('nav.subscription')}</a>
-          {user.isAdmin && <a href="/admin">{t('nav.administration')}</a>}
+          <Link to={`/u/${encodeURIComponent(user.pseudo)}`} onClick={() => setOpen(false)}>
+            {t('nav.myProfile')}
+          </Link>
+          <Link to="/settings" onClick={() => setOpen(false)}>
+            {t('nav.settings')}
+          </Link>
+          <Link to="/subscription" onClick={() => setOpen(false)}>
+            {t('nav.subscription')}
+          </Link>
+          {user.isAdmin && (
+            <Link to="/admin" onClick={() => setOpen(false)}>
+              {t('nav.administration')}
+            </Link>
+          )}
           <button type="button" onClick={handleLogout}>
             {t('nav.logout')}
           </button>
