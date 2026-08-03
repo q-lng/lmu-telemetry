@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import uPlot from 'uplot';
 import type { Lane } from '../types';
@@ -513,9 +513,12 @@ export function ChannelPlot({
   // lane's canvas at its stale size until something else forced a full
   // rebuild (e.g. switching x-axis mode). The ResizeObserver above is meant
   // to catch this too, but relying on it alone across several lanes resizing
-  // in the same batch has proven unreliable — this makes it immediate and
-  // certain regardless of observer timing.
-  useEffect(() => {
+  // in the same batch has proven unreliable.
+  // useLayoutEffect (not useEffect) deliberately — this runs synchronously
+  // right after the flexGrow style change is committed to the DOM, before
+  // the browser paints, so reading clientWidth/clientHeight here can't race
+  // against a deferred layout/paint pass the way a plain useEffect could.
+  useLayoutEffect(() => {
     const plot = plotRef.current;
     if (!plot || !containerRef.current) return;
     plot.setSize({ width: containerRef.current.clientWidth, height: containerRef.current.clientHeight });
