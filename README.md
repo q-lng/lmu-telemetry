@@ -1,85 +1,86 @@
 # lmu-telemetry
 
-Webapp de lecture/visualisation de télémétrie **Le Mans Ultimate** (format DuckDB),
-façon MoTeC i2 : ouverture d'une session, tous les canaux disponibles, graphes
-synchronisés, carte du circuit, comparaison de tours — plus une couche compte
-utilisateur (amis/follows, partage de sessions, notifications) et un panel
-d'administration pour la configuration du site.
+A webapp for reading/visualizing **Le Mans Ultimate** telemetry (DuckDB format),
+MoTeC i2 style: open a session, see every available channel, synchronized
+graphs, track map, lap comparison — plus a user-account layer (friends/follows,
+session sharing, notifications) and an admin panel for site-wide configuration.
 
-> Le projet évolue vers un **hub communautaire LMU** (tracking de sessions à
-> l'échelle de la communauté, bot Discord, hébergement dédié) — voir
-> [CONTEXT.md](CONTEXT.md) pour l'objectif détaillé et [TASKS.md](TASKS.md)
-> pour l'avancement au jour le jour.
+> The project is evolving into an **LMU community hub** (community-wide session
+> tracking, a Discord bot, dedicated hosting) — see
+> [CONTEXT.md](CONTEXT.md) for the detailed goal (in French) and the
+> [GitHub Project board](https://github.com/users/q-lng/projects/2) for
+> day-to-day progress.
 
 ## Stack
 
-- **TypeScript de bout en bout.** Pas de Python dans ce projet.
-- **Backend** : Node.js + Fastify + PostgreSQL (comptes/social/préférences) +
-  package `duckdb` (lecture directe des fichiers de télémétrie, pas d'ORM).
-- **Frontend** : Vite + React + TypeScript, graphes avec **uPlot**.
-- **Tout tourne en Docker / docker-compose**, y compris en dev.
+- **TypeScript end to end.** No Python in this project.
+- **Backend**: Node.js + Fastify + PostgreSQL (accounts/social/preferences) +
+  the `duckdb` package (reads telemetry files directly, no ORM).
+- **Frontend**: Vite + React + TypeScript, graphs with **uPlot**.
+- **Everything runs in Docker / docker-compose**, dev included.
 
-## Démarrer
+## Getting started
 
 ```bash
-cp .env.example .env   # renseigner les secrets (voir ci-dessous)
+cp .env.example .env   # fill in the secrets (see below)
 docker compose up --build
 ```
 
-- Frontend : http://localhost:5173
-- Backend : http://localhost:3891
-- Les fichiers de session (`.duckdb`) uploadés sont stockés dans `data/` (gitignoré).
+- Frontend: http://localhost:5173
+- Backend: http://localhost:3891
+- Uploaded session files (`.duckdb`) are stored in `data/` (gitignored).
 
-### Variables d'environnement (`.env`)
+### Environment variables (`.env`)
 
 | Variable | Description |
 | --- | --- |
-| `POSTGRES_PASSWORD` | Mot de passe de la base Postgres (comptes/social/préférences). |
-| `COOKIE_SECRET` | Secret de signature des cookies de session. |
-| `COOKIE_SECURE` | `true` en prod derrière HTTPS, `false` en local. |
-| `PUBLIC_BASE_URL` | URL publique de l'app — utilisée pour les liens cliquables dans les emails (reset mot de passe). |
-| `MAIL_HOST`, `MAIL_PORT`, `MAIL_SECURE`, `MAIL_USER`, `MAIL_PASSWORD`, `MAIL_FROM` | SMTP. Laisser vide pour désactiver l'envoi d'email (loggé, jamais bloquant). |
+| `POSTGRES_PASSWORD` | Password for the Postgres database (accounts/social/preferences). |
+| `COOKIE_SECRET` | Session cookie signing secret. |
+| `COOKIE_SECURE` | `true` in prod behind HTTPS, `false` locally. |
+| `PUBLIC_BASE_URL` | Public URL of the app — used to build clickable links in emails (password reset). |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_SECURE`, `MAIL_USER`, `MAIL_PASSWORD`, `MAIL_FROM` | SMTP. Leave empty to disable email sending (logged, never fatal). |
 
 ## Structure
 
 ```
-data/           fichiers .duckdb (gitignorés, montés en volume dans le conteneur backend)
-backend/        API Fastify + TS
-frontend/       app Vite + React + TS
-docs/SCHEMA.md  schéma DuckDB des fichiers de télémétrie (référence technique)
-CONTEXT.md      décisions de projet, objectif, état d'avancement
-TASKS.md        suivi continu des tâches (terminé / en cours / à faire)
+data/           .duckdb files (gitignored, mounted into the backend container)
+backend/        Fastify + TS API
+frontend/       Vite + React + TS app
+docs/SCHEMA.md  DuckDB schema reference for telemetry files
+CONTEXT.md      project decisions, goal, progress (French)
+TASKS.md        archived task log (French, frozen as of 2026-08-03 — see the
+                GitHub Project board above for current tracking)
 ```
 
-## Fonctionnalités
+## Features
 
-- Lecture/visualisation de télémétrie : graphes uPlot synchronisés, carte du
-  circuit, comparaison de tours (même session ou fichier externe), canal de
-  delta-time.
-- Comptes utilisateurs : amis/follows, partage de sessions et de tours
-  (public/amis/privé), profils publics ou privés, notifications (demandes
-  d'ami, nouveaux followers).
-- Presets d'affichage de la vue télémétrie, sauvegardés côté serveur (suivent
-  le compte, pas le navigateur).
-- Panel admin (`/admin`) : gestion des utilisateurs (plan, rôle admin,
-  activation/désactivation, reset mot de passe) et configuration globale de
-  l'affichage du site (police du site, police des affichages de données,
-  taille de texte, couleur d'accent par défaut et palette proposée, effet
-  néon).
-- Export MoTeC : **non implémenté** (voir [CONTEXT.md](CONTEXT.md) — mis de
-  côté volontairement, format pas assez documenté publiquement).
+- Telemetry reading/visualization: synchronized uPlot graphs, track map, lap
+  comparison (same session or an external file), delta-time channel.
+- User accounts: friends/follows, session and lap sharing (public/friends/
+  private), public or private profiles, notifications (friend requests, new
+  followers).
+- Telemetry view display presets, saved server-side (follow the account, not
+  the browser).
+- Admin panel (`/admin`): user management (plan, admin role, activate/
+  deactivate, password reset) and site-wide display configuration (site
+  font, data-display font, text size, default accent color and offered
+  palette, neon glow effect).
+- MoTeC export: **not implemented** (see [CONTEXT.md](CONTEXT.md) — deliberately
+  shelved, the format isn't documented reliably enough publicly).
 
-## Schéma des données
+## Data schema
 
-Voir [docs/SCHEMA.md](docs/SCHEMA.md) avant de toucher au backend — le format
-DuckDB est inhabituel (une table par canal, pas une table plate), avec une
-règle de reconstruction du temps à respecter pour les canaux continus.
+See [docs/SCHEMA.md](docs/SCHEMA.md) before touching the backend — the DuckDB
+format is unusual (one table per channel, not a flat table), with a time-
+reconstruction rule that has to be respected for continuous channels.
 
 ## Conventions
 
-- Noms de canaux/tables DuckDB avec espaces et caractères spéciaux → toujours
-  quoter les identifiants SQL et whitelister avant toute interpolation.
-- Préférences utilisateur toujours stockées côté backend, jamais en
-  `localStorage`.
-- Icônes : SVG inline uniquement, jamais d'emoji (voir
+- DuckDB channel/table names contain spaces and special characters → always
+  quote SQL identifiers and whitelist them before any interpolation.
+- User preferences are always stored server-side, never in `localStorage`.
+- Icons: inline SVG only, never emoji (see
   `frontend/src/components/icons.tsx`).
+- GitHub-facing content (issues, PRs, this README) is in English; the
+  project's own reference docs (`CLAUDE.md`, `CONTEXT.md`, `TASKS.md`) are in
+  French.
