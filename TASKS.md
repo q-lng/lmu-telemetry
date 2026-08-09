@@ -1,25 +1,13 @@
-# Suivi des tâches — lmu-telemetry
+# Suivi des tâches — lmu-telemetry (archive, jusqu'au 2026-08-03)
 
-> Tenu à jour en continu (pas juste en fin de session) pour que le contexte
-> survive même si on change de conversation Claude Code. Le détail complet de
-> chaque changement reste dans `git log` — ce fichier sert à s'orienter vite,
-> pas à dupliquer les messages de commit.
-
-## En cours / à faire
-
-- [ ] **Pivot produit (2026-08-03)** : le projet devient un hub communautaire
-      LMU — tracking des sessions/pilotes, import télémétrie (base actuelle),
-      bot Discord qui publie les résultats de course d'un joueur, etc.
-      Hébergement dédié + nom de domaine prévus. Implique un chantier
-      réglementaire (RGPD, mentions légales, copyright/marques) — liste
-      préparée et débrief à faire avec Quentin, voir mémoire Claude
-      `project_hub_pivot`. Rien d'implémenté encore côté code pour ce point.
-- [ ] **Refonte "Channels shown"** (sidebar TelemetryViewer, sélection/
-      groupement de canaux) : Quentin veut changer tout ce système, pas juste
-      le look des checkboxes — signalé le 2026-08-03, à préciser avec lui
-      avant de retoucher quoi que ce soit ici (volontairement pas touché
-      pendant le nettoyage des checkboxes système du 2026-08-03, voir
-      l'entrée "Terminé" du même jour).
+> **Remplacé par le GitHub Project** : https://github.com/users/q-lng/projects/2
+> (colonnes Todo / In Progress / Done, cartes = issues du repo). À partir du
+> 2026-08-03, c'est la référence pour "en cours / à faire" — ce fichier n'est
+> plus tenu à jour activement, il reste comme historique détaillé de ce qui a
+> été fait avant le switch (le détail des "Terminé" ci-dessous n'a pas été
+> recopié en issues, volontairement — voir mémoire Claude
+> `project_github_board`). Le détail complet de chaque changement reste aussi
+> dans `git log`.
 
 ## Terminé
 

@@ -22,18 +22,19 @@ backend/        API Fastify+TS
 frontend/       app Vite+React+TS
 docs/SCHEMA.md  schéma DuckDB des fichiers de télémétrie (référence technique)
 CONTEXT.md      décisions de projet et état d'avancement
-TASKS.md        suivi continu : tâches en cours / terminées (à tenir à jour à
-                chaque session, pas seulement en mémoire Claude — survit aux
-                nouvelles conversations)
+TASKS.md        archive du suivi (jusqu'au 2026-08-03, remplacé depuis par le
+                GitHub Project — voir ci-dessous)
 ```
 
 ## Suivi de l'avancement
 
-**Tenir `TASKS.md` à jour au fil de l'eau** (pas juste en fin de session) : ce qui
-vient d'être terminé, ce qui est en cours, ce qui reste à faire. C'est le fichier de
-référence pour reprendre le contexte dans une nouvelle conversation Claude Code —
-la mémoire Claude (feedback/préférences/roadmap) complète mais ne remplace pas ce
-suivi opérationnel.
+**Depuis le 2026-08-03**, le suivi "en cours / à faire" se fait sur le GitHub Project
+https://github.com/users/q-lng/projects/2 (colonnes Todo / In Progress / Done, une
+carte = une issue du repo) — pas dans un fichier du repo. À chaque nouvelle tâche :
+créer une issue (`gh`/API GitHub, token dans `.env`) et l'ajouter au board ; en fin de
+tâche, la passer en Done. `TASKS.md` reste comme archive du suivi d'avant cette date,
+plus mis à jour. La mémoire Claude (feedback/préférences/roadmap) complète mais ne
+remplace pas le board.
 
 ## Schéma des données
 
