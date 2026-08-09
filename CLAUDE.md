@@ -50,6 +50,14 @@ docker compose down
 
 Pas de commandes npm sur l'hôte (Node absent) — tout passe par les conteneurs.
 
+**Ajout d'une dépendance npm** : `docker compose exec frontend npm install <pkg>`
+installe dans la couche writable du conteneur en cours d'exécution, pas dans l'image —
+si le conteneur est recréé (pas juste redémarré) avant un rebuild, la dépendance
+disparaît et l'app plante au démarrage (`Failed to resolve import`). Toujours finir par
+`docker compose build frontend` (ou `backend`) pour que `npm install` tourne à nouveau
+depuis le `package.json` à jour et que la dépendance soit bien dans l'image — copier
+`package.json`/`package-lock.json` vers l'hôte ne suffit pas seul.
+
 ## Conventions
 
 - Noms de canaux/tables DuckDB contiennent espaces et caractères spéciaux → toujours
