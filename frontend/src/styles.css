@@ -27,6 +27,19 @@
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
+
+  /* Badge tones (see components/Badge.tsx) — fixed per tone, independent of
+     the user-customizable --accent above, so a badge's meaning (VIP gold,
+     active green, disabled red) never shifts with someone's color pick.
+     Gold matches the existing VIP crown color; red matches --danger. */
+  --badge-neutral-bg: rgba(96, 165, 250, 0.16);
+  --badge-neutral-fg: #60a5fa;
+  --badge-gold-bg: rgba(255, 213, 74, 0.16);
+  --badge-gold-fg: #ffd54a;
+  --badge-green-bg: rgba(74, 222, 128, 0.16);
+  --badge-green-fg: #4ade80;
+  --badge-red-bg: rgba(230, 103, 103, 0.16);
+  --badge-red-fg: var(--danger);
 }
 
 ::-webkit-scrollbar {
@@ -1416,6 +1429,55 @@ body {
   cursor: default;
 }
 
+/* Same recipe as a reusable class, for checkboxes outside .lap-select-table
+   (admin row menu, display settings) — kept as a separate class rather than
+   generalizing the rule above to every checkbox in the app, since the
+   Channels-shown checkboxes are intentionally being redesigned separately
+   (see GitHub issue #4) and shouldn't pick this up yet. */
+.checkbox-custom {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-2);
+  cursor: pointer;
+  position: relative;
+  vertical-align: middle;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.checkbox-custom:hover:not(:disabled) {
+  border-color: var(--muted-ink);
+}
+
+.checkbox-custom:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.checkbox-custom:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.checkbox-custom:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .compare-external-source {
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -2112,67 +2174,82 @@ body {
   box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
-.admin-status-cell {
+.admin-pseudo-cell {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: flex-start;
+  align-items: center;
+  gap: 6px;
 }
 
-.admin-status-active {
-  color: var(--accent);
-  font-weight: 600;
-  font-size: calc(1rem * 12 / 16);
-}
-
-.admin-status-disabled {
-  color: var(--danger);
-  font-weight: 600;
-  font-size: calc(1rem * 12 / 16);
-}
-
-.admin-actions-cell {
+.admin-edit-trigger {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: flex-start;
-}
-
-.admin-status-cell button,
-.admin-actions-cell button {
-  background: var(--surface-2);
-  color: var(--secondary-ink);
-  border: 1px solid var(--border);
+  align-items: center;
+  color: var(--muted-ink);
+  padding: 3px;
   border-radius: var(--radius-sm);
-  padding: 4px 8px;
-  font-size: calc(1rem * 12 / 16);
-  cursor: pointer;
-  white-space: nowrap;
-  transition:
-    color 0.15s ease,
-    border-color 0.15s ease;
+  flex: 0 0 auto;
 }
 
-.admin-status-cell button:hover:not(:disabled),
-.admin-actions-cell button:hover:not(:disabled) {
+.admin-edit-trigger:hover:not(:disabled) {
   color: var(--primary-ink);
-  border-color: var(--muted-ink);
+  background: var(--surface-2);
 }
 
-.admin-status-cell button:disabled,
-.admin-actions-cell button:disabled {
-  opacity: 0.4;
-  cursor: default;
+/* Soft pill label, one shared recipe per tone — see components/Badge.tsx. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: calc(1rem * 11 / 16);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
 }
 
+.badge-neutral {
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-fg);
+}
+
+.badge-gold {
+  background: var(--badge-gold-bg);
+  color: var(--badge-gold-fg);
+}
+
+.badge-green {
+  background: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+}
+
+.badge-red {
+  background: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+}
+
+/* Plan toggle's selected pill echoes the same tones as .badge-neutral/-gold
+   (same underlying meaning — "this is the current plan") instead of the
+   generic --accent fill every other .segmented control uses. */
+.admin-plan-toggle button.plan-free.active {
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-fg);
+  box-shadow: none;
+}
+
+.admin-plan-toggle button.plan-vip.active {
+  background: var(--badge-gold-bg);
+  color: var(--badge-gold-fg);
+  box-shadow: none;
+}
+
+/* Same red-on-hover treatment as .account-menu-logout — a destructive action
+   inside an otherwise-neutral dropdown menu. */
 .admin-delete-btn {
   color: var(--danger);
-  border-color: rgba(230, 103, 103, 0.4);
 }
 
 .admin-delete-btn:hover:not(:disabled) {
   color: var(--danger);
-  border-color: var(--danger);
+  background: var(--surface-2);
 }
 
 .color-picker-wrap {
@@ -2222,19 +2299,178 @@ body {
   box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
-.admin-page {
+/* Full-width "console" shell — replaces .social-page + .social-card (a
+   floating rounded card centered in an otherwise empty page) everywhere
+   except the telemetry viewer app (.app), which keeps its own layout for
+   now. No card chrome — fills the layout-outlet edge to edge (that's the
+   point of dropping the floating card), lighter background than the page
+   plane so it doesn't read as too dark without the card surface that used
+   to provide that contrast. Individual sections (tiles, table, form, list)
+   cap their own width when they want a narrower column (see
+   .narrow-form-section, .profile-card) instead of the shell doing it. */
+.page-shell {
+  flex: 1;
+  width: 100%;
+  background: var(--surface-1);
+  padding: 32px 40px;
+  display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 20px;
+  gap: 24px;
 }
 
-/* .social-card's own align-self:flex-start means something different once
-   the flex axes rotate (column vs row) — in row mode it just stops the card
-   from stretching to the container's full height; in this column layout the
-   cross axis is horizontal, so unset it would pin the card to the left
-   instead of letting .admin-page's align-items:center center it. */
-.admin-page .social-card {
-  align-self: center;
+/* For sparse hub-style pages (currently just /admin) — centers content
+   horizontally (the tile grid) while staying anchored to the top. */
+.page-shell-centered {
+  align-items: center;
+}
+
+.admin-back-link {
+  display: inline-block;
+  margin-bottom: 14px;
+  color: var(--secondary-ink);
+  font-size: calc(1rem * 12 / 16);
+  text-decoration: none;
+}
+
+.admin-back-link:hover {
+  color: var(--primary-ink);
+}
+
+/* Hub tiles on /admin — a small grid of big clickable cards linking to each
+   admin section, instead of one long page (Assetto Corsa Server Manager's
+   admin dashboard was the reference). */
+.admin-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(200px, 240px));
+  gap: 16px;
+}
+
+@media (max-width: 720px) {
+  .admin-tiles {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+}
+
+.admin-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 24px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--primary-ink);
+  text-decoration: none;
+  transition:
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.admin-tile:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.admin-tile h2 {
+  margin: 0;
+  font-size: calc(1rem * 16 / 16);
+  font-weight: 600;
+}
+
+.admin-tile p {
+  margin: 0;
+  color: var(--secondary-ink);
+  font-size: calc(1rem * 12 / 16);
+  line-height: 1.4;
+}
+
+/* Unlike .modal-table-wrap (bounded height for a modal's own internal
+   scroll), this is a full page — only horizontal overflow needs containing
+   (the table's min-width can exceed a narrow viewport), the page itself
+   scrolls normally via .layout-outlet. */
+.admin-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-users-table td {
+  vertical-align: middle;
+}
+
+.admin-storage-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 90px;
+}
+
+/* Per-row "⋮" menu (admin toggle, deactivate, reset password, delete) — same
+   click-outside/Escape popover pattern as AccountMenu/NotificationsBell. */
+.admin-row-menu {
+  position: relative;
+}
+
+.admin-row-menu-trigger {
+  display: flex;
+  align-items: center;
+  color: var(--secondary-ink);
+  padding: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.admin-row-menu-trigger:hover:not(:disabled) {
+  color: var(--primary-ink);
+  background: var(--surface-2);
+}
+
+/* Positioned inline (position: fixed, top/right in px) from the trigger
+   button's getBoundingClientRect() — portaled to document.body so it can't
+   be clipped by .admin-table-wrap's overflow (setting overflow-x alone
+   still forces the browser to compute overflow-y as auto too, which was
+   clipping/scrolling the popover instead of letting it float above the
+   table). */
+.admin-row-menu-popover {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 200px;
+  padding: 6px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.7);
+  z-index: 50;
+}
+
+.admin-row-menu-popover button {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  color: var(--secondary-ink);
+  font-size: calc(1rem * 13 / 16);
+  text-align: left;
+}
+
+.admin-row-menu-popover button:hover:not(:disabled) {
+  color: var(--primary-ink);
+  background: var(--surface-2);
+}
+
+.admin-row-menu-popover button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.admin-row-menu-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  font-size: calc(1rem * 13 / 16);
+  color: var(--secondary-ink);
+  cursor: pointer;
 }
 
 .admin-font-select {
@@ -2303,11 +2539,11 @@ input[type='range']::-moz-range-track {
   font-size: calc(1rem * 16 / 16);
 }
 
-.admin-display-section {
+.narrow-form-section {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 0 20px 20px;
+  max-width: 640px;
 }
 
 .admin-color-row {

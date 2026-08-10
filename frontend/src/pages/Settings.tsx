@@ -24,8 +24,8 @@ export function Settings() {
   }
 
   return (
-    <div className="social-page">
-      <div className="social-card">
+    <div className="page-shell">
+      <div className="narrow-form-section">
         <div className="auth-heading">
           <h1>{t('settings.title')}</h1>
         </div>

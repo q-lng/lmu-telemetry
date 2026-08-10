@@ -56,55 +56,53 @@ export function Browse() {
   }
 
   return (
-    <div className="social-page">
-      <div className="social-card">
-        <div className="auth-heading">
-          <h1>{t('browse.title')}</h1>
-          <p>{t('browse.subtitle')}</p>
-        </div>
-
-        <form
-          className="social-search-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            runSearch();
-          }}
-        >
-          <input value={track} onChange={(e) => setTrack(e.target.value)} placeholder={t('browse.trackPlaceholder')} />
-          <input value={car} onChange={(e) => setCar(e.target.value)} placeholder={t('browse.carPlaceholder')} />
-          <button className="auth-submit" type="submit" disabled={searching}>
-            {searching ? t('common.searching') : t('common.search')}
-          </button>
-        </form>
-
-        <h2 className="social-subheading">{t('browse.sessions')}</h2>
-        {deleteState.error && <div className="upload-error">{deleteState.error}</div>}
-        <SessionTable
-          sessions={sessions}
-          onSelect={(file) => {
-            navigate(`/telemetry?file=${encodeURIComponent(file)}`);
-          }}
-          deleteState={deleteState}
-          onDeleteSession={handleDeleteSession}
-        />
-
-        {lapsSearched && (
-          <>
-            <h2 className="social-subheading">{t('browse.sharedLaps')}</h2>
-            <div className="user-list">
-              {laps.length === 0 && <div className="social-empty">{t('browse.noSharedLapsFound')}</div>}
-              {laps.map((l) => (
-                <div className="user-row" key={`${l.filename}-${l.lapNumber}`}>
-                  <Link to={`/shared/${encodeURIComponent(l.filename)}/${l.lapNumber}`} className="user-row-name">
-                    {l.track ?? l.filename} — {t('lap.number', { n: l.lapNumber })}
-                    <span className="user-row-fullname">{l.car}</span>
-                  </Link>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+    <div className="page-shell">
+      <div className="auth-heading">
+        <h1>{t('browse.title')}</h1>
+        <p>{t('browse.subtitle')}</p>
       </div>
+
+      <form
+        className="social-search-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          runSearch();
+        }}
+      >
+        <input value={track} onChange={(e) => setTrack(e.target.value)} placeholder={t('browse.trackPlaceholder')} />
+        <input value={car} onChange={(e) => setCar(e.target.value)} placeholder={t('browse.carPlaceholder')} />
+        <button className="auth-submit" type="submit" disabled={searching}>
+          {searching ? t('common.searching') : t('common.search')}
+        </button>
+      </form>
+
+      <h2 className="social-subheading">{t('browse.sessions')}</h2>
+      {deleteState.error && <div className="upload-error">{deleteState.error}</div>}
+      <SessionTable
+        sessions={sessions}
+        onSelect={(file) => {
+          navigate(`/telemetry?file=${encodeURIComponent(file)}`);
+        }}
+        deleteState={deleteState}
+        onDeleteSession={handleDeleteSession}
+      />
+
+      {lapsSearched && (
+        <>
+          <h2 className="social-subheading">{t('browse.sharedLaps')}</h2>
+          <div className="user-list">
+            {laps.length === 0 && <div className="social-empty">{t('browse.noSharedLapsFound')}</div>}
+            {laps.map((l) => (
+              <div className="user-row" key={`${l.filename}-${l.lapNumber}`}>
+                <Link to={`/shared/${encodeURIComponent(l.filename)}/${l.lapNumber}`} className="user-row-name">
+                  {l.track ?? l.filename} — {t('lap.number', { n: l.lapNumber })}
+                  <span className="user-row-fullname">{l.car}</span>
+                </Link>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -24,10 +24,8 @@ export function Profile() {
 
   if (notFound) {
     return (
-      <div className="social-page">
-        <div className="social-card">
-          <div className="social-empty">{t('profile.notFound')}</div>
-        </div>
+      <div className="page-shell">
+        <div className="social-empty">{t('profile.notFound')}</div>
       </div>
     );
   }
@@ -43,8 +41,8 @@ export function Profile() {
   const isSelf = user?.pseudo === profile.pseudo;
 
   return (
-    <div className="social-page">
-      <div className="social-card profile-card">
+    <div className="page-shell">
+      <div className="profile-card">
         <div className="profile-heading">
           <h1>
             {profile.pseudo} <VipBadge plan={profile.plan} />

@@ -2,6 +2,7 @@ import { lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { RequireAuth } from './components/RequireAuth';
+import { RequireAdmin } from './components/RequireAdmin';
 
 // Route-level code splitting: each page is a separate chunk fetched on demand
 // instead of every page (including the heavy TelemetryViewer, which pulls in
@@ -18,7 +19,9 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword').then((m) => (
 const ResetPassword = lazy(() => import('./pages/ResetPassword').then((m) => ({ default: m.ResetPassword })));
 const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m.Settings })));
 const Subscription = lazy(() => import('./pages/Subscription').then((m) => ({ default: m.Subscription })));
-const Admin = lazy(() => import('./pages/Admin').then((m) => ({ default: m.Admin })));
+const AdminHome = lazy(() => import('./pages/AdminHome').then((m) => ({ default: m.AdminHome })));
+const AdminUsers = lazy(() => import('./pages/AdminUsers').then((m) => ({ default: m.AdminUsers })));
+const AdminDisplay = lazy(() => import('./pages/AdminDisplay').then((m) => ({ default: m.AdminDisplay })));
 
 export default function App() {
   return (
@@ -74,9 +77,25 @@ export default function App() {
         <Route
           path="admin"
           element={
-            <RequireAuth>
-              <Admin />
-            </RequireAuth>
+            <RequireAdmin>
+              <AdminHome />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="admin/users"
+          element={
+            <RequireAdmin>
+              <AdminUsers />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="admin/display"
+          element={
+            <RequireAdmin>
+              <AdminDisplay />
+            </RequireAdmin>
           }
         />
         <Route path="*" element={<Navigate to="/" replace />} />

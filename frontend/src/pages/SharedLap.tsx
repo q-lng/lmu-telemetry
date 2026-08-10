@@ -142,10 +142,8 @@ export function SharedLap() {
 
   if (error) {
     return (
-      <div className="social-page">
-        <div className="social-card">
-          <div className="social-empty">{error}</div>
-        </div>
+      <div className="page-shell">
+        <div className="social-empty">{error}</div>
       </div>
     );
   }

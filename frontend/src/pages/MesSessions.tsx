@@ -47,56 +47,54 @@ export function MesSessions() {
   }
 
   return (
-    <div className="social-page">
-      <div className="social-card">
-        <div className="auth-heading">
-          <h1>{t('mesSessions.title')}</h1>
-          <p>{t('mesSessions.subtitle')}</p>
-        </div>
+    <div className="page-shell">
+      <div className="auth-heading">
+        <h1>{t('mesSessions.title')}</h1>
+        <p>{t('mesSessions.subtitle')}</p>
+      </div>
 
-        {loading && <div className="social-empty">{t('mesSessions.loading')}</div>}
-        {!loading && files.length === 0 && <div className="social-empty">{t('mesSessions.noFiles')}</div>}
+      {loading && <div className="social-empty">{t('mesSessions.loading')}</div>}
+      {!loading && files.length === 0 && <div className="social-empty">{t('mesSessions.noFiles')}</div>}
 
-        <div className="user-list">
-          {files.map((f) => (
-            <div key={f.filename} className="mes-sessions-item">
-              <div className="user-row">
-                <button className="mes-sessions-name" onClick={() => toggleExpand(f.filename)}>
-                  {f.track ?? f.filename}
-                  {f.car ? ` — ${f.car}` : ''}
-                </button>
-                <select
-                  value={f.visibility}
-                  onChange={(e) => handleVisibilityChange(f.filename, e.target.value as Visibility)}
-                >
-                  <option value="private">{t('visibility.private')}</option>
-                  <option value="friends">{t('visibility.friends')}</option>
-                  <option value="public">{t('visibility.public')}</option>
-                </select>
-              </div>
-
-              {expanded === f.filename && (
-                <div className="mes-sessions-laps">
-                  {lapsLoading && <div className="social-empty">{t('mesSessions.loadingLaps')}</div>}
-                  {!lapsLoading &&
-                    laps.map((l) => (
-                      <div key={l.lap} className="mes-sessions-lap-row">
-                        <span>{t('lap.number', { n: l.lap })}</span>
-                        <select
-                          value={lapShares[l.lap] ?? 'file'}
-                          onChange={(e) => handleLapVisibilityChange(f.filename, l.lap, e.target.value)}
-                        >
-                          <option value="file">{t('mesSessions.followsFile')}</option>
-                          <option value="friends">{t('visibility.friends')}</option>
-                          <option value="public">{t('visibility.public')}</option>
-                        </select>
-                      </div>
-                    ))}
-                </div>
-              )}
+      <div className="user-list">
+        {files.map((f) => (
+          <div key={f.filename} className="mes-sessions-item">
+            <div className="user-row">
+              <button className="mes-sessions-name" onClick={() => toggleExpand(f.filename)}>
+                {f.track ?? f.filename}
+                {f.car ? ` — ${f.car}` : ''}
+              </button>
+              <select
+                value={f.visibility}
+                onChange={(e) => handleVisibilityChange(f.filename, e.target.value as Visibility)}
+              >
+                <option value="private">{t('visibility.private')}</option>
+                <option value="friends">{t('visibility.friends')}</option>
+                <option value="public">{t('visibility.public')}</option>
+              </select>
             </div>
-          ))}
-        </div>
+
+            {expanded === f.filename && (
+              <div className="mes-sessions-laps">
+                {lapsLoading && <div className="social-empty">{t('mesSessions.loadingLaps')}</div>}
+                {!lapsLoading &&
+                  laps.map((l) => (
+                    <div key={l.lap} className="mes-sessions-lap-row">
+                      <span>{t('lap.number', { n: l.lap })}</span>
+                      <select
+                        value={lapShares[l.lap] ?? 'file'}
+                        onChange={(e) => handleLapVisibilityChange(f.filename, l.lap, e.target.value)}
+                      >
+                        <option value="file">{t('mesSessions.followsFile')}</option>
+                        <option value="friends">{t('visibility.friends')}</option>
+                        <option value="public">{t('visibility.public')}</option>
+                      </select>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

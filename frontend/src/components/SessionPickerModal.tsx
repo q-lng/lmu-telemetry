@@ -5,6 +5,7 @@ import { fetchStorageUsage } from '../api';
 import { useAuth } from '../AuthContext';
 import { SessionTable } from './SessionTable';
 import { CloseIcon } from './icons';
+import { StorageBar } from './StorageBar';
 
 interface AsyncActionState {
   busy: boolean;
@@ -118,12 +119,7 @@ export function SessionPickerModal({
               {t('tv.storageUsed', { used: formatBytes(storage.usedBytes), quota: formatBytes(storage.quotaBytes) })}
               {storage.plan === 'vip' ? ` · ${t('tv.storagePlanVip')}` : ''}
             </span>
-            <div className="modal-storage-bar">
-              <div
-                className={`modal-storage-bar-fill${storage.usedBytes >= storage.quotaBytes ? ' modal-storage-bar-full' : ''}`}
-                style={{ width: `${Math.min(100, (storage.usedBytes / storage.quotaBytes) * 100)}%` }}
-              />
-            </div>
+            <StorageBar usedBytes={storage.usedBytes} quotaBytes={storage.quotaBytes} />
           </div>
         )}
       </div>
