@@ -190,18 +190,29 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  background: var(--page-plane);
 }
 
+/* Floating pill navbar (siteinspire.com/website/13457-daylight reference) —
+   inset from the edges instead of flush, rounded fully, with a real drop
+   shadow instead of a hairline border, so the page-plane background shows
+   around it and it reads as floating rather than docked. Daylight's own bar
+   is a tight 4-links-and-a-CTA pill; ours carries more nav items plus the
+   accent picker/bell/account controls, so it stays wide rather than
+   shrinking to Daylight's narrow centered width — watch for this needing a
+   collapse-to-menu treatment on narrow viewports. */
 .navbar {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 20px;
   height: 52px;
+  margin: 16px 20px 0;
   padding: 0 20px;
   background: var(--surface-1);
-  border-bottom: 1px solid var(--border);
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 12px 30px -12px rgba(0, 0, 0, 0.7);
 }
 
 .navbar-brand {
@@ -220,8 +231,7 @@ body {
   gap: 16px;
 }
 
-.navbar-links a,
-.navbar-login {
+.navbar-links a {
   color: var(--secondary-ink);
   font-weight: 600;
   text-decoration: none;
@@ -230,15 +240,38 @@ body {
   transition: color 0.15s ease;
 }
 
-.navbar-links a:hover,
-.navbar-login:hover {
+.navbar-links a:hover {
   color: var(--primary-ink);
 }
 
-.navbar-links a[aria-current='page'],
-.navbar-login[aria-current='page'] {
+.navbar-links a[aria-current='page'] {
   color: var(--primary-ink);
   border-bottom: 2px solid var(--accent);
+}
+
+/* The one standout pill CTA (Daylight's "Get started" button) — outlined
+   rather than solid-filled, like .auth-submit/.upload-btn elsewhere: the
+   accent color is user-customizable (AccentPicker), and some presets are
+   light/pastel, so a solid accent fill + white text risks unreadable
+   contrast depending on what's picked. Border+text in the accent color
+   reads as "the CTA" just as clearly without that risk. */
+.navbar-login {
+  color: var(--accent);
+  background: transparent;
+  border: 1.5px solid var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+  font-size: calc(1rem * 13 / 16);
+  padding: 7px 18px;
+  border-radius: 999px;
+  transition:
+    background-color 0.15s ease,
+    filter 0.15s ease;
+}
+
+.navbar-login:hover {
+  background: var(--accent-ring);
+  filter: brightness(1.2);
 }
 
 .navbar-link-with-badge {
