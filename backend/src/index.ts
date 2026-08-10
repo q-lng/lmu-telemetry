@@ -17,6 +17,7 @@ import { registerStorage, backfillMissingFileSizes } from './storage.js';
 import { registerAdmin } from './admin.js';
 import { registerSiteSettings } from './siteSettings.js';
 import { registerSearch } from './search.js';
+import { registerTracks } from './tracks.js';
 
 const app = Fastify({ logger: true });
 await app.register(cors, { origin: true });
@@ -37,6 +38,7 @@ await registerStorage(app);
 await registerAdmin(app);
 await registerSiteSettings(app);
 await registerSearch(app);
+await registerTracks(app);
 
 app.get('/api/health', async () => ({ ok: true }));
 

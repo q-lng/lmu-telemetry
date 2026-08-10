@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { searchUsersByPseudo, toPublicUser } from './users.js';
 import { toProfileSummary } from './social.js';
 import { searchTrackCarNames } from './access.js';
+import { findTrackCatalogEntryByName } from './tracks.js';
 
 /** Cross-entity navbar search (users/tracks/cars) — no dedicated table joins
  * either side needs, just the two existing lookups merged into one response
@@ -20,6 +21,9 @@ export async function registerSearch(app: FastifyInstance): Promise<void> {
       searchTrackCarNames(req.userId, q, 6),
     ]);
     const profiles = await Promise.all(users.map((u) => toProfileSummary(toPublicUser(u), req.userId)));
-    reply.send({ users: profiles, tracks, cars });
+    // slug is null when the track has no dedicated page yet — the frontend
+    // falls back to a filtered Browse link in that case.
+    const trackResults = tracks.map((name) => ({ name, slug: findTrackCatalogEntryByName(name)?.slug ?? null }));
+    reply.send({ users: profiles, tracks: trackResults, cars });
   });
 }

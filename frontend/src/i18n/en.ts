@@ -210,6 +210,13 @@ export const en = {
   'browse.statsComingSoon': 'Lap times and leaderboards — coming soon.',
   'browse.noSharedLapsFound': 'No shared lap found.',
 
+  'track.notFound': 'Track not found.',
+  'track.photoComingSoon': 'Photo coming soon',
+  'track.mapUnavailable': 'No track map available yet.',
+  'track.leaderboard': 'Leaderboard',
+  'track.leaderboardComingSoon': 'Lap time leaderboards by car category — coming soon.',
+  'track.sessions': 'Sessions',
+
   'sharedLap.notFound': 'Lap not found or not accessible',
 
   'channelPlot.comparedSuffix': ' (compared lap)',

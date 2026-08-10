@@ -18,6 +18,7 @@ import type {
   SharedLapResult,
   SiteSettings,
   StorageUsage,
+  TrackCatalogEntry,
   Visibility,
 } from './types';
 import { tError } from './i18n';
@@ -176,6 +177,10 @@ export function searchUsers(q: string): Promise<ProfileSummary[]> {
 
 export function searchAll(q: string): Promise<SearchResults> {
   return getJson<SearchResults>(`/api/search?q=${encodeURIComponent(q)}`);
+}
+
+export function fetchTrackCatalogEntry(slug: string): Promise<TrackCatalogEntry> {
+  return getJson<TrackCatalogEntry>(`/api/tracks/${encodeURIComponent(slug)}`);
 }
 
 export function fetchProfile(pseudo: string): Promise<ProfileSummary> {

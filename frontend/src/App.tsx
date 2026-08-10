@@ -14,6 +14,7 @@ const Social = lazy(() => import('./pages/Social').then((m) => ({ default: m.Soc
 const Profile = lazy(() => import('./pages/Profile').then((m) => ({ default: m.Profile })));
 const MesSessions = lazy(() => import('./pages/MesSessions').then((m) => ({ default: m.MesSessions })));
 const Browse = lazy(() => import('./pages/Browse').then((m) => ({ default: m.Browse })));
+const TrackPage = lazy(() => import('./pages/TrackPage').then((m) => ({ default: m.TrackPage })));
 const SharedLap = lazy(() => import('./pages/SharedLap').then((m) => ({ default: m.SharedLap })));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword').then((m) => ({ default: m.ForgotPassword })));
 const ResetPassword = lazy(() => import('./pages/ResetPassword').then((m) => ({ default: m.ResetPassword })));
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="forgot-password" element={<ForgotPassword />} />
         <Route path="reset-password" element={<ResetPassword />} />
         <Route path="browse" element={<Browse />} />
+        <Route path="tracks/:slug" element={<TrackPage />} />
         <Route path="shared/:file/:lap" element={<SharedLap />} />
         <Route
           path="friends"

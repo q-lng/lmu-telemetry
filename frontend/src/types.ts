@@ -120,10 +120,20 @@ export interface ProfileSummary extends PublicUser {
   friendRequestId?: number;
 }
 
+export interface TrackSearchResult {
+  name: string;
+  slug: string | null;
+}
+
 export interface SearchResults {
   users: ProfileSummary[];
-  tracks: string[];
+  tracks: TrackSearchResult[];
   cars: string[];
+}
+
+export interface TrackCatalogEntry {
+  slug: string;
+  name: string;
 }
 
 export interface FriendRequestSummary {

@@ -82,9 +82,9 @@ export function Navbar() {
     navigate(`/u/${encodeURIComponent(pseudo)}`);
   }
 
-  function goToTrack(name: string) {
+  function goToTrack(track: { name: string; slug: string | null }) {
     closeSearch();
-    navigate(`/browse?track=${encodeURIComponent(name)}`);
+    navigate(track.slug ? `/tracks/${track.slug}` : `/browse?track=${encodeURIComponent(track.name)}`);
   }
 
   function goToCar(name: string) {
@@ -149,9 +149,9 @@ export function Navbar() {
                 {results && results.tracks.length > 0 && (
                   <div className="navbar-search-group">
                     <div className="navbar-search-group-label">{t('nav.searchTracks')}</div>
-                    {results.tracks.map((name) => (
-                      <button key={name} className="navbar-search-result" onClick={() => goToTrack(name)}>
-                        {name}
+                    {results.tracks.map((track) => (
+                      <button key={track.name} className="navbar-search-result" onClick={() => goToTrack(track)}>
+                        {track.name}
                       </button>
                     ))}
                   </div>
