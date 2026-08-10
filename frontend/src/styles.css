@@ -27,6 +27,19 @@
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
+
+  /* Badge tones (see components/Badge.tsx) — fixed per tone, independent of
+     the user-customizable --accent above, so a badge's meaning (VIP gold,
+     active green, disabled red) never shifts with someone's color pick.
+     Gold matches the existing VIP crown color; red matches --danger. */
+  --badge-neutral-bg: rgba(96, 165, 250, 0.16);
+  --badge-neutral-fg: #60a5fa;
+  --badge-gold-bg: rgba(255, 213, 74, 0.16);
+  --badge-gold-fg: #ffd54a;
+  --badge-green-bg: rgba(74, 222, 128, 0.16);
+  --badge-green-fg: #4ade80;
+  --badge-red-bg: rgba(230, 103, 103, 0.16);
+  --badge-red-fg: var(--danger);
 }
 
 ::-webkit-scrollbar {
@@ -2119,16 +2132,51 @@ body {
   align-items: flex-start;
 }
 
-.admin-status-active {
-  color: var(--accent);
+/* Soft pill label, one shared recipe per tone — see components/Badge.tsx. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: calc(1rem * 11 / 16);
   font-weight: 600;
-  font-size: calc(1rem * 12 / 16);
+  line-height: 1.4;
+  white-space: nowrap;
 }
 
-.admin-status-disabled {
-  color: var(--danger);
-  font-weight: 600;
-  font-size: calc(1rem * 12 / 16);
+.badge-neutral {
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-fg);
+}
+
+.badge-gold {
+  background: var(--badge-gold-bg);
+  color: var(--badge-gold-fg);
+}
+
+.badge-green {
+  background: var(--badge-green-bg);
+  color: var(--badge-green-fg);
+}
+
+.badge-red {
+  background: var(--badge-red-bg);
+  color: var(--badge-red-fg);
+}
+
+/* Plan toggle's selected pill echoes the same tones as .badge-neutral/-gold
+   (same underlying meaning — "this is the current plan") instead of the
+   generic --accent fill every other .segmented control uses. */
+.admin-plan-toggle button.plan-free.active {
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-fg);
+  box-shadow: none;
+}
+
+.admin-plan-toggle button.plan-vip.active {
+  background: var(--badge-gold-bg);
+  color: var(--badge-gold-fg);
+  box-shadow: none;
 }
 
 .admin-actions-cell {

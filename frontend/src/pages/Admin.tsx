@@ -7,6 +7,7 @@ import type { AdminUserSummary, SiteSettings } from '../types';
 import { t } from '../i18n';
 import { CloseIcon } from '../components/icons';
 import { ColorPicker } from '../components/ColorPicker';
+import { Badge } from '../components/Badge';
 import { DATA_FONT_CATALOG, FONT_CATALOG } from '../fonts';
 
 function formatBytes(bytes: number): string {
@@ -75,11 +76,19 @@ function AdminUserRow({ target, isSelf, onChange }: RowProps) {
       </td>
       <td>{target.email}</td>
       <td>
-        <div className="segmented">
-          <button className={target.plan === 'free' ? 'active' : ''} disabled={busy} onClick={() => run(() => updateAdminUser(target.id, { plan: 'free' }))}>
+        <div className="segmented admin-plan-toggle">
+          <button
+            className={`plan-free${target.plan === 'free' ? ' active' : ''}`}
+            disabled={busy}
+            onClick={() => run(() => updateAdminUser(target.id, { plan: 'free' }))}
+          >
             {t('admin.planFree')}
           </button>
-          <button className={target.plan === 'vip' ? 'active' : ''} disabled={busy} onClick={() => run(() => updateAdminUser(target.id, { plan: 'vip' }))}>
+          <button
+            className={`plan-vip${target.plan === 'vip' ? ' active' : ''}`}
+            disabled={busy}
+            onClick={() => run(() => updateAdminUser(target.id, { plan: 'vip' }))}
+          >
             {t('admin.planVip')}
           </button>
         </div>
@@ -94,9 +103,7 @@ function AdminUserRow({ target, isSelf, onChange }: RowProps) {
       </td>
       <td>
         <div className="admin-status-cell">
-          <span className={target.isActive ? 'admin-status-active' : 'admin-status-disabled'}>
-            {target.isActive ? t('admin.statusActive') : t('admin.statusDisabled')}
-          </span>
+          <Badge tone={target.isActive ? 'green' : 'red'}>{target.isActive ? t('admin.statusActive') : t('admin.statusDisabled')}</Badge>
           <button
             disabled={busy || isSelf}
             onClick={() => {
