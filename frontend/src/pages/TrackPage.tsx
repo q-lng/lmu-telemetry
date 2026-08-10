@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { createServerDataSource } from '../dataSource';
 import { deleteSession, fetchSessions, fetchTrackCatalogEntry } from '../api';
 import type { SessionSummary, TrackCatalogEntry } from '../types';
 import { t } from '../i18n';
 import { SessionTable } from '../components/SessionTable';
-import { TrackMap } from '../components/TrackMap';
 import { Flag } from '../components/flags';
 
 // Tries <public>/track-photos/<slug>.jpg then .png — plain static assets,
@@ -29,10 +27,23 @@ function TrackHeroPhoto({ slug }: { slug: string }) {
   );
 }
 
-interface Gps {
-  lat: number[];
-  lon: number[];
-  t: number[];
+// Same pattern as TrackHeroPhoto, separate asset (<slug>-map.{png,jpg}) —
+// the real official track layout, not a telemetry-derived outline. Renders
+// nothing at all once both attempts fail, since it's a secondary decorative
+// element in the corner, not the hero's main content.
+function TrackHeroMap({ slug }: { slug: string }) {
+  const [attempt, setAttempt] = useState<'png' | 'jpg' | 'none'>('png');
+
+  if (attempt === 'none') return null;
+  return (
+    <img
+      key={attempt}
+      className="track-hero-map"
+      src={`/track-photos/${slug}-map.${attempt}`}
+      alt=""
+      onError={() => setAttempt((a) => (a === 'png' ? 'jpg' : 'none'))}
+    />
+  );
 }
 
 export function TrackPage() {
@@ -41,16 +52,12 @@ export function TrackPage() {
   const [entry, setEntry] = useState<TrackCatalogEntry | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
-  const [gps, setGps] = useState<Gps | null>(null);
-  const [mapLoading, setMapLoading] = useState(true);
   const [deleteState, setDeleteState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
 
   useEffect(() => {
     setNotFound(false);
     setEntry(null);
     setSessions([]);
-    setGps(null);
-    setMapLoading(true);
     fetchTrackCatalogEntry(slug)
       .then(setEntry)
       .catch(() => setNotFound(true));
@@ -60,32 +67,6 @@ export function TrackPage() {
     if (!entry) return;
     fetchSessions({ track: entry.name }).then(setSessions);
   }, [entry]);
-
-  // Reuses the first (most recent) public session's own GPS trace as a
-  // stand-in track outline — there's no separate "track map" asset, and
-  // this needs no new backend work (GET .../channel/GPS Latitude already
-  // works for any public file, unsliced). Falls back to a plain message if
-  // that particular session has no GPS channel.
-  useEffect(() => {
-    if (sessions.length === 0) {
-      setMapLoading(false);
-      return;
-    }
-    setMapLoading(true);
-    const ds = createServerDataSource(sessions[0].file);
-    Promise.all([
-      ds.fetchChannelSeries('GPS Latitude').catch(() => null),
-      ds.fetchChannelSeries('GPS Longitude').catch(() => null),
-    ])
-      .then(([latS, lonS]) => {
-        if (latS && lonS) {
-          setGps({ lat: latS.values.value as number[], lon: lonS.values.value as number[], t: latS.t });
-        } else {
-          setGps(null);
-        }
-      })
-      .finally(() => setMapLoading(false));
-  }, [sessions]);
 
   async function handleDeleteSession(file: string) {
     setDeleteState({ busy: true, error: null });
@@ -122,17 +103,8 @@ export function TrackPage() {
           <h1>
             <Flag country={entry.country} size={22} /> {entry.name}
           </h1>
+          <TrackHeroMap slug={entry.slug} />
         </div>
-      </div>
-
-      <div className="track-map-block">
-        {mapLoading && (
-          <div className="page-loading">
-            <span className="spinner" />
-          </div>
-        )}
-        {!mapLoading && gps && <TrackMap lat={gps.lat} lon={gps.lon} t={gps.t} cursorT={null} viewRange={null} height={320} />}
-        {!mapLoading && !gps && <div className="track-map-placeholder">{t('track.mapUnavailable')}</div>}
       </div>
 
       <div className="track-leaderboard-placeholder">

@@ -1178,6 +1178,8 @@ body {
   inset: 0;
   display: flex;
   align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
   padding: 20px;
   background: linear-gradient(180deg, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.75) 100%);
 }
@@ -1190,20 +1192,16 @@ body {
   color: #ffffff;
 }
 
-.track-map-block {
-  min-height: 80px;
-}
-
-.track-map-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 160px;
-  background: var(--surface-2);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-md);
-  color: var(--muted-ink);
-  font-size: calc(1rem * 12 / 16);
+/* Real official track layout (see TrackHeroMap) — sits opposite the title,
+   bottom-right of the hero. Renders nothing if the asset doesn't exist. */
+.track-hero-map {
+  flex: 0 0 auto;
+  width: 130px;
+  height: 90px;
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  padding: 6px;
 }
 
 .track-leaderboard-placeholder {

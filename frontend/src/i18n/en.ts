@@ -212,7 +212,6 @@ export const en = {
 
   'track.notFound': 'Track not found.',
   'track.photoComingSoon': 'Photo coming soon',
-  'track.mapUnavailable': 'No track map available yet.',
   'track.leaderboard': 'Leaderboard',
   'track.leaderboardComingSoon': 'Lap time leaderboards by car category — coming soon.',
   'track.sessions': 'Sessions',
