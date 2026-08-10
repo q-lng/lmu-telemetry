@@ -41,20 +41,22 @@ export function Profile() {
   const isSelf = user?.pseudo === profile.pseudo;
 
   return (
-    <div className="page-shell profile-card">
-      <div className="profile-heading">
-        <h1>
-          {profile.pseudo} <VipBadge plan={profile.plan} />
-        </h1>
-        <p>
-          {profile.prenom} {profile.nom}
-        </p>
+    <div className="page-shell">
+      <div className="profile-card">
+        <div className="profile-heading">
+          <h1>
+            {profile.pseudo} <VipBadge plan={profile.plan} />
+          </h1>
+          <p>
+            {profile.prenom} {profile.nom}
+          </p>
+        </div>
+        {isSelf ? (
+          <div className="social-empty">{t('profile.isSelf')}</div>
+        ) : (
+          <RelationActions profile={profile} onChange={() => setRefreshKey((k) => k + 1)} />
+        )}
       </div>
-      {isSelf ? (
-        <div className="social-empty">{t('profile.isSelf')}</div>
-      ) : (
-        <RelationActions profile={profile} onChange={() => setRefreshKey((k) => k + 1)} />
-      )}
     </div>
   );
 }
