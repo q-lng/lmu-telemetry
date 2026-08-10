@@ -2174,6 +2174,26 @@ body {
   box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
+.admin-pseudo-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-edit-trigger {
+  display: flex;
+  align-items: center;
+  color: var(--muted-ink);
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  flex: 0 0 auto;
+}
+
+.admin-edit-trigger:hover:not(:disabled) {
+  color: var(--primary-ink);
+  background: var(--surface-2);
+}
+
 /* Soft pill label, one shared recipe per tone — see components/Badge.tsx. */
 .badge {
   display: inline-flex;
@@ -2373,6 +2393,10 @@ body {
   overflow-x: auto;
 }
 
+.admin-users-table td {
+  vertical-align: middle;
+}
+
 .admin-storage-cell {
   display: flex;
   flex-direction: column;
@@ -2399,10 +2423,14 @@ body {
   background: var(--surface-2);
 }
 
+/* Positioned inline (position: fixed, top/right in px) from the trigger
+   button's getBoundingClientRect() — portaled to document.body so it can't
+   be clipped by .admin-table-wrap's overflow (setting overflow-x alone
+   still forces the browser to compute overflow-y as auto too, which was
+   clipping/scrolling the popover instead of letting it float above the
+   table). */
 .admin-row-menu-popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
+  position: fixed;
   display: flex;
   flex-direction: column;
   gap: 2px;

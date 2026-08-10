@@ -160,7 +160,6 @@ export const en = {
   'admin.deleteNeedsDeactivateHint': 'Deactivate the account first to enable deletion.',
   'admin.confirmDelete': (p: { pseudo: string }) => `Permanently delete ${p.pseudo}'s account? This cannot be undone.`,
   'admin.editPseudo': 'Edit pseudo',
-  'admin.you': ' (you)',
   'admin.saving': 'Saving…',
   'admin.displayTitle': 'Display',
   'admin.siteName': 'Site name',
