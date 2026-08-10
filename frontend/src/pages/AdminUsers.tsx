@@ -197,42 +197,38 @@ export function AdminUsers() {
   if (!user) return null;
 
   return (
-    <div className="social-page admin-page">
-      <div className="social-card">
-        <Link to="/admin" className="admin-back-link">
-          {t('admin.backToAdmin')}
-        </Link>
-        <div className="auth-heading">
-          <h1>{t('admin.usersTitle')}</h1>
+    <div className="admin-shell">
+      <Link to="/admin" className="admin-back-link">
+        {t('admin.backToAdmin')}
+      </Link>
+      <h1>{t('admin.usersTitle')}</h1>
+      {error && <div className="auth-error">{error}</div>}
+      {!users ? (
+        <div className="page-loading">
+          <span className="spinner" />
         </div>
-        {error && <div className="auth-error">{error}</div>}
-        {!users ? (
-          <div className="page-loading">
-            <span className="spinner" />
-          </div>
-        ) : (
-          <div className="modal-table-wrap">
-            <table className="modal-table">
-              <thead>
-                <tr>
-                  <th>{t('admin.colPseudo')}</th>
-                  <th>{t('admin.colEmail')}</th>
-                  <th>{t('admin.colPlan')}</th>
-                  <th>{t('admin.colAdmin')}</th>
-                  <th>{t('admin.colStatus')}</th>
-                  <th>{t('admin.colStorage')}</th>
-                  <th>{t('admin.colActions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((u) => (
-                  <AdminUserRow key={u.id} target={u} isSelf={u.id === user.id} onChange={refresh} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      ) : (
+        <div className="admin-table-wrap">
+          <table className="modal-table">
+            <thead>
+              <tr>
+                <th>{t('admin.colPseudo')}</th>
+                <th>{t('admin.colEmail')}</th>
+                <th>{t('admin.colPlan')}</th>
+                <th>{t('admin.colAdmin')}</th>
+                <th>{t('admin.colStatus')}</th>
+                <th>{t('admin.colStorage')}</th>
+                <th>{t('admin.colActions')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u) => (
+                <AdminUserRow key={u.id} target={u} isSelf={u.id === user.id} onChange={refresh} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

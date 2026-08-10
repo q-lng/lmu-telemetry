@@ -62,13 +62,12 @@ export function AdminDisplay() {
   }
 
   return (
-    <div className="social-page admin-page">
-      <div className="social-card">
-        <Link to="/admin" className="admin-back-link">
-          {t('admin.backToAdmin')}
-        </Link>
-        <div className="admin-display-section">
-          <h2 className="social-subheading">{t('admin.displayTitle')}</h2>
+    <div className="admin-shell">
+      <Link to="/admin" className="admin-back-link">
+        {t('admin.backToAdmin')}
+      </Link>
+      <div className="admin-display-section">
+        <h2 className="social-subheading">{t('admin.displayTitle')}</h2>
 
           {!draft ? (
             <div className="page-loading">
@@ -206,10 +205,9 @@ export function AdminDisplay() {
                 </button>
                 {saved && <span className="field-hint">{t('admin.saved')}</span>}
               </div>
-              {error && <div className="auth-error">{error}</div>}
-            </>
-          )}
-        </div>
+            {error && <div className="auth-error">{error}</div>}
+          </>
+        )}
       </div>
     </div>
   );

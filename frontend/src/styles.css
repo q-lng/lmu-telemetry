@@ -2279,19 +2279,19 @@ body {
   box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
-.admin-page {
+/* Full-width "console" shell for /admin/* — deliberately not the
+   .social-page + .social-card combo used elsewhere (a floating rounded card
+   centered in an otherwise empty page): Quentin found that too much like a
+   marketing/content page for what should read as an admin tool. Anchored to
+   the top-left, no card chrome; individual sections (tiles, table, form)
+   supply their own structure instead of one enclosing box. */
+.admin-shell {
+  flex: 1;
+  width: 100%;
+  padding: 32px 40px;
+  display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 20px;
-}
-
-/* .social-card's own align-self:flex-start means something different once
-   the flex axes rotate (column vs row) — in row mode it just stops the card
-   from stretching to the container's full height; in this column layout the
-   cross axis is horizontal, so unset it would pin the card to the left
-   instead of letting .admin-page's align-items:center center it. */
-.admin-page .social-card {
-  align-self: center;
+  gap: 24px;
 }
 
 .admin-back-link {
@@ -2313,6 +2313,7 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
+  max-width: 900px;
 }
 
 .admin-tile {
@@ -2347,6 +2348,14 @@ body {
   color: var(--secondary-ink);
   font-size: calc(1rem * 12 / 16);
   line-height: 1.4;
+}
+
+/* Unlike .modal-table-wrap (bounded height for a modal's own internal
+   scroll), this is a full page — only horizontal overflow needs containing
+   (the table's min-width can exceed a narrow viewport), the page itself
+   scrolls normally via .layout-outlet. */
+.admin-table-wrap {
+  overflow-x: auto;
 }
 
 .admin-storage-cell {
@@ -2491,7 +2500,7 @@ input[type='range']::-moz-range-track {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 0 20px 20px;
+  max-width: 640px;
 }
 
 .admin-color-row {
