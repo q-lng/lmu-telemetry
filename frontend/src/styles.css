@@ -2282,16 +2282,15 @@ body {
 /* Full-width "console" shell — replaces .social-page + .social-card (a
    floating rounded card centered in an otherwise empty page) everywhere
    except the telemetry viewer app (.app), which keeps its own layout for
-   now. No card chrome — anchored top-left, a lighter background than the
-   page plane so it doesn't read as too dark without the card surface that
-   used to provide that contrast; individual sections (tiles, table, form,
-   list) supply their own structure instead of one enclosing box. Capped
-   width so content doesn't stretch absurdly on a wide monitor, but not
-   centered — stays flush left, unlike the old floating card. */
+   now. No card chrome — fills the layout-outlet edge to edge (that's the
+   point of dropping the floating card), lighter background than the page
+   plane so it doesn't read as too dark without the card surface that used
+   to provide that contrast. Individual sections (tiles, table, form, list)
+   cap their own width when they want a narrower column (see
+   .narrow-form-section, .profile-card) instead of the shell doing it. */
 .page-shell {
   flex: 1;
   width: 100%;
-  max-width: 1200px;
   background: var(--surface-1);
   padding: 32px 40px;
   display: flex;
@@ -2305,7 +2304,6 @@ body {
 .page-shell-centered {
   justify-content: center;
   align-items: center;
-  margin: 0 auto;
 }
 
 .admin-back-link {
