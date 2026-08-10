@@ -3,6 +3,7 @@ import { fetchStorageUsage } from '../api';
 import type { StorageUsage } from '../types';
 import { useAuth } from '../AuthContext';
 import { t } from '../i18n';
+import { StorageBar } from '../components/StorageBar';
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -24,35 +25,28 @@ export function Subscription() {
   if (!user) return null;
 
   return (
-    <div className="social-page">
-      <div className="social-card">
-        <div className="auth-heading">
-          <h1>{t('subscription.title')}</h1>
-        </div>
-
-        <div className="info-panel">
-          <div>
-            <strong>{t('subscription.currentPlan')}</strong>{' '}
-            {user.plan === 'vip' ? t('subscription.planVip') : t('subscription.planFree')}
-          </div>
-        </div>
-
-        {storage && (
-          <div className="subscription-storage">
-            <span>
-              {t('tv.storageUsed', { used: formatBytes(storage.usedBytes), quota: formatBytes(storage.quotaBytes) })}
-            </span>
-            <div className="modal-storage-bar">
-              <div
-                className={`modal-storage-bar-fill${storage.usedBytes >= storage.quotaBytes ? ' modal-storage-bar-full' : ''}`}
-                style={{ width: `${Math.min(100, (storage.usedBytes / storage.quotaBytes) * 100)}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {user.plan === 'free' && <p className="field-hint">{t('subscription.upgradeHint')}</p>}
+    <div className="page-shell">
+      <div className="auth-heading">
+        <h1>{t('subscription.title')}</h1>
       </div>
+
+      <div className="info-panel">
+        <div>
+          <strong>{t('subscription.currentPlan')}</strong>{' '}
+          {user.plan === 'vip' ? t('subscription.planVip') : t('subscription.planFree')}
+        </div>
+      </div>
+
+      {storage && (
+        <div className="subscription-storage">
+          <span>
+            {t('tv.storageUsed', { used: formatBytes(storage.usedBytes), quota: formatBytes(storage.quotaBytes) })}
+          </span>
+          <StorageBar usedBytes={storage.usedBytes} quotaBytes={storage.quotaBytes} />
+        </div>
+      )}
+
+      {user.plan === 'free' && <p className="field-hint">{t('subscription.upgradeHint')}</p>}
     </div>
   );
 }

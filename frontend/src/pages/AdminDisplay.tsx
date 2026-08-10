@@ -62,11 +62,11 @@ export function AdminDisplay() {
   }
 
   return (
-    <div className="admin-shell">
+    <div className="page-shell">
       <Link to="/admin" className="admin-back-link">
         {t('admin.backToAdmin')}
       </Link>
-      <div className="admin-display-section">
+      <div className="narrow-form-section">
         <h2 className="social-subheading">{t('admin.displayTitle')}</h2>
 
           {!draft ? (

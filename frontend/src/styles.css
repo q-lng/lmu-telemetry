@@ -2279,19 +2279,33 @@ body {
   box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
-/* Full-width "console" shell for /admin/* — deliberately not the
-   .social-page + .social-card combo used elsewhere (a floating rounded card
-   centered in an otherwise empty page): Quentin found that too much like a
-   marketing/content page for what should read as an admin tool. Anchored to
-   the top-left, no card chrome; individual sections (tiles, table, form)
-   supply their own structure instead of one enclosing box. */
-.admin-shell {
+/* Full-width "console" shell — replaces .social-page + .social-card (a
+   floating rounded card centered in an otherwise empty page) everywhere
+   except the telemetry viewer app (.app), which keeps its own layout for
+   now. No card chrome — anchored top-left, a lighter background than the
+   page plane so it doesn't read as too dark without the card surface that
+   used to provide that contrast; individual sections (tiles, table, form,
+   list) supply their own structure instead of one enclosing box. Capped
+   width so content doesn't stretch absurdly on a wide monitor, but not
+   centered — stays flush left, unlike the old floating card. */
+.page-shell {
   flex: 1;
   width: 100%;
+  max-width: 1200px;
+  background: var(--surface-1);
   padding: 32px 40px;
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+
+/* For sparse hub-style pages (currently just /admin) where top-anchoring
+   the handful of tiles would look stranded — centers content as a block
+   instead, both axes. */
+.page-shell-centered {
+  justify-content: center;
+  align-items: center;
+  margin: 0 auto;
 }
 
 .admin-back-link {
@@ -2311,9 +2325,14 @@ body {
    admin dashboard was the reference). */
 .admin-tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(3, minmax(200px, 240px));
   gap: 16px;
-  max-width: 900px;
+}
+
+@media (max-width: 720px) {
+  .admin-tiles {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
 }
 
 .admin-tile {
@@ -2496,7 +2515,7 @@ input[type='range']::-moz-range-track {
   font-size: calc(1rem * 16 / 16);
 }
 
-.admin-display-section {
+.narrow-form-section {
   display: flex;
   flex-direction: column;
   gap: 14px;

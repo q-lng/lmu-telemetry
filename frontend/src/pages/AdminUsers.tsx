@@ -197,7 +197,7 @@ export function AdminUsers() {
   if (!user) return null;
 
   return (
-    <div className="admin-shell">
+    <div className="page-shell">
       <Link to="/admin" className="admin-back-link">
         {t('admin.backToAdmin')}
       </Link>

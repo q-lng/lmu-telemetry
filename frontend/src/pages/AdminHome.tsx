@@ -8,7 +8,7 @@ import { UsersIcon, GearIcon } from '../components/icons';
  * together. Add a new tile here as admin sections grow. */
 export function AdminHome() {
   return (
-    <div className="admin-shell">
+    <div className="page-shell page-shell-centered">
       <h1>{t('admin.title')}</h1>
       <div className="admin-tiles">
         <Link to="/admin/users" className="admin-tile">

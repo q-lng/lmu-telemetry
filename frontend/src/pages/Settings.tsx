@@ -24,44 +24,42 @@ export function Settings() {
   }
 
   return (
-    <div className="social-page">
-      <div className="social-card">
-        <div className="auth-heading">
-          <h1>{t('settings.title')}</h1>
+    <div className="page-shell narrow-form-section">
+      <div className="auth-heading">
+        <h1>{t('settings.title')}</h1>
+      </div>
+      <div className="info-panel">
+        <div>
+          <strong>{t('settings.pseudo')}</strong> {user.pseudo}
         </div>
-        <div className="info-panel">
-          <div>
-            <strong>{t('settings.pseudo')}</strong> {user.pseudo}
-          </div>
-          <div>
-            <strong>{t('settings.email')}</strong> {user.email}
-          </div>
-          <div>
-            <strong>{t('settings.name')}</strong> {user.prenom} {user.nom}
-          </div>
+        <div>
+          <strong>{t('settings.email')}</strong> {user.email}
         </div>
-        <p className="field-hint">{t('settings.comingSoon')}</p>
+        <div>
+          <strong>{t('settings.name')}</strong> {user.prenom} {user.nom}
+        </div>
+      </div>
+      <p className="field-hint">{t('settings.comingSoon')}</p>
 
-        <div className="field">
-          <strong>{t('settings.profileVisibility')}</strong>
-          <div className="segmented">
-            <button
-              className={user.profileVisibility === 'public' ? 'active' : ''}
-              disabled={saving}
-              onClick={() => setVisibility('public')}
-            >
-              {t('settings.profileVisibilityPublic')}
-            </button>
-            <button
-              className={user.profileVisibility === 'private' ? 'active' : ''}
-              disabled={saving}
-              onClick={() => setVisibility('private')}
-            >
-              {t('settings.profileVisibilityPrivate')}
-            </button>
-          </div>
-          <p className="field-hint">{saving ? t('settings.profileVisibilitySaving') : t('settings.profileVisibilityHint')}</p>
+      <div className="field">
+        <strong>{t('settings.profileVisibility')}</strong>
+        <div className="segmented">
+          <button
+            className={user.profileVisibility === 'public' ? 'active' : ''}
+            disabled={saving}
+            onClick={() => setVisibility('public')}
+          >
+            {t('settings.profileVisibilityPublic')}
+          </button>
+          <button
+            className={user.profileVisibility === 'private' ? 'active' : ''}
+            disabled={saving}
+            onClick={() => setVisibility('private')}
+          >
+            {t('settings.profileVisibilityPrivate')}
+          </button>
         </div>
+        <p className="field-hint">{saving ? t('settings.profileVisibilitySaving') : t('settings.profileVisibilityHint')}</p>
       </div>
     </div>
   );
