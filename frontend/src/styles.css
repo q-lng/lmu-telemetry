@@ -218,12 +218,11 @@ body {
   align-items: center;
   height: 52px;
   /* One shade up from the page canvas (.app-shell/.page-shell, both
-     --surface-1) so the pills read as distinct floating surfaces from
-     shadow + a real tone shift, not just a border. */
+     --surface-1) so the pills read as distinct surfaces from the tone
+     shift + border alone — no drop shadow, keep it flat and plain. */
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 999px;
-  box-shadow: 0 12px 30px -12px rgba(0, 0, 0, 0.7);
 }
 
 .navbar {
