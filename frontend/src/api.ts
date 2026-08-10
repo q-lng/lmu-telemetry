@@ -12,6 +12,7 @@ import type {
   ProfileSummary,
   ProfileVisibility,
   PublicUser,
+  SearchResults,
   SessionMetadata,
   SessionSummary,
   SharedLapResult,
@@ -171,6 +172,10 @@ export function fetchChannelSeries(
 
 export function searchUsers(q: string): Promise<ProfileSummary[]> {
   return getJson<{ users: ProfileSummary[] }>(`/api/users/search?q=${encodeURIComponent(q)}`).then((r) => r.users);
+}
+
+export function searchAll(q: string): Promise<SearchResults> {
+  return getJson<SearchResults>(`/api/search?q=${encodeURIComponent(q)}`);
 }
 
 export function fetchProfile(pseudo: string): Promise<ProfileSummary> {

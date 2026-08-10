@@ -42,14 +42,7 @@ export default function App() {
             </RequireAuth>
           }
         />
-        <Route
-          path="u/:pseudo"
-          element={
-            <RequireAuth>
-              <Profile />
-            </RequireAuth>
-          }
-        />
+        <Route path="u/:pseudo" element={<Profile />} />
         <Route
           path="my-sessions"
           element={

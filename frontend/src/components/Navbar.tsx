@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { useSiteSettings } from '../SiteSettingsContext';
-import { fetchFriendRequests } from '../api';
+import { fetchFriendRequests, searchAll } from '../api';
+import type { SearchResults } from '../types';
 import { t } from '../i18n';
 import { AccentPicker } from './AccentPicker';
 import { AccountMenu } from './AccountMenu';
 import { NotificationsBell } from './NotificationsBell';
+import { CloseIcon, SearchIcon } from './icons';
+import { VipBadge } from './VipBadge';
 
 // Client-side navigation (Link/useLocation) — the app used to force a real
 // full-page load on every navigation; that's what caused the white flash and
@@ -16,12 +19,78 @@ export function Navbar() {
   const { user, loading } = useAuth();
   const { settings: siteSettings } = useSiteSettings();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
   const siteName = siteSettings?.siteName ?? t('brand');
+
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<SearchResults | null>(null);
+  const [searching, setSearching] = useState(false);
+  const navRef = useRef<HTMLElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     document.title = siteName;
   }, [siteName]);
+
+  useEffect(() => {
+    if (searchOpen) inputRef.current?.focus();
+  }, [searchOpen]);
+
+  // Debounced — fires 250ms after typing stops, not on every keystroke.
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setResults(null);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    const timer = setTimeout(() => {
+      searchAll(trimmed)
+        .then(setResults)
+        .finally(() => setSearching(false));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    function onDocClick(e: MouseEvent) {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) closeSearch();
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') closeSearch();
+    }
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [searchOpen]);
+
+  function closeSearch() {
+    setSearchOpen(false);
+    setQuery('');
+    setResults(null);
+  }
+
+  function goToUser(pseudo: string) {
+    closeSearch();
+    navigate(`/u/${encodeURIComponent(pseudo)}`);
+  }
+
+  function goToTrack(name: string) {
+    closeSearch();
+    navigate(`/browse?track=${encodeURIComponent(name)}`);
+  }
+
+  function goToCar(name: string) {
+    closeSearch();
+    navigate(`/browse?car=${encodeURIComponent(name)}`);
+  }
 
   // Re-checked on every navigation (not just once) — cheaply keeps the badge
   // in sync with accepting/declining requests on /friends, without a whole
@@ -45,32 +114,90 @@ export function Navbar() {
 
   return (
     <div className="navbar-row">
-      <nav className="navbar">
+      <nav className={`navbar${searchOpen ? ' navbar-search-active' : ''}`} ref={navRef}>
         <Link to="/" className="navbar-brand">
           {siteName}
         </Link>
-        <div className="navbar-links">
-          <Link to="/" aria-current={pathname === '/' ? 'page' : undefined}>
-            {t('nav.home')}
-          </Link>
-          <Link to="/telemetry" aria-current={pathname === '/telemetry' ? 'page' : undefined}>
-            {t('nav.app')}
-          </Link>
-          <Link to="/browse" aria-current={pathname === '/browse' ? 'page' : undefined}>
-            {t('nav.browse')}
-          </Link>
-          {user && (
-            <>
-              <Link to="/friends" className="navbar-link-with-badge" aria-current={pathname === '/friends' ? 'page' : undefined}>
-                {t('nav.friends')}
-                {hasPendingRequest && <span className="navbar-badge" title={t('nav.pendingRequestBadge')} />}
+        {searchOpen ? (
+          <div className="navbar-search">
+            <SearchIcon size={14} />
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t('nav.searchPlaceholder')}
+            />
+            <button className="navbar-search-close" onClick={closeSearch} title={t('nav.searchClose')}>
+              <CloseIcon size={12} />
+            </button>
+            {query.trim() && (
+              <div className="navbar-search-results">
+                {searching && !results && <div className="navbar-search-empty">{t('common.searching')}</div>}
+                {results && results.users.length === 0 && results.tracks.length === 0 && results.cars.length === 0 && (
+                  <div className="navbar-search-empty">{t('nav.searchNoResults')}</div>
+                )}
+                {results && results.users.length > 0 && (
+                  <div className="navbar-search-group">
+                    <div className="navbar-search-group-label">{t('nav.searchUsers')}</div>
+                    {results.users.map((u) => (
+                      <button key={u.id} className="navbar-search-result" onClick={() => goToUser(u.pseudo)}>
+                        {u.pseudo} <VipBadge plan={u.plan} />
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {results && results.tracks.length > 0 && (
+                  <div className="navbar-search-group">
+                    <div className="navbar-search-group-label">{t('nav.searchTracks')}</div>
+                    {results.tracks.map((name) => (
+                      <button key={name} className="navbar-search-result" onClick={() => goToTrack(name)}>
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {results && results.cars.length > 0 && (
+                  <div className="navbar-search-group">
+                    <div className="navbar-search-group-label">{t('nav.searchCars')}</div>
+                    {results.cars.map((name) => (
+                      <button key={name} className="navbar-search-result" onClick={() => goToCar(name)}>
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="navbar-links">
+              <Link to="/" aria-current={pathname === '/' ? 'page' : undefined}>
+                {t('nav.home')}
               </Link>
-              <Link to="/my-sessions" aria-current={pathname === '/my-sessions' ? 'page' : undefined}>
-                {t('nav.mySessions')}
+              <Link to="/telemetry" aria-current={pathname === '/telemetry' ? 'page' : undefined}>
+                {t('nav.app')}
               </Link>
-            </>
-          )}
-        </div>
+              <Link to="/browse" aria-current={pathname === '/browse' ? 'page' : undefined}>
+                {t('nav.browse')}
+              </Link>
+              {user && (
+                <>
+                  <Link to="/friends" className="navbar-link-with-badge" aria-current={pathname === '/friends' ? 'page' : undefined}>
+                    {t('nav.friends')}
+                    {hasPendingRequest && <span className="navbar-badge" title={t('nav.pendingRequestBadge')} />}
+                  </Link>
+                  <Link to="/my-sessions" aria-current={pathname === '/my-sessions' ? 'page' : undefined}>
+                    {t('nav.mySessions')}
+                  </Link>
+                </>
+              )}
+            </div>
+            <button className="navbar-search-trigger" onClick={() => setSearchOpen(true)} title={t('nav.search')}>
+              <SearchIcon size={16} />
+            </button>
+          </>
+        )}
       </nav>
       <div className="navbar-side">
         <AccentPicker />

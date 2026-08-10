@@ -229,6 +229,122 @@ body {
   grid-column: 2;
   gap: 20px;
   padding: 0 20px;
+  min-width: 0;
+  transition: min-width 0.2s ease;
+}
+
+/* Clicking the search icon morphs the pill wider to make room for the
+   input, instead of opening a separate dropdown panel — the "expands into
+   a search bar" animation from the original navbar-search idea. */
+.navbar-search-active {
+  min-width: 420px;
+}
+
+.navbar-search-trigger {
+  display: flex;
+  align-items: center;
+  color: var(--secondary-ink);
+  padding: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.navbar-search-trigger:hover {
+  color: var(--primary-ink);
+  background: var(--surface-1);
+}
+
+.navbar-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  color: var(--secondary-ink);
+}
+
+.navbar-search input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  color: var(--primary-ink);
+  font-size: calc(1rem * 13 / 16);
+  padding: 4px 0;
+}
+
+.navbar-search input:focus {
+  outline: none;
+}
+
+.navbar-search-close {
+  display: flex;
+  align-items: center;
+  color: var(--muted-ink);
+  padding: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.navbar-search-close:hover {
+  color: var(--primary-ink);
+  background: var(--surface-1);
+}
+
+/* Dropdown one shade DOWN from the pill (surface-1, same as the page
+   canvas) rather than up — border only, no shadow, matching the rest of
+   this pass's flat-UI direction. */
+.navbar-search-results {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  z-index: 50;
+}
+
+.navbar-search-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.navbar-search-group-label {
+  color: var(--muted-ink);
+  font-size: calc(1rem * 11 / 16);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 8px;
+}
+
+.navbar-search-result {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  padding: 7px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--primary-ink);
+  font-size: calc(1rem * 13 / 16);
+}
+
+.navbar-search-result:hover {
+  background: var(--surface-2);
+}
+
+.navbar-search-empty {
+  color: var(--muted-ink);
+  font-size: calc(1rem * 12 / 16);
+  padding: 8px;
+  text-align: center;
 }
 
 .navbar-side {
@@ -999,6 +1115,20 @@ body {
   display: flex;
   gap: 8px;
   margin-bottom: 6px;
+}
+
+/* Placeholder shown when Browse is filtered to one track/car (typed
+   manually or arriving from the navbar search) — real session count now,
+   lap-time stats are a later, separate task (no cached lap-time data
+   exists yet, see access.ts). */
+.browse-stats-placeholder {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
 }
 
 .social-search-form input {
