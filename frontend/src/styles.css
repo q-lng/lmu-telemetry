@@ -2,6 +2,11 @@
   box-sizing: border-box;
 }
 
+/* Reusable "flat but not boring" background — see --gradient-surface. */
+.gradient-surface {
+  background: var(--gradient-surface);
+}
+
 :root {
   /* Cool blue/violet-tinted dark base (was neutral warm grey) — neon accents
      pop harder against this than against a neutral background. */
@@ -14,6 +19,9 @@
   --gridline: #262638;
   --axis: #3a3a54;
   --border: rgba(255, 255, 255, 0.1);
+  /* Liked a lot on the track-hero fallback — reuse via .gradient-surface
+     wherever a plain surface color reads as too flat. */
+  --gradient-surface: linear-gradient(135deg, var(--surface-2), var(--surface-1));
   /* Neon accent — user-customizable via the picker in the navbar (see
      theme.ts's applyAccentColor). Deliberately confined to buttons — panels/
      surfaces stay on the neutral --border above. */
@@ -1160,7 +1168,7 @@ body {
   align-items: flex-end;
   justify-content: flex-end;
   padding: 12px;
-  background: linear-gradient(135deg, var(--surface-2), var(--surface-1));
+  background: var(--gradient-surface);
   color: var(--muted-ink);
   font-size: calc(1rem * 12 / 16);
 }
