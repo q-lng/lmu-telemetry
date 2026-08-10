@@ -44,45 +44,48 @@ export function Navbar() {
   }, [user, pathname]);
 
   return (
-    <nav className="navbar">
-      <Link to="/" className="navbar-brand">
-        {siteName}
-      </Link>
-      <div className="navbar-links">
-        <Link to="/" aria-current={pathname === '/' ? 'page' : undefined}>
-          {t('nav.home')}
+    <div className="navbar-row">
+      <nav className="navbar">
+        <Link to="/" className="navbar-brand">
+          {siteName}
         </Link>
-        <Link to="/telemetry" aria-current={pathname === '/telemetry' ? 'page' : undefined}>
-          {t('nav.app')}
-        </Link>
-        <Link to="/browse" aria-current={pathname === '/browse' ? 'page' : undefined}>
-          {t('nav.browse')}
-        </Link>
-        {user && (
-          <>
-            <Link to="/friends" className="navbar-link-with-badge" aria-current={pathname === '/friends' ? 'page' : undefined}>
-              {t('nav.friends')}
-              {hasPendingRequest && <span className="navbar-badge" title={t('nav.pendingRequestBadge')} />}
-            </Link>
-            <Link to="/my-sessions" aria-current={pathname === '/my-sessions' ? 'page' : undefined}>
-              {t('nav.mySessions')}
-            </Link>
-          </>
-        )}
-      </div>
-      <div className="navbar-spacer" />
-      <AccentPicker />
-      {!loading &&
-        (user ? (
-          <>
-            <NotificationsBell />
-            <AccountMenu />
-          </>
-        ) : (
-          <Link to="/login" className="navbar-login" aria-current={pathname === '/login' ? 'page' : undefined}>
-            {t('nav.login')}
+        <div className="navbar-links">
+          <Link to="/" aria-current={pathname === '/' ? 'page' : undefined}>
+            {t('nav.home')}
           </Link>
-        ))}
-    </nav>
+          <Link to="/telemetry" aria-current={pathname === '/telemetry' ? 'page' : undefined}>
+            {t('nav.app')}
+          </Link>
+          <Link to="/browse" aria-current={pathname === '/browse' ? 'page' : undefined}>
+            {t('nav.browse')}
+          </Link>
+          {user && (
+            <>
+              <Link to="/friends" className="navbar-link-with-badge" aria-current={pathname === '/friends' ? 'page' : undefined}>
+                {t('nav.friends')}
+                {hasPendingRequest && <span className="navbar-badge" title={t('nav.pendingRequestBadge')} />}
+              </Link>
+              <Link to="/my-sessions" aria-current={pathname === '/my-sessions' ? 'page' : undefined}>
+                {t('nav.mySessions')}
+              </Link>
+            </>
+          )}
+        </div>
+      </nav>
+      <div className="navbar-side">
+        <AccentPicker />
+        {!loading &&
+          (user ? (
+            <>
+              <NotificationsBell />
+              <AccountMenu />
+            </>
+          ) : (
+            <Link to="/login" className="navbar-login" aria-current={pathname === '/login' ? 'page' : undefined}>
+              {t('nav.login')}
+            </Link>
+          ))}
+      </div>
+    </div>
   );
 }

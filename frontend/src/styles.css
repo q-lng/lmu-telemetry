@@ -190,29 +190,53 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: var(--page-plane);
+  /* Matches .page-shell's own background — the point of the floating pills
+     below is that they're the only things breaking from this flat canvas,
+     not that the canvas itself reads as a separate darker "backdrop". */
+  background: var(--surface-1);
 }
 
-/* Floating pill navbar (siteinspire.com/website/13457-daylight reference) —
-   inset from the edges instead of flush, rounded fully, with a real drop
-   shadow instead of a hairline border, so the page-plane background shows
-   around it and it reads as floating rather than docked. Daylight's own bar
-   is a tight 4-links-and-a-CTA pill; ours carries more nav items plus the
-   accent picker/bell/account controls, so it stays wide rather than
-   shrinking to Daylight's narrow centered width — watch for this needing a
-   collapse-to-menu treatment on narrow viewports. */
-.navbar {
+/* Floating pill navbar (siteinspire.com/website/13457-daylight reference),
+   split into two independent pills instead of one bar spanning the full
+   width: .navbar (brand + links) sits centered, .navbar-side (accent
+   picker/bell/account, or the login CTA) sits at the right. The 1fr/auto/1fr
+   grid keeps the center pill genuinely centered regardless of how wide the
+   side pill is — minmax(0, 1fr) on the outer tracks stops the side pill's
+   content from unbalancing the split. */
+.navbar-row {
   flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.navbar,
+.navbar-side {
   display: flex;
   align-items: center;
-  gap: 20px;
   height: 52px;
-  margin: 16px 20px 0;
-  padding: 0 20px;
-  background: var(--surface-1);
+  /* One shade up from the page canvas (.app-shell/.page-shell, both
+     --surface-1) so the pills read as distinct floating surfaces from
+     shadow + a real tone shift, not just a border. */
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 999px;
   box-shadow: 0 12px 30px -12px rgba(0, 0, 0, 0.7);
+}
+
+.navbar {
+  grid-column: 2;
+  gap: 20px;
+  padding: 0 20px;
+}
+
+.navbar-side {
+  grid-column: 3;
+  justify-self: end;
+  gap: 14px;
+  padding: 0 16px;
 }
 
 .navbar-brand {
@@ -287,10 +311,6 @@ body {
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 6px var(--accent-glow);
-}
-
-.navbar-spacer {
-  flex: 1;
 }
 
 .accent-picker-wrap {
