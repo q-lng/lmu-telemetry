@@ -134,6 +134,7 @@ export interface SearchResults {
 export interface TrackCatalogEntry {
   slug: string;
   name: string;
+  country: string;
 }
 
 export interface FriendRequestSummary {

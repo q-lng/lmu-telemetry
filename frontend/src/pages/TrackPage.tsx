@@ -6,6 +6,28 @@ import type { SessionSummary, TrackCatalogEntry } from '../types';
 import { t } from '../i18n';
 import { SessionTable } from '../components/SessionTable';
 import { TrackMap } from '../components/TrackMap';
+import { Flag } from '../components/flags';
+
+// Tries <public>/track-photos/<slug>.jpg then .png — plain static assets,
+// not backend-served, since these are site content (not user uploads) and
+// don't need any DB row to say whether one exists. Falls back to a plain
+// gradient with a small hint once both attempts 404.
+function TrackHeroPhoto({ slug }: { slug: string }) {
+  const [attempt, setAttempt] = useState<'jpg' | 'png' | 'none'>('jpg');
+
+  if (attempt === 'none') {
+    return <div className="track-hero-fallback">{t('track.photoComingSoon')}</div>;
+  }
+  return (
+    <img
+      key={attempt}
+      className="track-hero-photo"
+      src={`/track-photos/${slug}.${attempt}`}
+      alt=""
+      onError={() => setAttempt((a) => (a === 'jpg' ? 'png' : 'none'))}
+    />
+  );
+}
 
 interface Gps {
   lat: number[];
@@ -94,10 +116,12 @@ export function TrackPage() {
 
   return (
     <div className="page-shell">
-      <div className="track-header">
-        <div className="track-photo-placeholder">{t('track.photoComingSoon')}</div>
-        <div className="track-heading">
-          <h1>{entry.name}</h1>
+      <div className="track-hero">
+        <TrackHeroPhoto slug={entry.slug} />
+        <div className="track-hero-overlay">
+          <h1>
+            <Flag country={entry.country} size={22} /> {entry.name}
+          </h1>
         </div>
       </div>
 

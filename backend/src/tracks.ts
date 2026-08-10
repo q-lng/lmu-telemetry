@@ -3,6 +3,8 @@ import type { FastifyInstance } from 'fastify';
 export interface TrackCatalogEntry {
   slug: string;
   name: string;
+  /** ISO 3166-1 alpha-2 — drives the flag shown next to the track name. */
+  country: string;
 }
 
 /** Hand-maintained slug -> exact track name (as it appears in telemetry_files.track
@@ -11,9 +13,9 @@ export interface TrackCatalogEntry {
  * "Circuit de Spa-Francorchamps" for filtering sessions — add an entry here
  * whenever a new track should get its own page. */
 export const TRACK_CATALOG: TrackCatalogEntry[] = [
-  { slug: 'spa', name: 'Circuit de Spa-Francorchamps' },
-  { slug: 'lagunaseca', name: 'WeatherTech Raceway Laguna Seca' },
-  { slug: 'sebring', name: 'Sebring International Raceway' },
+  { slug: 'spa', name: 'Circuit de Spa-Francorchamps', country: 'BE' },
+  { slug: 'lagunaseca', name: 'WeatherTech Raceway Laguna Seca', country: 'US' },
+  { slug: 'sebring', name: 'Sebring International Raceway', country: 'US' },
 ];
 
 export function findTrackBySlug(slug: string): TrackCatalogEntry | undefined {

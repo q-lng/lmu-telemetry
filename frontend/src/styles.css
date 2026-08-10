@@ -1131,32 +1131,55 @@ body {
   border-radius: var(--radius-md);
 }
 
-/* Track detail page (/tracks/:slug) — photo/map/leaderboard are all
-   placeholders for now except the map, which reuses a real public
-   session's own GPS trace when one's available. */
-.track-header {
-  display: flex;
-  align-items: center;
-  gap: 20px;
+/* Track detail page (/tracks/:slug) — leaderboard is a placeholder (no
+   cached lap-time data or car-category taxonomy exists yet); the map
+   reuses a real public session's own GPS trace when one's available; the
+   hero photo is a real per-track static asset when one exists at
+   public/track-photos/<slug>.{jpg,png} (see TrackHeroPhoto), a plain
+   gradient otherwise. */
+.track-hero {
+  position: relative;
+  height: 220px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface-2);
 }
 
-.track-photo-placeholder {
-  flex: 0 0 auto;
-  width: 160px;
-  height: 100px;
+.track-hero-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.track-hero-fallback {
+  position: absolute;
+  inset: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  background: var(--surface-2);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-md);
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 12px;
+  background: linear-gradient(135deg, var(--surface-2), var(--surface-1));
   color: var(--muted-ink);
   font-size: calc(1rem * 12 / 16);
 }
 
-.track-heading h1 {
+.track-hero-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  padding: 20px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.75) 100%);
+}
+
+.track-hero-overlay h1 {
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ffffff;
 }
 
 .track-map-block {
