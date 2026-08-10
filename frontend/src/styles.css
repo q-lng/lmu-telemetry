@@ -1429,6 +1429,55 @@ body {
   cursor: default;
 }
 
+/* Same recipe as a reusable class, for checkboxes outside .lap-select-table
+   (admin row menu, display settings) — kept as a separate class rather than
+   generalizing the rule above to every checkbox in the app, since the
+   Channels-shown checkboxes are intentionally being redesigned separately
+   (see GitHub issue #4) and shouldn't pick this up yet. */
+.checkbox-custom {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-2);
+  cursor: pointer;
+  position: relative;
+  vertical-align: middle;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.checkbox-custom:hover:not(:disabled) {
+  border-color: var(--muted-ink);
+}
+
+.checkbox-custom:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.checkbox-custom:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.checkbox-custom:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .compare-external-source {
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -2125,13 +2174,6 @@ body {
   box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
-.admin-status-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: flex-start;
-}
-
 /* Soft pill label, one shared recipe per tone — see components/Badge.tsx. */
 .badge {
   display: inline-flex;
@@ -2179,48 +2221,15 @@ body {
   box-shadow: none;
 }
 
-.admin-actions-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: flex-start;
-}
-
-.admin-status-cell button,
-.admin-actions-cell button {
-  background: var(--surface-2);
-  color: var(--secondary-ink);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 4px 8px;
-  font-size: calc(1rem * 12 / 16);
-  cursor: pointer;
-  white-space: nowrap;
-  transition:
-    color 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.admin-status-cell button:hover:not(:disabled),
-.admin-actions-cell button:hover:not(:disabled) {
-  color: var(--primary-ink);
-  border-color: var(--muted-ink);
-}
-
-.admin-status-cell button:disabled,
-.admin-actions-cell button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
+/* Same red-on-hover treatment as .account-menu-logout — a destructive action
+   inside an otherwise-neutral dropdown menu. */
 .admin-delete-btn {
   color: var(--danger);
-  border-color: rgba(230, 103, 103, 0.4);
 }
 
 .admin-delete-btn:hover:not(:disabled) {
   color: var(--danger);
-  border-color: var(--danger);
+  background: var(--surface-2);
 }
 
 .color-picker-wrap {
@@ -2283,6 +2292,133 @@ body {
    instead of letting .admin-page's align-items:center center it. */
 .admin-page .social-card {
   align-self: center;
+}
+
+.admin-back-link {
+  display: inline-block;
+  margin-bottom: 14px;
+  color: var(--secondary-ink);
+  font-size: calc(1rem * 12 / 16);
+  text-decoration: none;
+}
+
+.admin-back-link:hover {
+  color: var(--primary-ink);
+}
+
+/* Hub tiles on /admin — a small grid of big clickable cards linking to each
+   admin section, instead of one long page (Assetto Corsa Server Manager's
+   admin dashboard was the reference). */
+.admin-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.admin-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 24px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--primary-ink);
+  text-decoration: none;
+  transition:
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.admin-tile:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.admin-tile h2 {
+  margin: 0;
+  font-size: calc(1rem * 16 / 16);
+  font-weight: 600;
+}
+
+.admin-tile p {
+  margin: 0;
+  color: var(--secondary-ink);
+  font-size: calc(1rem * 12 / 16);
+  line-height: 1.4;
+}
+
+.admin-storage-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 90px;
+}
+
+/* Per-row "⋮" menu (admin toggle, deactivate, reset password, delete) — same
+   click-outside/Escape popover pattern as AccountMenu/NotificationsBell. */
+.admin-row-menu {
+  position: relative;
+}
+
+.admin-row-menu-trigger {
+  display: flex;
+  align-items: center;
+  color: var(--secondary-ink);
+  padding: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.admin-row-menu-trigger:hover:not(:disabled) {
+  color: var(--primary-ink);
+  background: var(--surface-2);
+}
+
+.admin-row-menu-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 200px;
+  padding: 6px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.7);
+  z-index: 50;
+}
+
+.admin-row-menu-popover button {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  color: var(--secondary-ink);
+  font-size: calc(1rem * 13 / 16);
+  text-align: left;
+}
+
+.admin-row-menu-popover button:hover:not(:disabled) {
+  color: var(--primary-ink);
+  background: var(--surface-2);
+}
+
+.admin-row-menu-popover button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.admin-row-menu-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  font-size: calc(1rem * 13 / 16);
+  color: var(--secondary-ink);
+  cursor: pointer;
 }
 
 .admin-font-select {

@@ -143,6 +143,13 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
       reply.code(404).send({ error: 'USER_NOT_FOUND' });
       return;
     }
+    // Deactivating first kills every session for the account (see the PATCH
+    // handler above) — requiring it before delete means there's no window
+    // where a still-logged-in session outlives the account it belongs to.
+    if (target.isActive) {
+      reply.code(400).send({ error: 'MUST_DEACTIVATE_FIRST' });
+      return;
+    }
     await deleteUser(targetId);
     reply.code(204).send();
   });
