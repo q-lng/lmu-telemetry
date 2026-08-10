@@ -2298,11 +2298,9 @@ body {
   gap: 24px;
 }
 
-/* For sparse hub-style pages (currently just /admin) where top-anchoring
-   the handful of tiles would look stranded — centers content as a block
-   instead, both axes. */
+/* For sparse hub-style pages (currently just /admin) — centers content
+   horizontally (the tile grid) while staying anchored to the top. */
 .page-shell-centered {
-  justify-content: center;
   align-items: center;
 }
 
