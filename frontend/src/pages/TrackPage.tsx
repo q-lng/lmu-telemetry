@@ -30,19 +30,24 @@ function TrackHeroPhoto({ slug }: { slug: string }) {
 // Same pattern as TrackHeroPhoto, separate asset (<slug>-map.{png,jpg}) —
 // the real official track layout, not a telemetry-derived outline. Renders
 // nothing at all once both attempts fail, since it's a secondary decorative
-// element in the corner, not the hero's main content.
+// element in the corner, not the hero's main content. The gradient lives on
+// the wrapper, not the <img> itself — filter: invert(1) applies to an
+// element's whole rendered output, so a black gradient painted on the same
+// element as the invert would come out white.
 function TrackHeroMap({ slug }: { slug: string }) {
   const [attempt, setAttempt] = useState<'png' | 'jpg' | 'none'>('png');
 
   if (attempt === 'none') return null;
   return (
-    <img
-      key={attempt}
-      className="track-hero-map"
-      src={`/track-photos/${slug}-map.${attempt}`}
-      alt=""
-      onError={() => setAttempt((a) => (a === 'png' ? 'jpg' : 'none'))}
-    />
+    <div className="track-hero-map-frame">
+      <img
+        key={attempt}
+        className="track-hero-map"
+        src={`/track-photos/${slug}-map.${attempt}`}
+        alt=""
+        onError={() => setAttempt((a) => (a === 'png' ? 'jpg' : 'none'))}
+      />
+    </div>
   );
 }
 
