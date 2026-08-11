@@ -39,15 +39,40 @@
   /* Badge tones (see components/Badge.tsx) — fixed per tone, independent of
      the user-customizable --accent above, so a badge's meaning (VIP gold,
      active green, disabled red) never shifts with someone's color pick.
-     Gold matches the existing VIP crown color; red matches --danger. */
-  --badge-neutral-bg: rgba(96, 165, 250, 0.16);
+     Gold matches the existing VIP crown color; red matches --danger.
+     Backgrounds are the tone's color darkened to ~35% brightness (not the
+     full-brightness color at low alpha) so the pill reads as a solid dark
+     chip at 0.8 opacity instead of a wash of the same bright color as the
+     text, which would kill the contrast between the two. */
+  --badge-neutral-bg: rgba(34, 58, 88, 0.8);
   --badge-neutral-fg: #60a5fa;
-  --badge-gold-bg: rgba(255, 213, 74, 0.16);
+  --badge-gold-bg: rgba(89, 75, 26, 0.8);
   --badge-gold-fg: #ffd54a;
-  --badge-green-bg: rgba(74, 222, 128, 0.16);
+  --badge-green-bg: rgba(26, 78, 45, 0.8);
   --badge-green-fg: #4ade80;
-  --badge-red-bg: rgba(230, 103, 103, 0.16);
+  --badge-red-bg: rgba(81, 36, 36, 0.8);
   --badge-red-fg: var(--danger);
+  /* Added for car category tags (CarHero) — GTE/GT3/LMP3/LMP2 WEC/LMP2 ELMS.
+     Hypercar reuses --badge-red above ("Rouge"). Kept as distinct tones from
+     the existing gold/green/neutral rather than reusing them, even where the
+     requested color is close, so a car's category badge never gets confused
+     with an unrelated VIP/status badge using the exact same tone elsewhere. */
+  --badge-yellow-bg: rgba(86, 55, 4, 0.8);
+  --badge-yellow-fg: #f59e0b;
+  --badge-green-dark-bg: rgba(8, 57, 26, 0.8);
+  --badge-green-dark-fg: #16a34a;
+  --badge-purple-bg: rgba(58, 49, 88, 0.8);
+  --badge-purple-fg: #a78bfa;
+  --badge-blue-dark-bg: rgba(21, 46, 86, 0.8);
+  --badge-blue-dark-fg: #3b82f6;
+  --badge-orange-bg: rgba(88, 51, 21, 0.8);
+  --badge-orange-fg: #fb923c;
+  /* Light gray — for a badge that deliberately isn't tied to one specific
+     meaning (e.g. the /cars kanban's merged LMP2 column header, which covers
+     both the WEC and ELMS sub-classes and shouldn't borrow either one's
+     tone). */
+  --badge-gray-bg: rgba(56, 56, 60, 0.8);
+  --badge-gray-fg: #a1a1aa;
 }
 
 ::-webkit-scrollbar {
@@ -396,6 +421,68 @@ body {
   border-bottom: 2px solid var(--accent);
 }
 
+/* "Content" nav item (Tracks / Cars) — same trigger/popover shape as
+   .account-menu, mirrored to the left since it sits inline in .navbar-links
+   instead of the far-right corner. */
+.content-menu {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.content-menu-trigger {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 4px 2px;
+  color: var(--secondary-ink);
+  font-weight: 600;
+  font-size: calc(1rem * 13 / 16);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.content-menu-trigger:hover {
+  color: var(--primary-ink);
+}
+
+.content-menu-trigger[aria-current='page'] {
+  color: var(--primary-ink);
+  border-bottom: 2px solid var(--accent);
+}
+
+.content-menu-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 140px;
+  padding: 6px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  z-index: 50;
+}
+
+.content-menu-popover a {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  color: var(--secondary-ink);
+  font-size: calc(1rem * 13 / 16);
+  text-decoration: none;
+}
+
+.content-menu-popover a:hover {
+  color: var(--primary-ink);
+  background: var(--surface-2);
+}
+
 /* The one standout pill CTA (Daylight's "Get started" button) — outlined
    rather than solid-filled, like .auth-submit/.upload-btn elsewhere: the
    accent color is user-customizable (AccentPicker), and some presets are
@@ -421,20 +508,6 @@ body {
   filter: brightness(1.2);
 }
 
-.navbar-link-with-badge {
-  position: relative;
-}
-
-.navbar-badge {
-  position: absolute;
-  top: -1px;
-  right: -8px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 6px var(--accent-glow);
-}
 
 .accent-picker-wrap {
   position: relative;
@@ -576,6 +649,81 @@ body {
   padding: 10px;
   color: var(--secondary-ink);
   font-size: calc(1rem * 13 / 16);
+}
+
+/* Floating bottom-right module (see components/FriendsWidget.tsx) — replaces
+   the old navbar Friends link, reachable from anywhere instead of only while
+   the navbar is in view. No box-shadow on the popover (flat UI), unlike the
+   older .notif-bell-popover/.account-menu-popover above. */
+.friends-widget {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 50;
+}
+
+.friends-widget-trigger {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--primary-ink);
+  transition: border-color 0.15s ease;
+}
+
+.friends-widget-trigger:hover {
+  border-color: var(--muted-ink);
+}
+
+.friends-widget-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+}
+
+.friends-widget-popover {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: 0;
+  width: 300px;
+  max-height: 60vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.friends-widget-popover .social-subheading:first-child {
+  margin-top: 0;
+}
+
+.friends-widget-manage {
+  display: block;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  color: var(--secondary-ink);
+  font-size: calc(1rem * 12 / 16);
+  text-decoration: none;
+  text-align: center;
+}
+
+.friends-widget-manage:hover {
+  color: var(--primary-ink);
 }
 
 .account-menu {
@@ -1182,16 +1330,24 @@ body {
   gap: 16px;
   padding: 20px;
   /* Two stacked gradients: the bottom fade for title legibility, plus a
-     200px-wide band on the right (behind the map) going from 70%-opaque
+     320px-wide band on the right (behind the map) going from 70%-opaque
      black at the very edge to transparent moving left. */
   background-image: linear-gradient(to left, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0)),
     linear-gradient(180deg, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.75) 100%);
   background-position: right center, left top;
-  background-size: 200px 100%, 100% 100%;
+  background-size: 320px 100%, 100% 100%;
   background-repeat: no-repeat, no-repeat;
 }
 
-.track-hero-overlay h1 {
+.track-hero-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.track-hero-title h1,
+.track-hero-title h2 {
   margin: 0;
   display: flex;
   align-items: center;
@@ -1217,6 +1373,173 @@ body {
   height: 100%;
   object-fit: contain;
   filter: invert(1);
+}
+
+/* Grid-card variant (see /tracks catalog page) — same hero, just narrower,
+   so the fixed-px gradient band/map frame/heading tuned for a full-width
+   hero don't overwhelm a ~320px-wide card. */
+.track-hero--card {
+  height: 160px;
+}
+
+.track-hero--card .track-hero-overlay {
+  padding: 12px;
+  background-size: 140px 100%, 100% 100%;
+}
+
+.track-hero--card .track-hero-title h2 {
+  gap: 6px;
+  font-size: calc(1rem * 15 / 16);
+}
+
+.track-hero--card .track-hero-map-frame {
+  width: 70px;
+}
+
+.tracks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+/* Wraps each card in a Link — no drop-shadow (flat UI), just the same
+   lift + border-color cue as .landing-feature-card. */
+.track-hero-card-link {
+  display: block;
+  border-radius: var(--radius-md);
+  transition: transform 0.15s ease;
+}
+
+.track-hero-card-link:hover {
+  transform: translateY(-2px);
+}
+
+/* Car catalog — same hero/gradient/card recipe as .track-hero (see above),
+   swapping the country flag for a category Badge and the track minimap for
+   the manufacturer logo. */
+.car-hero {
+  position: relative;
+  height: 220px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.car-hero-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.car-hero-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 12px;
+  background: var(--gradient-surface);
+  color: var(--muted-ink);
+  font-size: calc(1rem * 12 / 16);
+}
+
+.car-hero-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px;
+  background-image: linear-gradient(to left, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0)),
+    linear-gradient(180deg, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.75) 100%);
+  background-position: right center, left top;
+  background-size: 320px 100%, 100% 100%;
+  background-repeat: no-repeat, no-repeat;
+}
+
+.car-hero-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.car-hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.car-hero-title h1,
+.car-hero-title h2,
+.car-hero-title h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffffff;
+}
+
+/* Sits inline with the name, in the flag's spot (see TrackHero's <Flag/>) —
+   shown as-is, no invert filter (unlike the track map's black line art). */
+.car-hero-manufacturer-badge {
+  height: 22px;
+  width: auto;
+  object-fit: contain;
+}
+
+.car-hero--card {
+  height: 160px;
+}
+
+.car-hero--card .car-hero-overlay {
+  padding: 12px;
+  background-size: 140px 100%, 100% 100%;
+}
+
+.car-hero--card .car-hero-title h2,
+.car-hero--card .car-hero-title h3 {
+  font-size: calc(1rem * 15 / 16);
+}
+
+.car-hero--card .car-hero-manufacturer-badge {
+  height: 16px;
+}
+
+.car-hero-card-link {
+  display: block;
+  border-radius: var(--radius-md);
+  transition: transform 0.15s ease;
+}
+
+.car-hero-card-link:hover {
+  transform: translateY(-2px);
+}
+
+/* Kanban board — one column per category, each just as tall as its own car
+   count needs (see CarsPage.tsx). The board scrolls horizontally rather than
+   squeezing columns to fit, same tradeoff every kanban/board UI (Trello,
+   Notion, ...) makes. */
+.cars-kanban-board {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.cars-kanban-column {
+  flex: 0 0 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cars-kanban-column-header {
+  margin: 0;
 }
 
 .track-leaderboard-placeholder {
@@ -2506,6 +2829,36 @@ body {
   color: var(--badge-red-fg);
 }
 
+.badge-yellow {
+  background: var(--badge-yellow-bg);
+  color: var(--badge-yellow-fg);
+}
+
+.badge-green-dark {
+  background: var(--badge-green-dark-bg);
+  color: var(--badge-green-dark-fg);
+}
+
+.badge-purple {
+  background: var(--badge-purple-bg);
+  color: var(--badge-purple-fg);
+}
+
+.badge-blue-dark {
+  background: var(--badge-blue-dark-bg);
+  color: var(--badge-blue-dark-fg);
+}
+
+.badge-orange {
+  background: var(--badge-orange-bg);
+  color: var(--badge-orange-fg);
+}
+
+.badge-gray {
+  background: var(--badge-gray-bg);
+  color: var(--badge-gray-fg);
+}
+
 /* Plan toggle's selected pill echoes the same tones as .badge-neutral/-gold
    (same underlying meaning — "this is the current plan") instead of the
    generic --accent fill every other .segmented control uses. */
@@ -2614,6 +2967,34 @@ body {
 
 .admin-back-link:hover {
   color: var(--primary-ink);
+}
+
+/* /admin/content's DLC/Tracks/Cars tab switcher — flat underline style (same
+   as .navbar-links a[aria-current='page']), no box-shadow/pill fill like
+   .segmented elsewhere in the app, to keep this new control flat. */
+.admin-content-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin: 16px 0 20px;
+}
+
+.admin-content-tab {
+  padding: 8px 14px;
+  color: var(--secondary-ink);
+  font-weight: 600;
+  font-size: calc(1rem * 13 / 16);
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease;
+}
+
+.admin-content-tab:hover {
+  color: var(--primary-ink);
+}
+
+.admin-content-tab.active {
+  color: var(--primary-ink);
+  border-bottom-color: var(--accent);
 }
 
 /* Hub tiles on /admin — a small grid of big clickable cards linking to each

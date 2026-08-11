@@ -4,51 +4,7 @@ import { deleteSession, fetchSessions, fetchTrackCatalogEntry } from '../api';
 import type { SessionSummary, TrackCatalogEntry } from '../types';
 import { t } from '../i18n';
 import { SessionTable } from '../components/SessionTable';
-import { Flag } from '../components/flags';
-
-// Tries /api/track-photos/<slug>.jpg then .png, backend-served (uploaded
-// through the admin panel — see AdminTracks.tsx). Falls back to a plain
-// gradient with a small hint once both attempts 404.
-function TrackHeroPhoto({ slug }: { slug: string }) {
-  const [attempt, setAttempt] = useState<'jpg' | 'png' | 'none'>('jpg');
-
-  if (attempt === 'none') {
-    return <div className="track-hero-fallback">{t('track.photoComingSoon')}</div>;
-  }
-  return (
-    <img
-      key={attempt}
-      className="track-hero-photo"
-      src={`/api/track-photos/${slug}.${attempt}`}
-      alt=""
-      onError={() => setAttempt((a) => (a === 'jpg' ? 'png' : 'none'))}
-    />
-  );
-}
-
-// Same pattern as TrackHeroPhoto, separate asset (<slug>-map.{png,jpg}) —
-// the real official track layout, not a telemetry-derived outline. Renders
-// nothing at all once both attempts fail, since it's a secondary decorative
-// element in the corner, not the hero's main content. The gradient lives on
-// the wrapper, not the <img> itself — filter: invert(1) applies to an
-// element's whole rendered output, so a black gradient painted on the same
-// element as the invert would come out white.
-function TrackHeroMap({ slug }: { slug: string }) {
-  const [attempt, setAttempt] = useState<'png' | 'jpg' | 'none'>('png');
-
-  if (attempt === 'none') return null;
-  return (
-    <div className="track-hero-map-frame">
-      <img
-        key={attempt}
-        className="track-hero-map"
-        src={`/api/track-photos/${slug}-map.${attempt}`}
-        alt=""
-        onError={() => setAttempt((a) => (a === 'png' ? 'jpg' : 'none'))}
-      />
-    </div>
-  );
-}
+import { TrackHero } from '../components/TrackHero';
 
 export function TrackPage() {
   const { slug = '' } = useParams<{ slug: string }>();
@@ -101,15 +57,7 @@ export function TrackPage() {
 
   return (
     <div className="page-shell">
-      <div className="track-hero">
-        <TrackHeroPhoto slug={entry.slug} />
-        <div className="track-hero-overlay">
-          <h1>
-            <Flag country={entry.country} size={22} /> {entry.name}
-          </h1>
-          <TrackHeroMap slug={entry.slug} />
-        </div>
-      </div>
+      <TrackHero entry={entry} />
 
       <div className="track-leaderboard-placeholder">
         <h2 className="social-subheading">{t('track.leaderboard')}</h2>

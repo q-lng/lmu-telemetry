@@ -1,12 +1,15 @@
 import type {
   AdminUserSummary,
+  CarCatalogEntry,
   ChannelDescriptor,
   ChannelSeries,
+  DlcCatalogEntry,
   FileRecord,
   FriendRequestSummary,
   LapInfo,
   LapShare,
   LapVisibility,
+  ManufacturerCatalogEntry,
   Notification,
   Plan,
   ProfileSummary,
@@ -21,6 +24,7 @@ import type {
   TrackCatalogEntry,
   Visibility,
 } from './types';
+import type { CarCategory } from './carCategories';
 import { tError } from './i18n';
 
 // Every helper below translates the backend's error CODE (or a missing/
@@ -151,15 +155,46 @@ export function fetchLaps(file: string): Promise<LapInfo[]> {
   return getJson(`/api/sessions/${encodeURIComponent(file)}/laps`);
 }
 
-export async function uploadSession(file: File): Promise<{ file: string }> {
-  const form = new FormData();
-  form.append('file', file, file.name);
-  const res = await fetch('/api/sessions/upload', { method: 'POST', body: form });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(tError((body as { error?: string }).error));
-  }
-  return res.json();
+// Telemetry files can run into the GB range (see the 5GB backend limit), so a
+// multi-minute upload with zero feedback reads as a hung/crashed tab — this
+// uses XMLHttpRequest instead of fetch specifically because fetch has no
+// widely-supported way to observe request-body (upload) progress.
+export function uploadSession(file: File, onProgress?: (fraction: number) => void): Promise<{ file: string }> {
+  return new Promise((resolve, reject) => {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/sessions/upload');
+    // Progress events can fire dozens of times per second at the start of a
+    // fast/local transfer (the OS send buffer flushes in a tight loop before
+    // real network backpressure kicks in) — each call re-renders a heavy
+    // component tree, so without throttling that burst reads as a freeze.
+    // Capping to one React update per whole percentage point keeps the bar
+    // smooth while bounding re-renders to ~100 over the whole upload.
+    let lastPercent = -1;
+    xhr.upload.onprogress = (e) => {
+      if (!e.lengthComputable) return;
+      const percent = Math.floor((e.loaded / e.total) * 100);
+      if (percent === lastPercent) return;
+      lastPercent = percent;
+      onProgress?.(percent / 100);
+    };
+    xhr.onload = () => {
+      let body: unknown = {};
+      try {
+        body = JSON.parse(xhr.responseText);
+      } catch {
+        // non-JSON body (shouldn't happen on this endpoint) — fall through to the ok/error check below
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(body as { file: string });
+      } else {
+        reject(new Error(tError((body as { error?: string }).error)));
+      }
+    };
+    xhr.onerror = () => reject(new Error(tError(undefined)));
+    xhr.send(form);
+  });
 }
 
 export function fetchChannelSeries(
@@ -181,6 +216,10 @@ export function searchAll(q: string): Promise<SearchResults> {
 
 export function fetchTrackCatalogEntry(slug: string): Promise<TrackCatalogEntry> {
   return getJson<TrackCatalogEntry>(`/api/tracks/${encodeURIComponent(slug)}`);
+}
+
+export function fetchTracks(): Promise<TrackCatalogEntry[]> {
+  return getJson<{ tracks: TrackCatalogEntry[] }>('/api/tracks').then((r) => r.tracks);
 }
 
 export function fetchProfile(pseudo: string): Promise<ProfileSummary> {
@@ -327,15 +366,18 @@ export function fetchAdminTracks(): Promise<TrackCatalogEntry[]> {
   return getJson<{ tracks: TrackCatalogEntry[] }>('/api/admin/tracks').then((r) => r.tracks);
 }
 
-export function createAdminTrack(entry: TrackCatalogEntry): Promise<TrackCatalogEntry> {
+export function createAdminTrack(entry: { slug: string; name: string; country: string }): Promise<TrackCatalogEntry> {
   return postJson<TrackCatalogEntry>('/api/admin/tracks', entry);
 }
 
-export function updateAdminTrack(slug: string, patch: { name?: string; country?: string }): Promise<TrackCatalogEntry> {
+export function updateAdminTrack(
+  slug: string,
+  patch: { name?: string; country?: string; dlcSlug?: string },
+): Promise<TrackCatalogEntry> {
   return patchJson<TrackCatalogEntry>(`/api/admin/tracks/${encodeURIComponent(slug)}`, patch);
 }
 
-async function uploadImage(url: string, file: File): Promise<void> {
+async function uploadImage<T>(url: string, file: File): Promise<T> {
   const form = new FormData();
   form.append('file', file, file.name);
   const res = await fetch(url, { method: 'POST', body: form });
@@ -343,12 +385,77 @@ async function uploadImage(url: string, file: File): Promise<void> {
     const body = await res.json().catch(() => ({}));
     throw new Error(tError((body as { error?: string }).error));
   }
+  return res.json();
 }
 
-export function uploadTrackPhoto(slug: string, file: File): Promise<void> {
+export function uploadTrackPhoto(slug: string, file: File): Promise<TrackCatalogEntry> {
   return uploadImage(`/api/admin/tracks/${encodeURIComponent(slug)}/photo`, file);
 }
 
-export function uploadTrackMap(slug: string, file: File): Promise<void> {
+export function uploadTrackMap(slug: string, file: File): Promise<TrackCatalogEntry> {
   return uploadImage(`/api/admin/tracks/${encodeURIComponent(slug)}/map`, file);
+}
+
+export function fetchCars(): Promise<CarCatalogEntry[]> {
+  return getJson<{ cars: CarCatalogEntry[] }>('/api/cars').then((r) => r.cars);
+}
+
+export function fetchCarCatalogEntry(slug: string): Promise<CarCatalogEntry> {
+  return getJson<CarCatalogEntry>(`/api/cars/${encodeURIComponent(slug)}`);
+}
+
+export function fetchAdminCars(): Promise<CarCatalogEntry[]> {
+  return getJson<{ cars: CarCatalogEntry[] }>('/api/admin/cars').then((r) => r.cars);
+}
+
+export function createAdminCar(entry: {
+  slug: string;
+  name: string;
+  manufacturerSlug: string;
+  category: CarCategory;
+}): Promise<CarCatalogEntry> {
+  return postJson<CarCatalogEntry>('/api/admin/cars', entry);
+}
+
+export function updateAdminCar(
+  slug: string,
+  patch: { name?: string; manufacturerSlug?: string; category?: CarCategory; dlcSlug?: string },
+): Promise<CarCatalogEntry> {
+  return patchJson<CarCatalogEntry>(`/api/admin/cars/${encodeURIComponent(slug)}`, patch);
+}
+
+export function uploadCarPhoto(slug: string, file: File): Promise<CarCatalogEntry> {
+  return uploadImage(`/api/admin/cars/${encodeURIComponent(slug)}/photo`, file);
+}
+
+export function fetchManufacturers(): Promise<ManufacturerCatalogEntry[]> {
+  return getJson<{ manufacturers: ManufacturerCatalogEntry[] }>('/api/manufacturers').then((r) => r.manufacturers);
+}
+
+export function fetchAdminManufacturers(): Promise<ManufacturerCatalogEntry[]> {
+  return getJson<{ manufacturers: ManufacturerCatalogEntry[] }>('/api/admin/manufacturers').then((r) => r.manufacturers);
+}
+
+export function createAdminManufacturer(entry: { slug: string; name: string }): Promise<ManufacturerCatalogEntry> {
+  return postJson<ManufacturerCatalogEntry>('/api/admin/manufacturers', entry);
+}
+
+export function updateAdminManufacturer(slug: string, patch: { name?: string }): Promise<ManufacturerCatalogEntry> {
+  return patchJson<ManufacturerCatalogEntry>(`/api/admin/manufacturers/${encodeURIComponent(slug)}`, patch);
+}
+
+export function uploadManufacturerBadge(slug: string, file: File): Promise<ManufacturerCatalogEntry> {
+  return uploadImage(`/api/admin/manufacturers/${encodeURIComponent(slug)}/badge`, file);
+}
+
+export function fetchAdminDlcs(): Promise<DlcCatalogEntry[]> {
+  return getJson<{ dlcs: DlcCatalogEntry[] }>('/api/admin/dlcs').then((r) => r.dlcs);
+}
+
+export function createAdminDlc(entry: { slug: string; name: string; color: string }): Promise<DlcCatalogEntry> {
+  return postJson<DlcCatalogEntry>('/api/admin/dlcs', entry);
+}
+
+export function updateAdminDlc(slug: string, patch: { name?: string; color?: string }): Promise<DlcCatalogEntry> {
+  return patchJson<DlcCatalogEntry>(`/api/admin/dlcs/${encodeURIComponent(slug)}`, patch);
 }

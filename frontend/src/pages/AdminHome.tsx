@@ -21,10 +21,10 @@ export function AdminHome() {
           <h2>{t('admin.tileDisplay')}</h2>
           <p>{t('admin.tileDisplayDesc')}</p>
         </Link>
-        <Link to="/admin/tracks" className="admin-tile">
+        <Link to="/admin/content" className="admin-tile">
           <MapPinIcon size={28} />
-          <h2>{t('admin.tileTracks')}</h2>
-          <p>{t('admin.tileTracksDesc')}</p>
+          <h2>{t('admin.tileContent')}</h2>
+          <p>{t('admin.tileContentDesc')}</p>
         </Link>
       </div>
     </div>

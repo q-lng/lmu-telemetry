@@ -1,40 +1,79 @@
 import type { FastifyInstance } from 'fastify';
-import fs from 'node:fs';
 import path from 'node:path';
 import { pgQuery } from './pg.js';
 import { DATA_DIR } from './db.js';
+import { resolveImageExt, serveImage, type ImageExt } from './imageAssets.js';
+
+export type { ImageExt };
 
 export interface TrackCatalogEntry {
   slug: string;
   name: string;
   country: string;
+  photoExt: ImageExt | null;
+  mapExt: ImageExt | null;
+  dlcSlug: string | null;
+  dlcName: string | null;
+  dlcColor: string | null;
+}
+
+interface TrackRow {
+  slug: string;
+  name: string;
+  country: string;
+  dlc_slug: string | null;
+  dlc_name: string | null;
+  dlc_color: string | null;
 }
 
 export const TRACK_PHOTOS_DIR = path.join(DATA_DIR, 'track-photos');
 
 export const SLUG_RE = /^[a-z0-9-]{1,64}$/;
 
+const SELECT_TRACK_SQL = `
+  SELECT t.slug, t.name, t.country, t.dlc_slug, d.name AS dlc_name, d.color AS dlc_color
+  FROM tracks t
+  LEFT JOIN dlcs d ON d.slug = t.dlc_slug
+`;
+
+function withAssets(row: TrackRow): TrackCatalogEntry {
+  return {
+    slug: row.slug,
+    name: row.name,
+    country: row.country,
+    photoExt: resolveImageExt(TRACK_PHOTOS_DIR, row.slug),
+    mapExt: resolveImageExt(TRACK_PHOTOS_DIR, `${row.slug}-map`),
+    dlcSlug: row.dlc_slug,
+    dlcName: row.dlc_name,
+    dlcColor: row.dlc_color,
+  };
+}
+
 export async function listTracks(): Promise<TrackCatalogEntry[]> {
-  return pgQuery<TrackCatalogEntry>(`SELECT slug, name, country FROM tracks ORDER BY name`);
+  const rows = await pgQuery<TrackRow>(`${SELECT_TRACK_SQL} ORDER BY t.name`);
+  return rows.map(withAssets);
 }
 
 export async function findTrackBySlug(slug: string): Promise<TrackCatalogEntry | null> {
-  const rows = await pgQuery<TrackCatalogEntry>(`SELECT slug, name, country FROM tracks WHERE slug = $1`, [slug]);
-  return rows[0] ?? null;
+  const rows = await pgQuery<TrackRow>(`${SELECT_TRACK_SQL} WHERE t.slug = $1`, [slug]);
+  return rows[0] ? withAssets(rows[0]) : null;
 }
 
 export async function findTrackCatalogEntryByName(name: string): Promise<TrackCatalogEntry | null> {
-  const rows = await pgQuery<TrackCatalogEntry>(`SELECT slug, name, country FROM tracks WHERE name = $1`, [name]);
-  return rows[0] ?? null;
+  const rows = await pgQuery<TrackRow>(`${SELECT_TRACK_SQL} WHERE t.name = $1`, [name]);
+  return rows[0] ? withAssets(rows[0]) : null;
 }
 
-export async function createTrack(entry: TrackCatalogEntry): Promise<void> {
+export async function createTrack(entry: { slug: string; name: string; country: string }): Promise<TrackCatalogEntry> {
   await pgQuery(`INSERT INTO tracks (slug, name, country) VALUES ($1, $2, $3)`, [entry.slug, entry.name, entry.country]);
+  return (await findTrackBySlug(entry.slug))!;
 }
 
 export interface TrackPatch {
   name?: string;
   country?: string;
+  /** Empty string clears it back to base game (NULL) — see admin.ts's route. */
+  dlcSlug?: string | null;
 }
 
 export async function updateTrack(slug: string, patch: TrackPatch): Promise<TrackCatalogEntry | null> {
@@ -48,21 +87,24 @@ export async function updateTrack(slug: string, patch: TrackPatch): Promise<Trac
     params.push(patch.country);
     sets.push(`country = $${params.length}`);
   }
-  if (sets.length === 0) return findTrackBySlug(slug);
-  const rows = await pgQuery<TrackCatalogEntry>(
-    `UPDATE tracks SET ${sets.join(', ')} WHERE slug = $1 RETURNING slug, name, country`,
-    params,
-  );
-  return rows[0] ?? null;
+  if (patch.dlcSlug !== undefined) {
+    params.push(patch.dlcSlug);
+    sets.push(`dlc_slug = $${params.length}`);
+  }
+  if (sets.length > 0) {
+    await pgQuery(`UPDATE tracks SET ${sets.join(', ')} WHERE slug = $1`, params);
+  }
+  return findTrackBySlug(slug);
 }
 
-const CONTENT_TYPES: Record<string, string> = {
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-};
-
 export async function registerTracks(app: FastifyInstance): Promise<void> {
+  // Public catalog listing — powers the /tracks page. Unlike /api/admin/tracks
+  // this needs no auth: it's the same site content the individual track pages
+  // already expose one at a time.
+  app.get('/api/tracks', async (_req, reply) => {
+    reply.send({ tracks: await listTracks() });
+  });
+
   app.get<{ Params: { slug: string } }>('/api/tracks/:slug', async (req, reply) => {
     const entry = await findTrackBySlug(req.params.slug);
     if (!entry) {
@@ -72,22 +114,16 @@ export async function registerTracks(app: FastifyInstance): Promise<void> {
     reply.send(entry);
   });
 
-  // Public, unauthenticated — these are site content (hero photo / map),
-  // not user data. path.basename guards against traversal; the extension
-  // allow-list doubles as the content-type lookup.
   app.get<{ Params: { filename: string } }>('/api/track-photos/:filename', async (req, reply) => {
-    const filename = path.basename(req.params.filename);
-    const ext = path.extname(filename).toLowerCase();
-    const contentType = CONTENT_TYPES[ext];
-    if (!contentType) {
+    const found = serveImage(TRACK_PHOTOS_DIR, req.params.filename);
+    if (!found) {
       reply.code(404).send({ error: 'NOT_FOUND' });
       return;
     }
-    const filePath = path.join(TRACK_PHOTOS_DIR, filename);
-    if (!fs.existsSync(filePath)) {
-      reply.code(404).send({ error: 'NOT_FOUND' });
-      return;
-    }
-    reply.type(contentType).send(fs.createReadStream(filePath));
+    // `return` matters here: without it, this async handler's own promise
+    // resolves right after send() is called (before the stream has piped any
+    // bytes), and Fastify finalizes the response early — 200 with
+    // Content-Length: 0 and an empty body, for every file, every time.
+    return reply.type(found.contentType).send(found.stream);
   });
 }

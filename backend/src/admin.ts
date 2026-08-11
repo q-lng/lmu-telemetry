@@ -1,6 +1,4 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import fs from 'node:fs';
-import path from 'node:path';
 import {
   deleteUser,
   findUserById,
@@ -26,14 +24,28 @@ import {
   type SiteSettingsPatch,
 } from './siteSettings.js';
 import { createTrack, findTrackBySlug, listTracks, updateTrack, SLUG_RE, TRACK_PHOTOS_DIR } from './tracks.js';
+import {
+  createCar,
+  findCarBySlug,
+  listCars,
+  updateCar,
+  CAR_CATEGORIES,
+  CAR_PHOTOS_DIR,
+  type CarCategory,
+} from './cars.js';
+import {
+  createManufacturer,
+  findManufacturerBySlug,
+  listManufacturers,
+  updateManufacturer,
+  MANUFACTURER_PHOTOS_DIR,
+} from './manufacturers.js';
+import { createDlc, findDlcBySlug, listDlcs, updateDlc } from './dlcs.js';
+import { UPLOAD_CONTENT_TYPES, writeImageAtomic } from './imageAssets.js';
 
 const PSEUDO_RE = /^[a-zA-Z0-9_-]{3,32}$/;
 const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
 const COUNTRY_RE = /^[A-Z]{2}$/;
-const UPLOAD_CONTENT_TYPES: Record<string, string> = {
-  'image/png': '.png',
-  'image/jpeg': '.jpg',
-};
 
 /** Admin-only guard — unlike requireAuth this needs a DB round-trip (isAdmin
  * isn't on the request), acceptable overhead since every /api/admin/* route
@@ -267,12 +279,11 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
         reply.code(409).send({ error: 'SLUG_ALREADY_USED' });
         return;
       }
-      await createTrack({ slug, name, country });
-      reply.code(201).send({ slug, name, country });
+      reply.code(201).send(await createTrack({ slug, name, country }));
     },
   );
 
-  app.patch<{ Params: { slug: string }; Body: { name?: string; country?: string } }>(
+  app.patch<{ Params: { slug: string }; Body: { name?: string; country?: string; dlcSlug?: string } }>(
     '/api/admin/tracks/:slug',
     { preHandler: requireAdmin },
     async (req, reply) => {
@@ -281,8 +292,8 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
         reply.code(404).send({ error: 'TRACK_NOT_FOUND' });
         return;
       }
-      const { name, country } = req.body ?? {};
-      const patch: { name?: string; country?: string } = {};
+      const { name, country, dlcSlug } = req.body ?? {};
+      const patch: { name?: string; country?: string; dlcSlug?: string | null } = {};
       if (name !== undefined) {
         const trimmed = name.trim();
         if (trimmed.length === 0 || trimmed.length > 120) {
@@ -299,34 +310,36 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
         }
         patch.country = upper;
       }
+      // Empty string clears the DLC tag back to base game.
+      if (dlcSlug !== undefined) {
+        if (dlcSlug !== '' && !(await findDlcBySlug(dlcSlug))) {
+          reply.code(400).send({ error: 'INVALID_DLC' });
+          return;
+        }
+        patch.dlcSlug = dlcSlug === '' ? null : dlcSlug;
+      }
       const updated = await updateTrack(req.params.slug, patch);
       reply.send(updated);
     },
   );
 
-  // Shared by the photo/map upload routes below — same small-file pattern,
-  // just a different destination filename. Clears both possible existing
-  // extensions first so switching from a .png to a .jpg doesn't leave a
-  // stale file that TrackHeroPhoto/TrackHeroMap's try-png-then-jpg fallback
-  // would still find.
-  async function handleImageUpload(req: FastifyRequest, reply: FastifyReply, baseName: string): Promise<void> {
+  // Shared by every photo/map/badge upload route below (tracks and cars) —
+  // same small-file pattern, just a different destination dir/filename.
+  /** Returns true on a successful write; false after already sending an error reply. */
+  async function handleImageUpload(req: FastifyRequest, reply: FastifyReply, dir: string, baseName: string): Promise<boolean> {
     const data = await req.file();
     if (!data) {
       reply.code(400).send({ error: 'NO_FILE_PROVIDED' });
-      return;
+      return false;
     }
     const ext = UPLOAD_CONTENT_TYPES[data.mimetype];
     if (!ext) {
       reply.code(400).send({ error: 'INVALID_IMAGE_TYPE' });
-      return;
+      return false;
     }
     const buffer = await data.toBuffer();
-    fs.mkdirSync(TRACK_PHOTOS_DIR, { recursive: true });
-    for (const otherExt of Object.values(UPLOAD_CONTENT_TYPES)) {
-      fs.rmSync(path.join(TRACK_PHOTOS_DIR, `${baseName}${otherExt}`), { force: true });
-    }
-    fs.writeFileSync(path.join(TRACK_PHOTOS_DIR, `${baseName}${ext}`), buffer);
-    reply.code(204).send();
+    writeImageAtomic(dir, baseName, ext, buffer);
+    return true;
   }
 
   app.post<{ Params: { slug: string } }>(
@@ -337,7 +350,9 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
         reply.code(404).send({ error: 'TRACK_NOT_FOUND' });
         return;
       }
-      await handleImageUpload(req, reply, req.params.slug);
+      if (await handleImageUpload(req, reply, TRACK_PHOTOS_DIR, req.params.slug)) {
+        reply.send(await findTrackBySlug(req.params.slug));
+      }
     },
   );
 
@@ -349,7 +364,228 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
         reply.code(404).send({ error: 'TRACK_NOT_FOUND' });
         return;
       }
-      await handleImageUpload(req, reply, `${req.params.slug}-map`);
+      if (await handleImageUpload(req, reply, TRACK_PHOTOS_DIR, `${req.params.slug}-map`)) {
+        reply.send(await findTrackBySlug(req.params.slug));
+      }
+    },
+  );
+
+  app.get('/api/admin/cars', { preHandler: requireAdmin }, async (_req, reply) => {
+    reply.send({ cars: await listCars() });
+  });
+
+  app.post<{ Body: { slug?: string; name?: string; manufacturerSlug?: string; category?: string } }>(
+    '/api/admin/cars',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const slug = (req.body?.slug ?? '').trim().toLowerCase();
+      const name = (req.body?.name ?? '').trim();
+      const manufacturerSlug = (req.body?.manufacturerSlug ?? '').trim();
+      const category = req.body?.category ?? '';
+      if (!SLUG_RE.test(slug)) {
+        reply.code(400).send({ error: 'INVALID_SLUG' });
+        return;
+      }
+      if (name.length === 0 || name.length > 120) {
+        reply.code(400).send({ error: 'INVALID_NAME' });
+        return;
+      }
+      if (!(await findManufacturerBySlug(manufacturerSlug))) {
+        reply.code(400).send({ error: 'INVALID_MANUFACTURER' });
+        return;
+      }
+      if (!CAR_CATEGORIES.includes(category as CarCategory)) {
+        reply.code(400).send({ error: 'INVALID_CATEGORY' });
+        return;
+      }
+      if (await findCarBySlug(slug)) {
+        reply.code(409).send({ error: 'SLUG_ALREADY_USED' });
+        return;
+      }
+      reply.code(201).send(await createCar({ slug, name, manufacturerSlug, category: category as CarCategory }));
+    },
+  );
+
+  app.patch<{
+    Params: { slug: string };
+    Body: { name?: string; manufacturerSlug?: string; category?: string; dlcSlug?: string };
+  }>('/api/admin/cars/:slug', { preHandler: requireAdmin }, async (req, reply) => {
+    const target = await findCarBySlug(req.params.slug);
+    if (!target) {
+      reply.code(404).send({ error: 'CAR_NOT_FOUND' });
+      return;
+    }
+    const { name, manufacturerSlug, category, dlcSlug } = req.body ?? {};
+    const patch: { name?: string; manufacturerSlug?: string; category?: CarCategory; dlcSlug?: string | null } = {};
+    if (name !== undefined) {
+      const trimmed = name.trim();
+      if (trimmed.length === 0 || trimmed.length > 120) {
+        reply.code(400).send({ error: 'INVALID_NAME' });
+        return;
+      }
+      patch.name = trimmed;
+    }
+    if (manufacturerSlug !== undefined) {
+      if (!(await findManufacturerBySlug(manufacturerSlug))) {
+        reply.code(400).send({ error: 'INVALID_MANUFACTURER' });
+        return;
+      }
+      patch.manufacturerSlug = manufacturerSlug;
+    }
+    if (category !== undefined) {
+      if (!CAR_CATEGORIES.includes(category as CarCategory)) {
+        reply.code(400).send({ error: 'INVALID_CATEGORY' });
+        return;
+      }
+      patch.category = category as CarCategory;
+    }
+    // Empty string clears the DLC tag back to base game.
+    if (dlcSlug !== undefined) {
+      if (dlcSlug !== '' && !(await findDlcBySlug(dlcSlug))) {
+        reply.code(400).send({ error: 'INVALID_DLC' });
+        return;
+      }
+      patch.dlcSlug = dlcSlug === '' ? null : dlcSlug;
+    }
+    const updated = await updateCar(req.params.slug, patch);
+    reply.send(updated);
+  });
+
+  app.post<{ Params: { slug: string } }>(
+    '/api/admin/cars/:slug/photo',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      if (!(await findCarBySlug(req.params.slug))) {
+        reply.code(404).send({ error: 'CAR_NOT_FOUND' });
+        return;
+      }
+      if (await handleImageUpload(req, reply, CAR_PHOTOS_DIR, req.params.slug)) {
+        reply.send(await findCarBySlug(req.params.slug));
+      }
+    },
+  );
+
+  app.get('/api/admin/manufacturers', { preHandler: requireAdmin }, async (_req, reply) => {
+    reply.send({ manufacturers: await listManufacturers() });
+  });
+
+  app.post<{ Body: { slug?: string; name?: string } }>(
+    '/api/admin/manufacturers',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const slug = (req.body?.slug ?? '').trim().toLowerCase();
+      const name = (req.body?.name ?? '').trim();
+      if (!SLUG_RE.test(slug)) {
+        reply.code(400).send({ error: 'INVALID_SLUG' });
+        return;
+      }
+      if (name.length === 0 || name.length > 80) {
+        reply.code(400).send({ error: 'INVALID_NAME' });
+        return;
+      }
+      if (await findManufacturerBySlug(slug)) {
+        reply.code(409).send({ error: 'SLUG_ALREADY_USED' });
+        return;
+      }
+      reply.code(201).send(await createManufacturer({ slug, name }));
+    },
+  );
+
+  app.patch<{ Params: { slug: string }; Body: { name?: string } }>(
+    '/api/admin/manufacturers/:slug',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const target = await findManufacturerBySlug(req.params.slug);
+      if (!target) {
+        reply.code(404).send({ error: 'MANUFACTURER_NOT_FOUND' });
+        return;
+      }
+      const { name } = req.body ?? {};
+      if (name !== undefined) {
+        const trimmed = name.trim();
+        if (trimmed.length === 0 || trimmed.length > 80) {
+          reply.code(400).send({ error: 'INVALID_NAME' });
+          return;
+        }
+        reply.send(await updateManufacturer(req.params.slug, { name: trimmed }));
+        return;
+      }
+      reply.send(target);
+    },
+  );
+
+  app.post<{ Params: { slug: string } }>(
+    '/api/admin/manufacturers/:slug/badge',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      if (!(await findManufacturerBySlug(req.params.slug))) {
+        reply.code(404).send({ error: 'MANUFACTURER_NOT_FOUND' });
+        return;
+      }
+      if (await handleImageUpload(req, reply, MANUFACTURER_PHOTOS_DIR, req.params.slug)) {
+        reply.send(await findManufacturerBySlug(req.params.slug));
+      }
+    },
+  );
+
+  app.get('/api/admin/dlcs', { preHandler: requireAdmin }, async (_req, reply) => {
+    reply.send({ dlcs: await listDlcs() });
+  });
+
+  app.post<{ Body: { slug?: string; name?: string; color?: string } }>(
+    '/api/admin/dlcs',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const slug = (req.body?.slug ?? '').trim().toLowerCase();
+      const name = (req.body?.name ?? '').trim();
+      const color = (req.body?.color ?? '').trim();
+      if (!SLUG_RE.test(slug)) {
+        reply.code(400).send({ error: 'INVALID_SLUG' });
+        return;
+      }
+      if (name.length === 0 || name.length > 80) {
+        reply.code(400).send({ error: 'INVALID_NAME' });
+        return;
+      }
+      if (!HEX_COLOR_RE.test(color)) {
+        reply.code(400).send({ error: 'INVALID_COLOR' });
+        return;
+      }
+      if (await findDlcBySlug(slug)) {
+        reply.code(409).send({ error: 'SLUG_ALREADY_USED' });
+        return;
+      }
+      reply.code(201).send(await createDlc({ slug, name, color }));
+    },
+  );
+
+  app.patch<{ Params: { slug: string }; Body: { name?: string; color?: string } }>(
+    '/api/admin/dlcs/:slug',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const target = await findDlcBySlug(req.params.slug);
+      if (!target) {
+        reply.code(404).send({ error: 'DLC_NOT_FOUND' });
+        return;
+      }
+      const { name, color } = req.body ?? {};
+      const patch: { name?: string; color?: string } = {};
+      if (name !== undefined) {
+        const trimmed = name.trim();
+        if (trimmed.length === 0 || trimmed.length > 80) {
+          reply.code(400).send({ error: 'INVALID_NAME' });
+          return;
+        }
+        patch.name = trimmed;
+      }
+      if (color !== undefined) {
+        if (!HEX_COLOR_RE.test(color)) {
+          reply.code(400).send({ error: 'INVALID_COLOR' });
+          return;
+        }
+        patch.color = color;
+      }
+      reply.send(await updateDlc(req.params.slug, patch));
     },
   );
 }

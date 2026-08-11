@@ -1,85 +1,23 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { createAdminTrack, fetchAdminTracks, updateAdminTrack, uploadTrackMap, uploadTrackPhoto } from '../api';
-import type { TrackCatalogEntry } from '../types';
+import { createAdminTrack, fetchAdminDlcs, fetchAdminTracks, updateAdminTrack, uploadTrackMap, uploadTrackPhoto } from '../api';
+import type { DlcCatalogEntry, TrackCatalogEntry } from '../types';
 import { t } from '../i18n';
 import { Flag } from '../components/flags';
 import { PencilIcon } from '../components/icons';
-
-// Mirrors TrackPage.tsx's TrackHeroPhoto/TrackHeroMap fallback order exactly
-// (photo: jpg then png; map: png then jpg) — a single-extension guess here
-// would wrongly show "none" whenever the real file uses the other one.
-// `version` forces a fresh attempt after a new upload (cache-busting via
-// the querystring alone doesn't reset React state back to the first
-// extension to try).
-function PhotoThumbnail({ slug, version }: { slug: string; version: number }) {
-  const [attempt, setAttempt] = useState<'jpg' | 'png' | 'none'>('jpg');
-  useEffect(() => setAttempt('jpg'), [version]);
-  if (attempt === 'none') return <span className="field-hint">{t('adminTracks.none')}</span>;
-  return (
-    <img
-      key={`${attempt}-${version}`}
-      className="admin-track-thumb"
-      src={`/api/track-photos/${slug}.${attempt}?v=${version}`}
-      alt=""
-      onError={() => setAttempt((a) => (a === 'jpg' ? 'png' : 'none'))}
-    />
-  );
-}
-
-function MapThumbnail({ slug, version }: { slug: string; version: number }) {
-  const [attempt, setAttempt] = useState<'png' | 'jpg' | 'none'>('png');
-  useEffect(() => setAttempt('png'), [version]);
-  if (attempt === 'none') return <span className="field-hint">{t('adminTracks.none')}</span>;
-  return (
-    <img
-      key={`${attempt}-${version}`}
-      className="admin-track-thumb"
-      src={`/api/track-photos/${slug}-map.${attempt}?v=${version}`}
-      alt=""
-      onError={() => setAttempt((a) => (a === 'png' ? 'jpg' : 'none'))}
-    />
-  );
-}
-
-interface UploadButtonProps {
-  label: string;
-  busy: boolean;
-  onFile: (file: File) => void;
-}
-
-function UploadButton({ label, busy, onFile }: UploadButtonProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  return (
-    <>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/png,image/jpeg"
-        style={{ display: 'none' }}
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = '';
-          if (file) onFile(file);
-        }}
-      />
-      <button className="upload-btn" disabled={busy} onClick={() => inputRef.current?.click()}>
-        {busy ? t('admin.saving') : label}
-      </button>
-    </>
-  );
-}
+import { AssetThumbnail, UploadButton } from '../components/AdminAssetUpload';
 
 interface RowProps {
   track: TrackCatalogEntry;
+  dlcs: DlcCatalogEntry[];
   onChange: (updated: TrackCatalogEntry) => void;
 }
 
-function TrackRow({ track, onChange }: RowProps) {
+function TrackRow({ track, dlcs, onChange }: RowProps) {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(track.name);
   const [countryDraft, setCountryDraft] = useState(track.country);
-  const [busy, setBusy] = useState<'name' | 'country' | 'photo' | 'map' | null>(null);
+  const [busy, setBusy] = useState<'name' | 'country' | 'dlc' | 'photo' | 'map' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [photoVersion, setPhotoVersion] = useState(0);
 
@@ -122,11 +60,23 @@ function TrackRow({ track, onChange }: RowProps) {
     }
   }
 
+  async function saveDlc(dlcSlug: string) {
+    setBusy('dlc');
+    setError(null);
+    try {
+      onChange(await updateAdminTrack(track.slug, { dlcSlug }));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function handlePhoto(file: File) {
     setBusy('photo');
     setError(null);
     try {
-      await uploadTrackPhoto(track.slug, file);
+      onChange(await uploadTrackPhoto(track.slug, file));
       setPhotoVersion((v) => v + 1);
     } catch (err) {
       setError((err as Error).message);
@@ -139,7 +89,7 @@ function TrackRow({ track, onChange }: RowProps) {
     setBusy('map');
     setError(null);
     try {
-      await uploadTrackMap(track.slug, file);
+      onChange(await uploadTrackMap(track.slug, file));
       setPhotoVersion((v) => v + 1);
     } catch (err) {
       setError((err as Error).message);
@@ -198,14 +148,26 @@ function TrackRow({ track, onChange }: RowProps) {
         </div>
       </td>
       <td>
+        <select value={track.dlcSlug ?? ''} disabled={busy === 'dlc'} onChange={(e) => saveDlc(e.target.value)}>
+          <option value="">{t('dlc.baseGame')}</option>
+          {dlcs.map((dlc) => (
+            <option key={dlc.slug} value={dlc.slug}>
+              {dlc.name}
+            </option>
+          ))}
+        </select>
+      </td>
+      <td>
         <div className="admin-track-asset">
-          <PhotoThumbnail slug={track.slug} version={photoVersion} />
+          <AssetThumbnail src={track.photoExt ? `/api/track-photos/${track.slug}.${track.photoExt}?v=${photoVersion}` : null} />
           <UploadButton label={t('adminTracks.uploadPhoto')} busy={busy === 'photo'} onFile={handlePhoto} />
         </div>
       </td>
       <td>
         <div className="admin-track-asset">
-          <MapThumbnail slug={track.slug} version={photoVersion} />
+          <AssetThumbnail
+            src={track.mapExt ? `/api/track-photos/${track.slug}-map.${track.mapExt}?v=${photoVersion}` : null}
+          />
           <UploadButton label={t('adminTracks.uploadMap')} busy={busy === 'map'} onFile={handleMap} />
         </div>
       </td>
@@ -263,8 +225,11 @@ function AddTrackForm({ onAdded }: { onAdded: (track: TrackCatalogEntry) => void
   );
 }
 
-export function AdminTracks() {
+/** Embedded as the Tracks tab of /admin/content (see AdminContent.tsx) — no
+ * page-shell/heading of its own, the parent page owns that. */
+export function TracksAdminPanel() {
   const [tracks, setTracks] = useState<TrackCatalogEntry[] | null>(null);
+  const [dlcs, setDlcs] = useState<DlcCatalogEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   function refresh() {
@@ -275,6 +240,7 @@ export function AdminTracks() {
 
   useEffect(() => {
     refresh();
+    fetchAdminDlcs().then(setDlcs);
   }, []);
 
   function replaceTrack(updated: TrackCatalogEntry) {
@@ -282,11 +248,7 @@ export function AdminTracks() {
   }
 
   return (
-    <div className="page-shell">
-      <Link to="/admin" className="admin-back-link">
-        {t('admin.backToAdmin')}
-      </Link>
-      <h1>{t('adminTracks.title')}</h1>
+    <div>
       <p className="field-hint">{t('adminTracks.subtitle')}</p>
 
       <AddTrackForm onAdded={(created) => setTracks((prev) => [...(prev ?? []), created])} />
@@ -304,6 +266,7 @@ export function AdminTracks() {
                 <th>{t('adminTracks.colSlug')}</th>
                 <th>{t('adminTracks.colName')}</th>
                 <th>{t('adminTracks.colCountry')}</th>
+                <th>{t('adminTracks.colDlc')}</th>
                 <th>{t('adminTracks.colPhoto')}</th>
                 <th>{t('adminTracks.colMap')}</th>
                 <th></th>
@@ -311,7 +274,7 @@ export function AdminTracks() {
             </thead>
             <tbody>
               {tracks.map((track) => (
-                <TrackRow key={track.slug} track={track} onChange={replaceTrack} />
+                <TrackRow key={track.slug} track={track} dlcs={dlcs} onChange={replaceTrack} />
               ))}
             </tbody>
           </table>

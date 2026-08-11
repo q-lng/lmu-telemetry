@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { useSiteSettings } from '../SiteSettingsContext';
-import { fetchFriendRequests, searchAll } from '../api';
+import { searchAll } from '../api';
 import type { SearchResults } from '../types';
 import { t } from '../i18n';
 import { AccentPicker } from './AccentPicker';
 import { AccountMenu } from './AccountMenu';
+import { ContentMenu } from './ContentMenu';
 import { NotificationsBell } from './NotificationsBell';
 import { CloseIcon, SearchIcon } from './icons';
 import { VipBadge } from './VipBadge';
@@ -20,7 +21,6 @@ export function Navbar() {
   const { settings: siteSettings } = useSiteSettings();
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const [hasPendingRequest, setHasPendingRequest] = useState(false);
   const siteName = siteSettings?.siteName ?? t('brand');
 
   const [searchOpen, setSearchOpen] = useState(false);
@@ -92,26 +92,6 @@ export function Navbar() {
     navigate(`/browse?car=${encodeURIComponent(name)}`);
   }
 
-  // Re-checked on every navigation (not just once) — cheaply keeps the badge
-  // in sync with accepting/declining requests on /friends, without a whole
-  // separate polling/websocket mechanism for what's still a small, personal-
-  // scale app.
-  useEffect(() => {
-    if (!user) {
-      setHasPendingRequest(false);
-      return;
-    }
-    let cancelled = false;
-    fetchFriendRequests()
-      .then((r) => {
-        if (!cancelled) setHasPendingRequest(r.incoming.length > 0);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [user, pathname]);
-
   return (
     <div className="navbar-row">
       <nav className={`navbar${searchOpen ? ' navbar-search-active' : ''}`} ref={navRef}>
@@ -181,16 +161,11 @@ export function Navbar() {
               <Link to="/browse" aria-current={pathname === '/browse' ? 'page' : undefined}>
                 {t('nav.browse')}
               </Link>
+              <ContentMenu />
               {user && (
-                <>
-                  <Link to="/friends" className="navbar-link-with-badge" aria-current={pathname === '/friends' ? 'page' : undefined}>
-                    {t('nav.friends')}
-                    {hasPendingRequest && <span className="navbar-badge" title={t('nav.pendingRequestBadge')} />}
-                  </Link>
-                  <Link to="/my-sessions" aria-current={pathname === '/my-sessions' ? 'page' : undefined}>
-                    {t('nav.mySessions')}
-                  </Link>
-                </>
+                <Link to="/my-sessions" aria-current={pathname === '/my-sessions' ? 'page' : undefined}>
+                  {t('nav.mySessions')}
+                </Link>
               )}
             </div>
             <button className="navbar-search-trigger" onClick={() => setSearchOpen(true)} title={t('nav.search')}>
