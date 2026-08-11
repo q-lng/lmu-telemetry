@@ -1193,18 +1193,17 @@ body {
 }
 
 /* Real official track layout (see TrackHeroMap) — sits opposite the title,
-   bottom-right of the hero. Renders nothing if the asset doesn't exist. */
+   bottom-right of the hero. Renders nothing if the asset doesn't exist.
+   These outlines are typically black line art on a transparent PNG — no
+   background box (transparent, sits right on the hero gradient), and
+   inverted so the line art itself reads white instead of black. invert()
+   only touches RGB, so the transparent background stays transparent. */
 .track-hero-map {
   flex: 0 0 auto;
   width: 130px;
   height: 90px;
   object-fit: contain;
-  /* Solid white, not a subtle tint — these track outlines are typically
-     black line art on a transparent PNG, invisible against a dark
-     translucent box. A plain white card keeps them legible regardless. */
-  background: #ffffff;
-  border-radius: var(--radius-sm);
-  padding: 6px;
+  filter: invert(1);
 }
 
 .track-leaderboard-placeholder {
