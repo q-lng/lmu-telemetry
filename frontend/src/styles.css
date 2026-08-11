@@ -1199,7 +1199,10 @@ body {
   width: 130px;
   height: 90px;
   object-fit: contain;
-  background: rgba(255, 255, 255, 0.06);
+  /* Solid white, not a subtle tint — these track outlines are typically
+     black line art on a transparent PNG, invisible against a dark
+     translucent box. A plain white card keeps them legible regardless. */
+  background: #ffffff;
   border-radius: var(--radius-sm);
   padding: 6px;
 }
