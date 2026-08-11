@@ -6,9 +6,8 @@ import { t } from '../i18n';
 import { SessionTable } from '../components/SessionTable';
 import { Flag } from '../components/flags';
 
-// Tries <public>/track-photos/<slug>.jpg then .png — plain static assets,
-// not backend-served, since these are site content (not user uploads) and
-// don't need any DB row to say whether one exists. Falls back to a plain
+// Tries /api/track-photos/<slug>.jpg then .png, backend-served (uploaded
+// through the admin panel — see AdminTracks.tsx). Falls back to a plain
 // gradient with a small hint once both attempts 404.
 function TrackHeroPhoto({ slug }: { slug: string }) {
   const [attempt, setAttempt] = useState<'jpg' | 'png' | 'none'>('jpg');
@@ -20,7 +19,7 @@ function TrackHeroPhoto({ slug }: { slug: string }) {
     <img
       key={attempt}
       className="track-hero-photo"
-      src={`/track-photos/${slug}.${attempt}`}
+      src={`/api/track-photos/${slug}.${attempt}`}
       alt=""
       onError={() => setAttempt((a) => (a === 'jpg' ? 'png' : 'none'))}
     />
@@ -43,7 +42,7 @@ function TrackHeroMap({ slug }: { slug: string }) {
       <img
         key={attempt}
         className="track-hero-map"
-        src={`/track-photos/${slug}-map.${attempt}`}
+        src={`/api/track-photos/${slug}-map.${attempt}`}
         alt=""
         onError={() => setAttempt((a) => (a === 'png' ? 'jpg' : 'none'))}
       />

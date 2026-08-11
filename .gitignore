@@ -6,6 +6,10 @@ build/
 # Telemetry data files (large, user-specific)
 data/*.duckdb
 
+# Track hero photos/maps, uploaded via the admin panel — runtime content,
+# not committed (same reasoning as the .duckdb files above)
+data/track-photos/
+
 # Env
 .env
 .env.local

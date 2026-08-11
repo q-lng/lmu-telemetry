@@ -2684,6 +2684,50 @@ body {
   min-width: 90px;
 }
 
+.admin-track-slug {
+  font-family: var(--telemetry-font-family, monospace);
+  font-size: calc(1rem * 12 / 16);
+  color: var(--secondary-ink);
+}
+
+.admin-track-country {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-track-country-input {
+  width: 40px;
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+  font-size: calc(1rem * 13 / 16);
+  color: var(--primary-ink);
+  text-transform: uppercase;
+}
+
+.admin-track-country-input:hover,
+.admin-track-country-input:focus {
+  border-color: var(--border);
+}
+
+.admin-track-asset {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 160px;
+}
+
+.admin-track-thumb {
+  width: 56px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
 /* Per-row "⋮" menu (admin toggle, deactivate, reset password, delete) — same
    click-outside/Escape popover pattern as AccountMenu/NotificationsBell. */
 .admin-row-menu {

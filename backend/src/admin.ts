@@ -1,4 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   deleteUser,
   findUserById,
@@ -23,9 +25,15 @@ import {
   type TelemetryFontMode,
   type SiteSettingsPatch,
 } from './siteSettings.js';
+import { createTrack, findTrackBySlug, listTracks, updateTrack, SLUG_RE, TRACK_PHOTOS_DIR } from './tracks.js';
 
 const PSEUDO_RE = /^[a-zA-Z0-9_-]{3,32}$/;
 const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
+const COUNTRY_RE = /^[A-Z]{2}$/;
+const UPLOAD_CONTENT_TYPES: Record<string, string> = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+};
 
 /** Admin-only guard — unlike requireAuth this needs a DB round-trip (isAdmin
  * isn't on the request), acceptable overhead since every /api/admin/* route
@@ -231,4 +239,117 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
 
     reply.send(await updateSiteSettings(patch));
   });
+
+  app.get('/api/admin/tracks', { preHandler: requireAdmin }, async (_req, reply) => {
+    reply.send({ tracks: await listTracks() });
+  });
+
+  app.post<{ Body: { slug?: string; name?: string; country?: string } }>(
+    '/api/admin/tracks',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const slug = (req.body?.slug ?? '').trim().toLowerCase();
+      const name = (req.body?.name ?? '').trim();
+      const country = (req.body?.country ?? '').trim().toUpperCase();
+      if (!SLUG_RE.test(slug)) {
+        reply.code(400).send({ error: 'INVALID_SLUG' });
+        return;
+      }
+      if (name.length === 0 || name.length > 120) {
+        reply.code(400).send({ error: 'INVALID_NAME' });
+        return;
+      }
+      if (!COUNTRY_RE.test(country)) {
+        reply.code(400).send({ error: 'INVALID_COUNTRY' });
+        return;
+      }
+      if (await findTrackBySlug(slug)) {
+        reply.code(409).send({ error: 'SLUG_ALREADY_USED' });
+        return;
+      }
+      await createTrack({ slug, name, country });
+      reply.code(201).send({ slug, name, country });
+    },
+  );
+
+  app.patch<{ Params: { slug: string }; Body: { name?: string; country?: string } }>(
+    '/api/admin/tracks/:slug',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const target = await findTrackBySlug(req.params.slug);
+      if (!target) {
+        reply.code(404).send({ error: 'TRACK_NOT_FOUND' });
+        return;
+      }
+      const { name, country } = req.body ?? {};
+      const patch: { name?: string; country?: string } = {};
+      if (name !== undefined) {
+        const trimmed = name.trim();
+        if (trimmed.length === 0 || trimmed.length > 120) {
+          reply.code(400).send({ error: 'INVALID_NAME' });
+          return;
+        }
+        patch.name = trimmed;
+      }
+      if (country !== undefined) {
+        const upper = country.trim().toUpperCase();
+        if (!COUNTRY_RE.test(upper)) {
+          reply.code(400).send({ error: 'INVALID_COUNTRY' });
+          return;
+        }
+        patch.country = upper;
+      }
+      const updated = await updateTrack(req.params.slug, patch);
+      reply.send(updated);
+    },
+  );
+
+  // Shared by the photo/map upload routes below — same small-file pattern,
+  // just a different destination filename. Clears both possible existing
+  // extensions first so switching from a .png to a .jpg doesn't leave a
+  // stale file that TrackHeroPhoto/TrackHeroMap's try-png-then-jpg fallback
+  // would still find.
+  async function handleImageUpload(req: FastifyRequest, reply: FastifyReply, baseName: string): Promise<void> {
+    const data = await req.file();
+    if (!data) {
+      reply.code(400).send({ error: 'NO_FILE_PROVIDED' });
+      return;
+    }
+    const ext = UPLOAD_CONTENT_TYPES[data.mimetype];
+    if (!ext) {
+      reply.code(400).send({ error: 'INVALID_IMAGE_TYPE' });
+      return;
+    }
+    const buffer = await data.toBuffer();
+    fs.mkdirSync(TRACK_PHOTOS_DIR, { recursive: true });
+    for (const otherExt of Object.values(UPLOAD_CONTENT_TYPES)) {
+      fs.rmSync(path.join(TRACK_PHOTOS_DIR, `${baseName}${otherExt}`), { force: true });
+    }
+    fs.writeFileSync(path.join(TRACK_PHOTOS_DIR, `${baseName}${ext}`), buffer);
+    reply.code(204).send();
+  }
+
+  app.post<{ Params: { slug: string } }>(
+    '/api/admin/tracks/:slug/photo',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      if (!(await findTrackBySlug(req.params.slug))) {
+        reply.code(404).send({ error: 'TRACK_NOT_FOUND' });
+        return;
+      }
+      await handleImageUpload(req, reply, req.params.slug);
+    },
+  );
+
+  app.post<{ Params: { slug: string } }>(
+    '/api/admin/tracks/:slug/map',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      if (!(await findTrackBySlug(req.params.slug))) {
+        reply.code(404).send({ error: 'TRACK_NOT_FOUND' });
+        return;
+      }
+      await handleImageUpload(req, reply, `${req.params.slug}-map`);
+    },
+  );
 }

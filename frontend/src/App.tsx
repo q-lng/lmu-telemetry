@@ -23,6 +23,7 @@ const Subscription = lazy(() => import('./pages/Subscription').then((m) => ({ de
 const AdminHome = lazy(() => import('./pages/AdminHome').then((m) => ({ default: m.AdminHome })));
 const AdminUsers = lazy(() => import('./pages/AdminUsers').then((m) => ({ default: m.AdminUsers })));
 const AdminDisplay = lazy(() => import('./pages/AdminDisplay').then((m) => ({ default: m.AdminDisplay })));
+const AdminTracks = lazy(() => import('./pages/AdminTracks').then((m) => ({ default: m.AdminTracks })));
 
 export default function App() {
   return (
@@ -90,6 +91,14 @@ export default function App() {
           element={
             <RequireAdmin>
               <AdminDisplay />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="admin/tracks"
+          element={
+            <RequireAdmin>
+              <AdminTracks />
             </RequireAdmin>
           }
         />

@@ -23,7 +23,9 @@ export async function registerSearch(app: FastifyInstance): Promise<void> {
     const profiles = await Promise.all(users.map((u) => toProfileSummary(toPublicUser(u), req.userId)));
     // slug is null when the track has no dedicated page yet — the frontend
     // falls back to a filtered Browse link in that case.
-    const trackResults = tracks.map((name) => ({ name, slug: findTrackCatalogEntryByName(name)?.slug ?? null }));
+    const trackResults = await Promise.all(
+      tracks.map(async (name) => ({ name, slug: (await findTrackCatalogEntryByName(name))?.slug ?? null })),
+    );
     reply.send({ users: profiles, tracks: trackResults, cars });
   });
 }

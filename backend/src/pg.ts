@@ -49,6 +49,11 @@ export async function initSiteSettingsSchema(): Promise<void> {
   await runSchemaFile('siteSettingsSchema.sql');
 }
 
+/** Runs the idempotent tracks schema DDL (the admin-editable track catalog) at startup. */
+export async function initTracksSchema(): Promise<void> {
+  await runSchemaFile('tracksSchema.sql');
+}
+
 /** Runs `fn` inside a single client transaction, committing on success and rolling
  * back on any thrown error — needed for multi-statement mutations (e.g. accepting a
  * friend request: delete the request row + insert the friendship row atomically). */

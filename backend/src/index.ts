@@ -8,6 +8,7 @@ import {
   initMailSchema,
   initPreferencesSchema,
   initSiteSettingsSchema,
+  initTracksSchema,
 } from './pg.js';
 import { registerAuth } from './auth.js';
 import { registerSocial } from './social.js';
@@ -29,6 +30,7 @@ await initFilesSchema();
 await initMailSchema();
 await initPreferencesSchema();
 await initSiteSettingsSchema();
+await initTracksSchema();
 await backfillMissingFileSizes();
 await registerAuth(app);
 await registerSocial(app);

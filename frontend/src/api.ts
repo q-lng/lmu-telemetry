@@ -322,3 +322,33 @@ export function fetchSiteSettings(): Promise<SiteSettings> {
 export function updateSiteSettings(patch: Partial<SiteSettings>): Promise<SiteSettings> {
   return patchJson('/api/admin/site-settings', patch);
 }
+
+export function fetchAdminTracks(): Promise<TrackCatalogEntry[]> {
+  return getJson<{ tracks: TrackCatalogEntry[] }>('/api/admin/tracks').then((r) => r.tracks);
+}
+
+export function createAdminTrack(entry: TrackCatalogEntry): Promise<TrackCatalogEntry> {
+  return postJson<TrackCatalogEntry>('/api/admin/tracks', entry);
+}
+
+export function updateAdminTrack(slug: string, patch: { name?: string; country?: string }): Promise<TrackCatalogEntry> {
+  return patchJson<TrackCatalogEntry>(`/api/admin/tracks/${encodeURIComponent(slug)}`, patch);
+}
+
+async function uploadImage(url: string, file: File): Promise<void> {
+  const form = new FormData();
+  form.append('file', file, file.name);
+  const res = await fetch(url, { method: 'POST', body: form });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(tError((body as { error?: string }).error));
+  }
+}
+
+export function uploadTrackPhoto(slug: string, file: File): Promise<void> {
+  return uploadImage(`/api/admin/tracks/${encodeURIComponent(slug)}/photo`, file);
+}
+
+export function uploadTrackMap(slug: string, file: File): Promise<void> {
+  return uploadImage(`/api/admin/tracks/${encodeURIComponent(slug)}/map`, file);
+}
