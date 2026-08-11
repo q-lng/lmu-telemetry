@@ -59,6 +59,13 @@ disparaît et l'app plante au démarrage (`Failed to resolve import`). Toujours 
 depuis le `package.json` à jour et que la dépendance soit bien dans l'image — copier
 `package.json`/`package-lock.json` vers l'hôte ne suffit pas seul.
 
+**Assets statiques (`frontend/public/`)** : monté explicitement dans `docker-compose.yml`
+(`./frontend/public:/app/public`) — un fichier déposé côté hôte dans ce dossier sans ce
+mount n'atteint jamais le conteneur qui tourne. Piège silencieux : `curl` sur le chemin
+renvoie quand même un `200` (fallback SPA de Vite qui sert `index.html` pour toute route
+non trouvée), donc vérifier le `Content-Type` de la réponse, pas juste le code HTTP, pour
+confirmer qu'un asset est réellement servi.
+
 ## Conventions
 
 - Noms de canaux/tables DuckDB contiennent espaces et caractères spéciaux → toujours
