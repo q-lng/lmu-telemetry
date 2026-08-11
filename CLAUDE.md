@@ -59,6 +59,13 @@ disparaît et l'app plante au démarrage (`Failed to resolve import`). Toujours 
 depuis le `package.json` à jour et que la dépendance soit bien dans l'image — copier
 `package.json`/`package-lock.json` vers l'hôte ne suffit pas seul.
 
+**Assets statiques uploadés (photos/maps de circuit)** : servis par le backend depuis
+`DATA_DIR/track-photos` (voir `backend/src/tracks.ts`), pas par le frontend — le dossier
+`frontend/public/` n'est plus monté du tout dans `docker-compose.yml`. Piège général à
+retenir : un `curl` en dev sur une route inconnue du frontend (Vite) renvoie quand même un
+`200` (fallback SPA qui sert `index.html`), donc pour confirmer qu'un asset/fichier est
+réellement servi, vérifier le `Content-Type` de la réponse, pas juste le code HTTP.
+
 ## Conventions
 
 - Noms de canaux/tables DuckDB contiennent espaces et caractères spéciaux → toujours

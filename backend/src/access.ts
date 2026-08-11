@@ -159,6 +159,51 @@ export async function listVisibleFiles(
   return rows.map(fromRow);
 }
 
+/** Distinct track/car names matching a query, same visibility rule as
+ * listVisibleFiles (public, or friends-of-owner/own files when logged in) —
+ * for the navbar search dropdown, not a full session list. */
+export async function searchTrackCarNames(
+  viewerId: number | null,
+  query: string,
+  limit = 6,
+): Promise<{ tracks: string[]; cars: string[] }> {
+  const visibilityClauses = [`visibility = 'public'`];
+  const params: unknown[] = [];
+
+  function addParam(value: unknown): string {
+    params.push(value);
+    return `$${params.length}`;
+  }
+
+  if (viewerId !== null) {
+    visibilityClauses.push(`owner_id = ${addParam(viewerId)}`);
+    visibilityClauses.push(
+      `(visibility = 'friends' AND owner_id IN (
+        SELECT CASE WHEN user_a_id = ${addParam(viewerId)} THEN user_b_id ELSE user_a_id END
+        FROM friendships WHERE user_a_id = ${addParam(viewerId)} OR user_b_id = ${addParam(viewerId)}
+      ))`,
+    );
+  }
+  const visibilityWhere = `(${visibilityClauses.join(' OR ')})`;
+  const likeParam = addParam(`%${query}%`);
+  const limitParam = addParam(limit);
+
+  const [trackRows, carRows] = await Promise.all([
+    pgQuery<{ track: string }>(
+      `SELECT DISTINCT track FROM telemetry_files WHERE ${visibilityWhere} AND track ILIKE ${likeParam} ORDER BY track LIMIT ${limitParam}`,
+      params,
+    ),
+    pgQuery<{ car: string }>(
+      `SELECT DISTINCT car FROM telemetry_files WHERE ${visibilityWhere} AND car ILIKE ${likeParam} ORDER BY car LIMIT ${limitParam}`,
+      params,
+    ),
+  ]);
+  return {
+    tracks: trackRows.map((r) => r.track).filter((v): v is string => !!v),
+    cars: carRows.map((r) => r.car).filter((v): v is string => !!v),
+  };
+}
+
 /** Public (or friends-of-owner) shared laps matching track/car, across all files. */
 export async function searchSharedLaps(
   viewerId: number | null,

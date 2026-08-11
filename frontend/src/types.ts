@@ -1,3 +1,5 @@
+import type { CarCategory } from './carCategories';
+
 export interface SessionSummary {
   file: string;
   ownerId: number | null;
@@ -118,6 +120,55 @@ export interface ProfileSummary extends PublicUser {
   isFollowing: boolean;
   requestState: 'none' | 'sent' | 'received';
   friendRequestId?: number;
+}
+
+export interface TrackSearchResult {
+  name: string;
+  slug: string | null;
+}
+
+export interface SearchResults {
+  users: ProfileSummary[];
+  tracks: TrackSearchResult[];
+  cars: string[];
+}
+
+export type ImageExt = 'jpg' | 'png';
+
+export interface TrackCatalogEntry {
+  slug: string;
+  name: string;
+  country: string;
+  photoExt: ImageExt | null;
+  mapExt: ImageExt | null;
+  dlcSlug: string | null;
+  dlcName: string | null;
+  dlcColor: string | null;
+}
+
+export interface CarCatalogEntry {
+  slug: string;
+  name: string;
+  category: CarCategory;
+  manufacturerSlug: string;
+  manufacturer: string;
+  photoExt: ImageExt | null;
+  manufacturerBadgeExt: ImageExt | null;
+  dlcSlug: string | null;
+  dlcName: string | null;
+  dlcColor: string | null;
+}
+
+export interface DlcCatalogEntry {
+  slug: string;
+  name: string;
+  color: string;
+}
+
+export interface ManufacturerCatalogEntry {
+  slug: string;
+  name: string;
+  badgeExt: ImageExt | null;
 }
 
 export interface FriendRequestSummary {

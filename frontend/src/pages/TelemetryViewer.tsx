@@ -393,10 +393,11 @@ export default function TelemetryViewer() {
   // server actually having the data to serve to others.
   const [publishVisibility, setPublishVisibility] = useState<LapVisibility>('public');
   const [publishScope, setPublishScope] = useState<'file' | 'lap'>('file');
-  const [publishState, setPublishState] = useState<{ busy: boolean; error: string | null; done: boolean }>({
+  const [publishState, setPublishState] = useState<{ busy: boolean; error: string | null; done: boolean; progress: number | null }>({
     busy: false,
     error: null,
     done: false,
+    progress: null,
   });
   const [dataSource, setDataSource] = useState<DataSource | null>(null);
   const [metadata, setMetadata] = useState<SessionMetadata | null>(null);
@@ -496,7 +497,11 @@ export default function TelemetryViewer() {
     });
   }
   const [viewRange, setViewRange] = useState<{ min: number; max: number } | null>(null);
-  const [uploadState, setUploadState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
+  const [uploadState, setUploadState] = useState<{ busy: boolean; error: string | null; progress: number | null }>({
+    busy: false,
+    error: null,
+    progress: null,
+  });
   const [deleteState, setDeleteState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
   const [laneWeights, setLaneWeights] = useState<Record<string, number>>(INITIAL_LANE_WEIGHTS);
   const [selectedPreset, setSelectedPreset] = useState('');
@@ -1144,14 +1149,16 @@ export default function TelemetryViewer() {
   }
 
   async function handleUpload(file: File) {
-    setUploadState({ busy: true, error: null });
+    setUploadState({ busy: true, error: null, progress: 0 });
     try {
-      const { file: savedName } = await uploadSession(file);
+      const { file: savedName } = await uploadSession(file, (progress) =>
+        setUploadState((prev) => ({ ...prev, progress })),
+      );
       reloadSessions(savedName);
-      setUploadState({ busy: false, error: null });
+      setUploadState({ busy: false, error: null, progress: null });
       setSessionPickerOpen(false);
     } catch (err) {
-      setUploadState({ busy: false, error: (err as Error).message });
+      setUploadState({ busy: false, error: (err as Error).message, progress: null });
     }
   }
 
@@ -1169,17 +1176,19 @@ export default function TelemetryViewer() {
 
   async function handlePublish() {
     if (!guestFile) return;
-    setPublishState({ busy: true, error: null, done: false });
+    setPublishState({ busy: true, error: null, done: false, progress: 0 });
     try {
-      const { file: savedName } = await uploadSession(guestFile);
+      const { file: savedName } = await uploadSession(guestFile, (progress) =>
+        setPublishState((prev) => ({ ...prev, progress })),
+      );
       if (publishScope === 'lap' && selectedLap !== 'full') {
         await setLapVisibility(savedName, selectedLap, publishVisibility);
       } else {
         await setFileVisibility(savedName, publishVisibility);
       }
-      setPublishState({ busy: false, error: null, done: true });
+      setPublishState({ busy: false, error: null, done: true, progress: null });
     } catch (err) {
-      setPublishState({ busy: false, error: (err as Error).message, done: false });
+      setPublishState({ busy: false, error: (err as Error).message, done: false, progress: null });
     }
   }
 
@@ -1613,7 +1622,9 @@ export default function TelemetryViewer() {
               </button>
             </div>
             <button className="upload-btn" disabled={publishState.busy} onClick={handlePublish}>
-              {publishState.busy ? t('tv.publishing') : t('tv.publish')}
+              {publishState.busy
+                ? t('tv.publishingProgress', { percent: Math.round((publishState.progress ?? 0) * 100) })
+                : t('tv.publish')}
             </button>
             {publishState.error && <div className="upload-error">{publishState.error}</div>}
             {publishState.done && <div className="field-hint">{t('tv.publishDone')}</div>}

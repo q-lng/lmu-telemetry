@@ -49,6 +49,31 @@ export async function initSiteSettingsSchema(): Promise<void> {
   await runSchemaFile('siteSettingsSchema.sql');
 }
 
+/** Runs the idempotent tracks schema DDL (the admin-editable track catalog) at startup. */
+export async function initTracksSchema(): Promise<void> {
+  await runSchemaFile('tracksSchema.sql');
+}
+
+/** Runs the idempotent cars schema DDL (the admin-editable car catalog) at
+ * startup — must run after initFilesSchema, since it ALTERs telemetry_files. */
+export async function initCarsSchema(): Promise<void> {
+  await runSchemaFile('carsSchema.sql');
+}
+
+/** Runs the idempotent manufacturers schema DDL (badge catalog, one entry
+ * shared by every car model from that manufacturer) at startup — must run
+ * after initCarsSchema, since it ALTERs cars. */
+export async function initManufacturersSchema(): Promise<void> {
+  await runSchemaFile('manufacturersSchema.sql');
+}
+
+/** Runs the idempotent DLC schema DDL (which pack a track/car belongs to,
+ * null = base game) at startup — must run after initCarsSchema, since it
+ * ALTERs both tracks and cars. */
+export async function initDlcSchema(): Promise<void> {
+  await runSchemaFile('dlcSchema.sql');
+}
+
 /** Runs `fn` inside a single client transaction, committing on success and rolling
  * back on any thrown error — needed for multi-statement mutations (e.g. accepting a
  * friend request: delete the request row + insert the friendship row atomically). */

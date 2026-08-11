@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { t } from '../i18n';
-import { UsersIcon, GearIcon } from '../components/icons';
+import { UsersIcon, GearIcon, MapPinIcon } from '../components/icons';
 
 /** Landing hub for /admin — big clickable tiles linking to each admin
  * section (Assetto Corsa Server Manager's admin dashboard was the reference
@@ -20,6 +20,11 @@ export function AdminHome() {
           <GearIcon size={28} />
           <h2>{t('admin.tileDisplay')}</h2>
           <p>{t('admin.tileDisplayDesc')}</p>
+        </Link>
+        <Link to="/admin/content" className="admin-tile">
+          <MapPinIcon size={28} />
+          <h2>{t('admin.tileContent')}</h2>
+          <p>{t('admin.tileContentDesc')}</p>
         </Link>
       </div>
     </div>

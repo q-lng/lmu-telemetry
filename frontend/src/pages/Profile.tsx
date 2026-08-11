@@ -53,8 +53,10 @@ export function Profile() {
         </div>
         {isSelf ? (
           <div className="social-empty">{t('profile.isSelf')}</div>
-        ) : (
+        ) : user ? (
           <RelationActions profile={profile} onChange={() => setRefreshKey((k) => k + 1)} />
+        ) : (
+          <p className="field-hint">{t('profile.signInToInteract')}</p>
         )}
       </div>
     </div>

@@ -14,6 +14,10 @@ const Social = lazy(() => import('./pages/Social').then((m) => ({ default: m.Soc
 const Profile = lazy(() => import('./pages/Profile').then((m) => ({ default: m.Profile })));
 const MesSessions = lazy(() => import('./pages/MesSessions').then((m) => ({ default: m.MesSessions })));
 const Browse = lazy(() => import('./pages/Browse').then((m) => ({ default: m.Browse })));
+const TrackPage = lazy(() => import('./pages/TrackPage').then((m) => ({ default: m.TrackPage })));
+const TracksPage = lazy(() => import('./pages/TracksPage').then((m) => ({ default: m.TracksPage })));
+const CarsPage = lazy(() => import('./pages/CarsPage').then((m) => ({ default: m.CarsPage })));
+const CarPage = lazy(() => import('./pages/CarPage').then((m) => ({ default: m.CarPage })));
 const SharedLap = lazy(() => import('./pages/SharedLap').then((m) => ({ default: m.SharedLap })));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword').then((m) => ({ default: m.ForgotPassword })));
 const ResetPassword = lazy(() => import('./pages/ResetPassword').then((m) => ({ default: m.ResetPassword })));
@@ -22,6 +26,8 @@ const Subscription = lazy(() => import('./pages/Subscription').then((m) => ({ de
 const AdminHome = lazy(() => import('./pages/AdminHome').then((m) => ({ default: m.AdminHome })));
 const AdminUsers = lazy(() => import('./pages/AdminUsers').then((m) => ({ default: m.AdminUsers })));
 const AdminDisplay = lazy(() => import('./pages/AdminDisplay').then((m) => ({ default: m.AdminDisplay })));
+const AdminContent = lazy(() => import('./pages/AdminContent').then((m) => ({ default: m.AdminContent })));
+const AdminManufacturers = lazy(() => import('./pages/AdminManufacturers').then((m) => ({ default: m.AdminManufacturers })));
 
 export default function App() {
   return (
@@ -33,6 +39,10 @@ export default function App() {
         <Route path="forgot-password" element={<ForgotPassword />} />
         <Route path="reset-password" element={<ResetPassword />} />
         <Route path="browse" element={<Browse />} />
+        <Route path="tracks" element={<TracksPage />} />
+        <Route path="tracks/:slug" element={<TrackPage />} />
+        <Route path="cars" element={<CarsPage />} />
+        <Route path="cars/:slug" element={<CarPage />} />
         <Route path="shared/:file/:lap" element={<SharedLap />} />
         <Route
           path="friends"
@@ -42,14 +52,7 @@ export default function App() {
             </RequireAuth>
           }
         />
-        <Route
-          path="u/:pseudo"
-          element={
-            <RequireAuth>
-              <Profile />
-            </RequireAuth>
-          }
-        />
+        <Route path="u/:pseudo" element={<Profile />} />
         <Route
           path="my-sessions"
           element={
@@ -95,6 +98,30 @@ export default function App() {
           element={
             <RequireAdmin>
               <AdminDisplay />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="admin/content"
+          element={
+            <RequireAdmin>
+              <AdminContent />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="admin/content/:tab"
+          element={
+            <RequireAdmin>
+              <AdminContent />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="admin/manufacturers"
+          element={
+            <RequireAdmin>
+              <AdminManufacturers />
             </RequireAdmin>
           }
         />

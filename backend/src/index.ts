@@ -8,6 +8,10 @@ import {
   initMailSchema,
   initPreferencesSchema,
   initSiteSettingsSchema,
+  initTracksSchema,
+  initCarsSchema,
+  initManufacturersSchema,
+  initDlcSchema,
 } from './pg.js';
 import { registerAuth } from './auth.js';
 import { registerSocial } from './social.js';
@@ -16,6 +20,10 @@ import { registerPreferences } from './preferences.js';
 import { registerStorage, backfillMissingFileSizes } from './storage.js';
 import { registerAdmin } from './admin.js';
 import { registerSiteSettings } from './siteSettings.js';
+import { registerSearch } from './search.js';
+import { registerTracks } from './tracks.js';
+import { registerCars } from './cars.js';
+import { registerManufacturers } from './manufacturers.js';
 
 const app = Fastify({ logger: true });
 await app.register(cors, { origin: true });
@@ -27,6 +35,10 @@ await initFilesSchema();
 await initMailSchema();
 await initPreferencesSchema();
 await initSiteSettingsSchema();
+await initTracksSchema();
+await initCarsSchema();
+await initManufacturersSchema();
+await initDlcSchema();
 await backfillMissingFileSizes();
 await registerAuth(app);
 await registerSocial(app);
@@ -35,6 +47,10 @@ await registerPreferences(app);
 await registerStorage(app);
 await registerAdmin(app);
 await registerSiteSettings(app);
+await registerSearch(app);
+await registerTracks(app);
+await registerCars(app);
+await registerManufacturers(app);
 
 app.get('/api/health', async () => ({ ok: true }));
 

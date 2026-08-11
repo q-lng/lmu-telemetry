@@ -15,14 +15,20 @@ import {
 import { follow, unfollow, isFollowing, listFollowing, listFollowers } from './follows.js';
 import { listNotifications, markNotificationsSeen } from './notifications.js';
 
-interface ProfileSummary extends PublicUser {
+export interface ProfileSummary extends PublicUser {
   isFriend: boolean;
   isFollowing: boolean;
   requestState: 'none' | 'sent' | 'received';
   friendRequestId?: number;
 }
 
-async function toProfileSummary(target: PublicUser, viewerId: number): Promise<ProfileSummary> {
+/** viewerId is null for anonymous callers (navbar search, direct profile
+ * links) — there's no relationship to report in that case, just the plain
+ * public fields. */
+export async function toProfileSummary(target: PublicUser, viewerId: number | null): Promise<ProfileSummary> {
+  if (viewerId === null) {
+    return { ...target, isFriend: false, isFollowing: false, requestState: 'none' };
+  }
   const [friend, following, pending] = await Promise.all([
     areFriends(viewerId, target.id),
     isFollowing(viewerId, target.id),
@@ -38,34 +44,29 @@ async function toProfileSummary(target: PublicUser, viewerId: number): Promise<P
 }
 
 export async function registerSocial(app: FastifyInstance): Promise<void> {
-  app.get<{ Querystring: { q?: string } }>(
-    '/api/users/search',
-    { preHandler: requireAuth },
-    async (req, reply) => {
-      const q = (req.query.q ?? '').trim();
-      if (q.length === 0) {
-        reply.send({ users: [] });
-        return;
-      }
-      const users = await searchUsersByPseudo(q, req.userId!);
-      const profiles = await Promise.all(users.map((u) => toProfileSummary(toPublicUser(u), req.userId!)));
-      reply.send({ users: profiles });
-    },
-  );
+  app.get<{ Querystring: { q?: string } }>('/api/users/search', async (req, reply) => {
+    const q = (req.query.q ?? '').trim();
+    if (q.length === 0) {
+      reply.send({ users: [] });
+      return;
+    }
+    const users = await searchUsersByPseudo(q, req.userId);
+    const profiles = await Promise.all(users.map((u) => toProfileSummary(toPublicUser(u), req.userId)));
+    reply.send({ users: profiles });
+  });
 
-  app.get<{ Params: { pseudo: string } }>(
-    '/api/users/:pseudo',
-    { preHandler: requireAuth },
-    async (req, reply) => {
-      const target = await findUserByPseudo(req.params.pseudo);
-      if (!target) {
-        reply.code(404).send({ error: 'USER_NOT_FOUND' });
-        return;
-      }
-      const profile = await toProfileSummary(toPublicUser(target), req.userId!);
-      reply.send({ profile });
-    },
-  );
+  app.get<{ Params: { pseudo: string } }>('/api/users/:pseudo', async (req, reply) => {
+    const target = await findUserByPseudo(req.params.pseudo);
+    // Same 404 either way — a private profile shouldn't even reveal that the
+    // pseudo exists to a viewer who isn't the account owner (public-vs-private
+    // is the only tier there is; no "friends can still view" exception).
+    if (!target || (target.profileVisibility === 'private' && target.id !== req.userId)) {
+      reply.code(404).send({ error: 'USER_NOT_FOUND' });
+      return;
+    }
+    const profile = await toProfileSummary(toPublicUser(target), req.userId);
+    reply.send({ profile });
+  });
 
   app.post<{ Body: { pseudo?: string } }>(
     '/api/friends/requests',

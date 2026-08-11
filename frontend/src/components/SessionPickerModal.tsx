@@ -12,11 +12,15 @@ interface AsyncActionState {
   error: string | null;
 }
 
+interface UploadState extends AsyncActionState {
+  progress: number | null;
+}
+
 interface Props {
   sessions: SessionSummary[];
   onSelect: (file: string) => void;
   onClose: () => void;
-  uploadState: AsyncActionState;
+  uploadState: UploadState;
   onUploadFile: (file: File) => void;
   guestState: AsyncActionState;
   onOpenGuestFile: (file: File) => void;
@@ -74,7 +78,9 @@ export function SessionPickerModal({
 
         <div className="modal-load-actions">
           <button className="upload-btn" disabled={uploadState.busy} onClick={() => fileInputRef.current?.click()}>
-            {uploadState.busy ? t('tv.importing') : t('tv.importFile')}
+            {uploadState.busy
+              ? t('tv.importingProgress', { percent: Math.round((uploadState.progress ?? 0) * 100) })
+              : t('tv.importFile')}
           </button>
           <input
             ref={fileInputRef}

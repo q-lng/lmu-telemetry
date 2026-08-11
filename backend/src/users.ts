@@ -164,10 +164,18 @@ export async function updatePasswordHash(userId: number, passwordHash: string): 
   await pgQuery(`UPDATE users SET password_hash = $2 WHERE id = $1`, [userId, passwordHash]);
 }
 
-/** Prefix search on pseudo, case-insensitive, excluding the searching user themselves. */
-export async function searchUsersByPseudo(query: string, excludeUserId: number, limit = 20): Promise<User[]> {
+/** Prefix search on pseudo, case-insensitive, excluding the searching user
+ * themselves (when known — anonymous callers pass null) and private profiles,
+ * which shouldn't surface in search regardless of who's looking: there's
+ * nothing a viewer could do with a private result anyway (friend-request/
+ * follow already reject with PROFILE_IS_PRIVATE). */
+export async function searchUsersByPseudo(query: string, excludeUserId: number | null, limit = 20): Promise<User[]> {
   const rows = await pgQuery<UserRow>(
-    `SELECT * FROM users WHERE pseudo ILIKE $1 || '%' AND id <> $2 ORDER BY pseudo LIMIT $3`,
+    `SELECT * FROM users
+     WHERE pseudo ILIKE $1 || '%'
+       AND ($2::int IS NULL OR id <> $2)
+       AND profile_visibility = 'public'
+     ORDER BY pseudo LIMIT $3`,
     [query, excludeUserId, limit],
   );
   return rows.map(fromRow);
