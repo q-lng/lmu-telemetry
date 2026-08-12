@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { useSiteSettings } from '../SiteSettingsContext';
@@ -11,6 +11,27 @@ import { ContentMenu } from './ContentMenu';
 import { NotificationsBell } from './NotificationsBell';
 import { CloseIcon, SearchIcon } from './icons';
 import { VipBadge } from './VipBadge';
+import { Flag } from './flags';
+import { Badge } from './Badge';
+import { CAR_CATEGORY_LABELS, CAR_CATEGORY_TONES } from '../carCategories';
+
+// Track/car search results get the entity's own photo pinned to the right
+// half of the row (a real <img> with object-fit: cover, same technique as
+// TrackHero/CarHero — a CSS background-size percentage would stretch it
+// instead of cropping to fit), with a gradient overlay sized to exactly that
+// same box so it reads as "starts at 50% of the row, ends at 100%": opaque
+// at the box's own left edge (blends into the row, right where the text
+// sits) fading to transparent at its right edge (revealing the photo fully
+// at the row's outer edge).
+function SearchResultPhoto({ url }: { url: string | null }) {
+  if (!url) return null;
+  return (
+    <>
+      <img className="navbar-search-result-photo" src={url} alt="" />
+      <span className="navbar-search-result-fade" aria-hidden="true" />
+    </>
+  );
+}
 
 // Client-side navigation (Link/useLocation) — the app used to force a real
 // full-page load on every navigation; that's what caused the white flash and
@@ -87,9 +108,9 @@ export function Navbar() {
     navigate(track.slug ? `/tracks/${track.slug}` : `/browse?track=${encodeURIComponent(track.name)}`);
   }
 
-  function goToCar(name: string) {
+  function goToCar(slug: string) {
     closeSearch();
-    navigate(`/browse?car=${encodeURIComponent(name)}`);
+    navigate(`/cars/${slug}`);
   }
 
   return (
@@ -119,30 +140,57 @@ export function Navbar() {
                 {results && results.users.length > 0 && (
                   <div className="navbar-search-group">
                     <div className="navbar-search-group-label">{t('nav.searchUsers')}</div>
-                    {results.users.map((u) => (
-                      <button key={u.id} className="navbar-search-result" onClick={() => goToUser(u.pseudo)}>
-                        {u.pseudo} <VipBadge plan={u.plan} />
-                      </button>
+                    {results.users.map((u, i) => (
+                      <Fragment key={u.id}>
+                        {i > 0 && <div className="navbar-search-divider" />}
+                        <button className="navbar-search-result" onClick={() => goToUser(u.pseudo)}>
+                          <VipBadge plan={u.plan} /> {u.pseudo}
+                        </button>
+                      </Fragment>
                     ))}
                   </div>
                 )}
                 {results && results.tracks.length > 0 && (
                   <div className="navbar-search-group">
                     <div className="navbar-search-group-label">{t('nav.searchTracks')}</div>
-                    {results.tracks.map((track) => (
-                      <button key={track.name} className="navbar-search-result" onClick={() => goToTrack(track)}>
-                        {track.name}
-                      </button>
+                    {results.tracks.map((track, i) => (
+                      <Fragment key={track.name}>
+                        {i > 0 && <div className="navbar-search-divider" />}
+                        <button className="navbar-search-result" onClick={() => goToTrack(track)}>
+                          <SearchResultPhoto url={track.photoExt ? `/api/track-photos/${track.slug}.${track.photoExt}` : null} />
+                          <span className="navbar-search-result-content">
+                            {track.country && <Flag country={track.country} size={14} />} {track.name}
+                          </span>
+                        </button>
+                      </Fragment>
                     ))}
                   </div>
                 )}
                 {results && results.cars.length > 0 && (
                   <div className="navbar-search-group">
                     <div className="navbar-search-group-label">{t('nav.searchCars')}</div>
-                    {results.cars.map((name) => (
-                      <button key={name} className="navbar-search-result" onClick={() => goToCar(name)}>
-                        {name}
-                      </button>
+                    {results.cars.map((car, i) => (
+                      <Fragment key={car.slug}>
+                        {i > 0 && <div className="navbar-search-divider" />}
+                        <button className="navbar-search-result" onClick={() => goToCar(car.slug)}>
+                          <SearchResultPhoto url={car.photoExt ? `/api/car-photos/${car.slug}.${car.photoExt}` : null} />
+                          <span className="navbar-search-result-content">
+                            <span className="navbar-search-result-main">
+                              {car.manufacturerBadgeExt && (
+                                <img
+                                  className="navbar-search-result-mfr-badge"
+                                  src={`/api/manufacturer-photos/${car.manufacturerSlug}.${car.manufacturerBadgeExt}`}
+                                  alt=""
+                                />
+                              )}
+                              {car.name}
+                            </span>
+                            <span className="navbar-search-result-category">
+                              <Badge tone={CAR_CATEGORY_TONES[car.category]}>{CAR_CATEGORY_LABELS[car.category]}</Badge>
+                            </span>
+                          </span>
+                        </button>
+                      </Fragment>
                     ))}
                   </div>
                 )}

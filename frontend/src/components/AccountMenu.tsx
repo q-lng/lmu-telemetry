@@ -47,8 +47,8 @@ export function AccountMenu() {
         <span className="navbar-avatar" aria-hidden="true">
           <UserIcon />
         </span>
-        <span className="account-menu-name">{user.pseudo}</span>
         <VipBadge plan={user.plan} />
+        <span className="account-menu-name">{user.pseudo}</span>
       </button>
       {open && (
         <div className="account-menu-popover">

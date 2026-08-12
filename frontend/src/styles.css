@@ -346,7 +346,17 @@ body {
 .navbar-search-group {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+}
+
+/* A real sibling element, not a border on .navbar-search-result itself —
+   that row has its own border-radius + overflow:hidden (needed to clip the
+   photo layer), which made a border-top/bottom on the row curve at the
+   corners and sit oddly inside the flex gap instead of reading as one clean
+   straight line between rows. */
+.navbar-search-divider {
+  height: 1px;
+  margin: 2px 8px;
+  background: var(--border);
 }
 
 .navbar-search-group-label {
@@ -358,6 +368,7 @@ body {
 }
 
 .navbar-search-result {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -367,10 +378,75 @@ body {
   border-radius: var(--radius-sm);
   color: var(--primary-ink);
   font-size: calc(1rem * 13 / 16);
+  overflow: hidden;
 }
 
+/* Track/car results carry a real photo (see Navbar.tsx's SearchResultPhoto)
+   sitting behind the text via absolute positioning — that's why the hover
+   cue for every row is a brightness bump rather than relying only on the
+   background-color swap below: a plain row's background-color would show
+   fine, but a photo row's image/fade layers sit visually on top of it and
+   would hide the color change entirely. */
 .navbar-search-result:hover {
   background: var(--surface-2);
+  filter: brightness(1.15);
+}
+
+/* Right-anchored, object-fit: cover (not a stretched background-size) so the
+   photo keeps its real aspect ratio — same technique as TrackHero/CarHero. */
+.navbar-search-result-photo {
+  position: absolute;
+  inset: 0;
+  left: 50%;
+  width: 50%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Sized to exactly the same box as the photo above, so the fade reads as
+   "starts at 50% of the row, ends at 100%": opaque at its own left edge
+   (blends into the row, right where the text sits) fading to transparent at
+   its own right edge (revealing the photo fully at the row's outer edge). */
+.navbar-search-result-fade {
+  position: absolute;
+  inset: 0;
+  left: 50%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(to right, var(--surface-1), transparent);
+}
+
+.navbar-search-result-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.navbar-search-result-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.navbar-search-result-mfr-badge {
+  height: 14px;
+  width: auto;
+  object-fit: contain;
+}
+
+/* Pushed to the far right of .navbar-search-result-content (a flex row) —
+   smaller than a normal .badge since this is a secondary tag next to the
+   car's own name, not the primary label the way it is on a /cars card. */
+.navbar-search-result-category {
+  margin-left: auto;
+}
+
+.navbar-search-result-category .badge {
+  font-size: calc(1rem * 9 / 16);
+  padding: 2px 6px;
 }
 
 .navbar-search-empty {
@@ -858,6 +934,8 @@ body {
 /* ---- Landing page ---- */
 
 .landing {
+  flex: 1;
+  width: 100%;
   max-width: 900px;
   margin: 0 auto;
   padding: 60px 24px;
@@ -2955,6 +3033,67 @@ body {
    horizontally (the tile grid) while staying anchored to the top. */
 .page-shell-centered {
   align-items: center;
+}
+
+/* Legal Notice / Terms / Privacy — caps line length for readability on a
+   page that's mostly prose, unlike every other (mostly table/grid/chart)
+   page-shell user. */
+.legal-page {
+  max-width: 720px;
+}
+
+.legal-page h2 {
+  margin-bottom: 8px;
+}
+
+.legal-page p,
+.legal-page ul {
+  color: var(--secondary-ink);
+  line-height: 1.6;
+}
+
+.legal-page ul {
+  padding-left: 20px;
+}
+
+.legal-page a {
+  color: var(--accent);
+}
+
+/* Scrolls with each page's content (lives inside .layout-outlet, after
+   <Outlet/>) rather than sitting as a persistent bar that would eat into
+   the viewport height other pages (charts, tables) assume they fully own. */
+.app-footer {
+  flex: 0 0 auto;
+  margin-top: 24px;
+  padding: 12px 40px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.app-footer-links {
+  display: flex;
+  gap: 16px;
+}
+
+.app-footer-links a {
+  color: var(--secondary-ink);
+  font-size: calc(1rem * 12 / 16);
+  text-decoration: none;
+}
+
+.app-footer-links a:hover {
+  color: var(--primary-ink);
+}
+
+.app-footer-disclaimer {
+  color: var(--muted-ink);
+  font-size: calc(1rem * 11 / 16);
+  margin: 0;
 }
 
 .admin-back-link {

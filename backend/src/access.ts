@@ -159,14 +159,18 @@ export async function listVisibleFiles(
   return rows.map(fromRow);
 }
 
-/** Distinct track/car names matching a query, same visibility rule as
+/** Distinct track names matching a query, same visibility rule as
  * listVisibleFiles (public, or friends-of-owner/own files when logged in) —
- * for the navbar search dropdown, not a full session list. */
-export async function searchTrackCarNames(
-  viewerId: number | null,
-  query: string,
-  limit = 6,
-): Promise<{ tracks: string[]; cars: string[] }> {
+ * for the navbar search dropdown, not a full session list.
+ *
+ * Cars used to be searched the same way (distinct telemetry_files.car
+ * strings) — that only ever found a car if someone had already uploaded a
+ * session with it, so searching e.g. "ferrari" found nothing unless a
+ * Ferrari session existed. Tracks still work this way because the track
+ * catalog (tracks.ts) isn't fully populated yet (3 of the ~18 real tracks);
+ * cars now search the catalog directly instead (see cars.ts's searchCars),
+ * since all 42 real cars are already seeded there. */
+export async function searchTrackNames(viewerId: number | null, query: string, limit = 6): Promise<string[]> {
   const visibilityClauses = [`visibility = 'public'`];
   const params: unknown[] = [];
 
@@ -188,20 +192,11 @@ export async function searchTrackCarNames(
   const likeParam = addParam(`%${query}%`);
   const limitParam = addParam(limit);
 
-  const [trackRows, carRows] = await Promise.all([
-    pgQuery<{ track: string }>(
-      `SELECT DISTINCT track FROM telemetry_files WHERE ${visibilityWhere} AND track ILIKE ${likeParam} ORDER BY track LIMIT ${limitParam}`,
-      params,
-    ),
-    pgQuery<{ car: string }>(
-      `SELECT DISTINCT car FROM telemetry_files WHERE ${visibilityWhere} AND car ILIKE ${likeParam} ORDER BY car LIMIT ${limitParam}`,
-      params,
-    ),
-  ]);
-  return {
-    tracks: trackRows.map((r) => r.track).filter((v): v is string => !!v),
-    cars: carRows.map((r) => r.car).filter((v): v is string => !!v),
-  };
+  const trackRows = await pgQuery<{ track: string }>(
+    `SELECT DISTINCT track FROM telemetry_files WHERE ${visibilityWhere} AND track ILIKE ${likeParam} ORDER BY track LIMIT ${limitParam}`,
+    params,
+  );
+  return trackRows.map((r) => r.track).filter((v): v is string => !!v);
 }
 
 /** Public (or friends-of-owner) shared laps matching track/car, across all files. */

@@ -125,12 +125,17 @@ export interface ProfileSummary extends PublicUser {
 export interface TrackSearchResult {
   name: string;
   slug: string | null;
+  country: string | null;
+  photoExt: ImageExt | null;
 }
 
 export interface SearchResults {
   users: ProfileSummary[];
   tracks: TrackSearchResult[];
-  cars: string[];
+  // Cars search returns full catalog entries (not a slim search-result type)
+  // since it's always a real catalog match now — see backend/src/cars.ts's
+  // searchCars.
+  cars: CarCatalogEntry[];
 }
 
 export type ImageExt = 'jpg' | 'png';
