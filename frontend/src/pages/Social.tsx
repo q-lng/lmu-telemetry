@@ -130,7 +130,7 @@ export function Social() {
             {results.map((r) => (
               <div className="user-row" key={r.id}>
                 <Link to={`/u/${encodeURIComponent(r.pseudo)}`} className="user-row-name">
-                  {r.pseudo} <VipBadge plan={r.plan} /> <span className="user-row-fullname">{r.prenom} {r.nom}</span>
+                  <VipBadge plan={r.plan} /> {r.pseudo} <span className="user-row-fullname">{r.prenom} {r.nom}</span>
                 </Link>
                 <RelationActions profile={r} onChange={bump} />
               </div>
@@ -152,7 +152,7 @@ export function Social() {
                 {friends.map((u) => (
                   <div className="user-row" key={u.id}>
                     <Link to={`/u/${encodeURIComponent(u.pseudo)}`} className="user-row-name">
-                      {u.pseudo} <VipBadge plan={u.plan} /> <span className="user-row-fullname">{u.prenom} {u.nom}</span>
+                      <VipBadge plan={u.plan} /> {u.pseudo} <span className="user-row-fullname">{u.prenom} {u.nom}</span>
                     </Link>
                     <div className="user-row-actions">
                       <button onClick={() => removeFriend(u.id).then(bump)}>{t('friends.remove')}</button>
@@ -179,7 +179,7 @@ export function Social() {
                 {requests.incoming.map((r) => (
                   <div className="user-row" key={r.id}>
                     <Link to={`/u/${encodeURIComponent(r.user.pseudo)}`} className="user-row-name">
-                      {r.user.pseudo} <VipBadge plan={r.user.plan} />
+                      <VipBadge plan={r.user.plan} /> {r.user.pseudo}
                     </Link>
                     <div className="user-row-actions">
                       <button className="relation-accept" onClick={() => acceptFriendRequest(r.id).then(bump)}>
@@ -197,7 +197,7 @@ export function Social() {
                 {requests.outgoing.map((r) => (
                   <div className="user-row" key={r.id}>
                     <Link to={`/u/${encodeURIComponent(r.user.pseudo)}`} className="user-row-name">
-                      {r.user.pseudo} <VipBadge plan={r.user.plan} />
+                      <VipBadge plan={r.user.plan} /> {r.user.pseudo}
                     </Link>
                     <div className="user-row-actions">
                       <button onClick={() => declineFriendRequest(r.id).then(bump)}>{t('friends.cancel')}</button>
@@ -224,7 +224,7 @@ export function Social() {
                 {following.map((u) => (
                   <div className="user-row" key={u.id}>
                     <Link to={`/u/${encodeURIComponent(u.pseudo)}`} className="user-row-name">
-                      {u.pseudo} <VipBadge plan={u.plan} />
+                      <VipBadge plan={u.plan} /> {u.pseudo}
                     </Link>
                     <div className="user-row-actions">
                       <button onClick={() => unfollowUser(u.pseudo).then(bump)}>{t('follows.unfollow')}</button>
@@ -239,7 +239,7 @@ export function Social() {
                 {followers.map((u) => (
                   <div className="user-row" key={u.id}>
                     <Link to={`/u/${encodeURIComponent(u.pseudo)}`} className="user-row-name">
-                      {u.pseudo} <VipBadge plan={u.plan} />
+                      <VipBadge plan={u.plan} /> {u.pseudo}
                     </Link>
                     {!followingIds.has(u.id) && (
                       <div className="user-row-actions">

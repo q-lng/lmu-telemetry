@@ -28,6 +28,9 @@ const AdminUsers = lazy(() => import('./pages/AdminUsers').then((m) => ({ defaul
 const AdminDisplay = lazy(() => import('./pages/AdminDisplay').then((m) => ({ default: m.AdminDisplay })));
 const AdminContent = lazy(() => import('./pages/AdminContent').then((m) => ({ default: m.AdminContent })));
 const AdminManufacturers = lazy(() => import('./pages/AdminManufacturers').then((m) => ({ default: m.AdminManufacturers })));
+const LegalNotice = lazy(() => import('./pages/LegalNotice').then((m) => ({ default: m.LegalNotice })));
+const TermsOfService = lazy(() => import('./pages/TermsOfService').then((m) => ({ default: m.TermsOfService })));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy').then((m) => ({ default: m.PrivacyPolicy })));
 
 export default function App() {
   return (
@@ -125,6 +128,9 @@ export default function App() {
             </RequireAdmin>
           }
         />
+        <Route path="legal/notice" element={<LegalNotice />} />
+        <Route path="legal/terms" element={<TermsOfService />} />
+        <Route path="legal/privacy" element={<PrivacyPolicy />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

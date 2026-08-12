@@ -75,7 +75,7 @@ export function FriendsWidget() {
             {requests.incoming.map((r) => (
               <div className="user-row" key={r.id}>
                 <Link to={`/u/${encodeURIComponent(r.user.pseudo)}`} className="user-row-name" onClick={() => setOpen(false)}>
-                  {r.user.pseudo} <VipBadge plan={r.user.plan} />
+                  <VipBadge plan={r.user.plan} /> {r.user.pseudo}
                 </Link>
                 <div className="user-row-actions">
                   <button
@@ -102,7 +102,7 @@ export function FriendsWidget() {
                 {requests.outgoing.map((r) => (
                   <div className="user-row" key={r.id}>
                     <Link to={`/u/${encodeURIComponent(r.user.pseudo)}`} className="user-row-name" onClick={() => setOpen(false)}>
-                      {r.user.pseudo} <VipBadge plan={r.user.plan} />
+                      <VipBadge plan={r.user.plan} /> {r.user.pseudo}
                     </Link>
                     <div className="user-row-actions">
                       <button onClick={() => declineFriendRequest(r.id).then(refreshRequests)}>{t('friends.cancel')}</button>
@@ -119,7 +119,7 @@ export function FriendsWidget() {
             {friends.map((u) => (
               <div className="user-row" key={u.id}>
                 <Link to={`/u/${encodeURIComponent(u.pseudo)}`} className="user-row-name" onClick={() => setOpen(false)}>
-                  {u.pseudo} <VipBadge plan={u.plan} />
+                  <VipBadge plan={u.plan} /> {u.pseudo}
                 </Link>
                 <div className="user-row-actions">
                   <button onClick={() => removeFriend(u.id).then(refreshFriends)}>{t('friends.remove')}</button>

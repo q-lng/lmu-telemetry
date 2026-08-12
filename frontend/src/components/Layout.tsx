@@ -1,7 +1,8 @@
 import { Suspense } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Navbar } from './Navbar';
 import { FriendsWidget } from './FriendsWidget';
+import { Footer } from './Footer';
 import { useAuth } from '../AuthContext';
 import { usePreferences } from '../PreferencesContext';
 
@@ -16,6 +17,7 @@ function PageLoading() {
 export function Layout() {
   const { loading: authLoading } = useAuth();
   const { loading: preferencesLoading } = usePreferences();
+  const { pathname } = useLocation();
 
   // Hold off rendering the shell entirely until we know the real accent
   // color (auth + preferences both resolved) — otherwise the navbar/buttons
@@ -32,6 +34,10 @@ export function Layout() {
         <Suspense fallback={<PageLoading />}>
           <Outlet />
         </Suspense>
+        {/* Not on /telemetry — that view is a dense, chart-heavy workspace
+            that assumes it owns the full outlet height; a footer there is
+            just unwanted scroll clutter below the actual tool. */}
+        {pathname !== '/telemetry' && <Footer />}
       </main>
       <FriendsWidget />
     </div>

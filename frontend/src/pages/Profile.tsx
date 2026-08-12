@@ -45,7 +45,7 @@ export function Profile() {
       <div className="profile-card">
         <div className="profile-heading">
           <h1>
-            {profile.pseudo} <VipBadge plan={profile.plan} />
+            <VipBadge plan={profile.plan} /> {profile.pseudo}
           </h1>
           <p>
             {profile.prenom} {profile.nom}

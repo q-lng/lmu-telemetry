@@ -70,6 +70,20 @@ export async function findCarBySlug(slug: string): Promise<CarCatalogEntry | nul
   return rows[0] ? withAssets(rows[0]) : null;
 }
 
+/** Navbar search — matches by car name OR manufacturer (see access.ts's
+ * searchTrackNames for why cars search the catalog directly instead of
+ * distinct telemetry_files.car strings: the catalog has every real car,
+ * uploaded sessions only have whichever ones someone's actually driven).
+ * Returns full catalog entries (not just name/slug) so the search dropdown
+ * can show the category badge + car photo, same as the /cars cards. */
+export async function searchCars(query: string, limit = 6): Promise<CarCatalogEntry[]> {
+  const rows = await pgQuery<CarRow>(`${SELECT_CAR_SQL} WHERE c.name ILIKE $1 OR m.name ILIKE $1 ORDER BY c.name LIMIT $2`, [
+    `%${query}%`,
+    limit,
+  ]);
+  return rows.map(withAssets);
+}
+
 export async function createCar(entry: {
   slug: string;
   name: string;
