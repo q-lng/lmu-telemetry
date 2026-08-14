@@ -5,6 +5,7 @@ import type { SessionSummary, TrackCatalogEntry } from '../types';
 import { t } from '../i18n';
 import { SessionTable } from '../components/SessionTable';
 import { TrackHero } from '../components/TrackHero';
+import { TrackLeaderboard } from '../components/TrackLeaderboard';
 
 export function TrackPage() {
   const { slug = '' } = useParams<{ slug: string }>();
@@ -59,10 +60,8 @@ export function TrackPage() {
     <div className="page-shell">
       <TrackHero entry={entry} />
 
-      <div className="track-leaderboard-placeholder">
-        <h2 className="social-subheading">{t('track.leaderboard')}</h2>
-        <p className="field-hint">{t('track.leaderboardComingSoon')}</p>
-      </div>
+      <h2 className="social-subheading">{t('track.leaderboard')}</h2>
+      <TrackLeaderboard slug={slug} />
 
       <h2 className="social-subheading">{t('track.sessions')}</h2>
       {deleteState.error && <div className="upload-error">{deleteState.error}</div>}

@@ -24,6 +24,7 @@ import { registerSearch } from './search.js';
 import { registerTracks } from './tracks.js';
 import { registerCars } from './cars.js';
 import { registerManufacturers } from './manufacturers.js';
+import { registerLeaderboard } from './leaderboard.js';
 
 const app = Fastify({ logger: true });
 await app.register(cors, { origin: true });
@@ -51,6 +52,7 @@ await registerSearch(app);
 await registerTracks(app);
 await registerCars(app);
 await registerManufacturers(app);
+await registerLeaderboard(app);
 
 app.get('/api/health', async () => ({ ok: true }));
 

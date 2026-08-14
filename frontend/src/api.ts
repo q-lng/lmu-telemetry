@@ -9,6 +9,8 @@ import type {
   LapInfo,
   LapShare,
   LapVisibility,
+  LeaderboardClass,
+  LeaderboardEntry,
   ManufacturerCatalogEntry,
   Notification,
   Plan,
@@ -130,6 +132,10 @@ export function resetPassword(token: string, password: string): Promise<void> {
 
 export function updateProfileVisibility(visibility: ProfileVisibility): Promise<PublicUser> {
   return putJson<{ user: PublicUser }>('/api/auth/profile-visibility', { visibility }).then((r) => r.user);
+}
+
+export function updateProfile(patch: { nom?: string; prenom?: string; lmuPseudo?: string }): Promise<PublicUser> {
+  return putJson<{ user: PublicUser }>('/api/auth/profile', patch).then((r) => r.user);
 }
 
 export function fetchSessions(
@@ -298,6 +304,16 @@ export function fetchLapShares(filename: string): Promise<LapShare[]> {
 
 export function setLapVisibility(filename: string, lapNumber: number, visibility: LapVisibility | null): Promise<void> {
   return postJson(`/api/sessions/${encodeURIComponent(filename)}/laps/${lapNumber}/visibility`, { visibility });
+}
+
+export function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
+  return getJson<{ entries: LeaderboardEntry[] }>('/api/leaderboard').then((r) => r.entries);
+}
+
+export function fetchTrackLeaderboard(slug: string): Promise<Partial<Record<LeaderboardClass, LeaderboardEntry[]>>> {
+  return getJson<{ classes: Partial<Record<LeaderboardClass, LeaderboardEntry[]>> }>(
+    `/api/tracks/${encodeURIComponent(slug)}/leaderboard`,
+  ).then((r) => r.classes);
 }
 
 export function searchSharedLaps(filter: { track?: string; car?: string } = {}): Promise<SharedLapResult[]> {

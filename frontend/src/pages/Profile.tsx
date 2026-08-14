@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { fetchProfile } from '../api';
 import type { ProfileSummary } from '../types';
 import { useAuth } from '../AuthContext';
@@ -52,7 +52,9 @@ export function Profile() {
           </p>
         </div>
         {isSelf ? (
-          <div className="social-empty">{t('profile.isSelf')}</div>
+          <Link to="/settings" className="modal-table-action">
+            {t('profile.editProfile')}
+          </Link>
         ) : user ? (
           <RelationActions profile={profile} onChange={() => setRefreshKey((k) => k + 1)} />
         ) : (

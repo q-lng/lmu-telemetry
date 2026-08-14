@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { createSharedLapDataSource } from '../dataSource';
 import type { ChannelSeries, Lane, SessionMetadata } from '../types';
 import { ChannelPlot } from '../components/ChannelPlot';
@@ -151,13 +151,21 @@ export function SharedLap() {
   return (
     <div className="shared-lap-page">
       <div className="shared-lap-header">
-        <h1>
-          {metadata?.info.TrackName ?? file} — {t('lap.number', { n: lapNumber })}
-        </h1>
-        <p>
-          {metadata?.info.CarName}
-          {metadata?.info.DriverName ? ` · ${metadata.info.DriverName}` : ''}
-        </p>
+        <div>
+          <h1>
+            {metadata?.info.TrackName ?? file} — {t('lap.number', { n: lapNumber })}
+          </h1>
+          <p>
+            {metadata?.info.CarName}
+            {metadata?.info.DriverName ? ` · ${metadata.info.DriverName}` : ''}
+          </p>
+        </div>
+        {/* Opens the full session in the main app, but doesn't jump to this
+            specific lap yet — TelemetryViewer only reads ?file=, not a lap —
+            see the tracked follow-up issue for deep-linking straight to it. */}
+        <Link to={`/telemetry?file=${encodeURIComponent(file)}`} className="auth-submit">
+          {t('lap.openInApp')}
+        </Link>
       </div>
 
       {gps && <TrackMap lat={gps.lat} lon={gps.lon} t={gps.t} cursorT={cursorT} viewRange={viewRange} height={260} />}
