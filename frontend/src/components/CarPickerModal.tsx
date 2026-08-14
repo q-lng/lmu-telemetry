@@ -1,10 +1,11 @@
 import { Fragment, useEffect, useState } from 'react';
 import { fetchCars } from '../api';
 import type { CarCatalogEntry } from '../types';
-import { CAR_KANBAN_GROUPS } from '../carCategories';
+import { CAR_CATEGORY_TONES, CAR_KANBAN_GROUPS } from '../carCategories';
 import { t } from '../i18n';
 import { CloseIcon } from './icons';
 import { SearchResultPhoto } from './SearchResultPhoto';
+import { Badge } from './Badge';
 
 interface Props {
   onSelect: (carSlug: string | null) => void;
@@ -65,7 +66,11 @@ export function CarPickerModal({ onSelect, onClose }: Props) {
           <div className="cars-kanban-board">
             {columns.map(({ group, cars: columnCars }) => (
               <div key={group.label} className="cars-kanban-column">
-                <h3 className="social-subheading cars-kanban-column-header">{group.label}</h3>
+                <h3 className="social-subheading cars-kanban-column-header">
+                  <Badge tone={group.categories.length === 1 ? CAR_CATEGORY_TONES[group.categories[0]] : 'gray'}>
+                    {group.label} ({columnCars.length})
+                  </Badge>
+                </h3>
                 <div className="navbar-search-group">
                   {columnCars.map((car, i) => (
                     <Fragment key={car.slug}>
