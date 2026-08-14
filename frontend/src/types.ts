@@ -77,6 +77,10 @@ export interface StorageUsage {
 export interface SessionMetadata {
   info: Record<string, string>;
   carSetup: unknown;
+  // Present on /api/sessions/:file/metadata and /api/shared-lap/.../metadata
+  // — the resolved real car (override, else livery mapping, else the raw
+  // info.CarName livery) — see backend/src/carResolution.ts.
+  resolvedCar?: string | null;
 }
 
 export type ChannelKind = 'continuous' | 'event';
@@ -216,6 +220,9 @@ export interface FileRecord {
   // Real car manually assigned by the owner, overriding the admin livery
   // mapping for this specific session — see backend/src/leaderboard.ts.
   carSlug: string | null;
+  // Resolved display name (override, else livery mapping, else the raw
+  // `car` livery above) — computed server-side, see resolveCarName.
+  resolvedCar: string | null;
 }
 
 export interface LiveryMapping {

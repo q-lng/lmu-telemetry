@@ -3,6 +3,7 @@ import { pgQuery } from './pg.js';
 import { getSessionMetadata } from './metadata.js';
 import { getLaps, type LapInfo } from './channels.js';
 import { listLmuPseudoMatches } from './users.js';
+import { listLiveryToCarSlug, resolveCarSlug } from './carResolution.js';
 
 export type LeaderboardClass = 'hypercar' | 'lmp2' | 'lmp3' | 'gte' | 'gt3' | 'unknown';
 
@@ -64,24 +65,6 @@ interface CarInfo {
 async function listCarInfo(): Promise<Map<string, CarInfo>> {
   const rows = await pgQuery<{ slug: string; name: string; category: string }>(`SELECT slug, name, category FROM cars`);
   return new Map(rows.map((r) => [r.slug, { name: r.name, category: catalogCategoryToLeaderboardClass(r.category) }]));
-}
-
-/** Admin-maintained livery (telemetry_files.car, free text) → real car —
- * see backend/src/liveryMappings.ts. Resolves every session sharing that
- * exact livery string, without per-session action. */
-async function listLiveryToCarSlug(): Promise<Map<string, string>> {
-  const rows = await pgQuery<{ livery_name: string; car_slug: string }>(
-    `SELECT livery_name, car_slug FROM livery_car_mappings`,
-  );
-  return new Map(rows.map((r) => [r.livery_name, r.car_slug]));
-}
-
-/** Per-session override (telemetry_files.car_slug) wins when set; otherwise
- * falls back to the admin livery mapping for this session's raw car string. */
-function resolveCarSlug(f: { car: string | null; carSlug: string | null }, liveryMap: Map<string, string>): string | null {
-  if (f.carSlug) return f.carSlug;
-  if (f.car) return liveryMap.get(f.car.trim()) ?? null;
-  return null;
 }
 
 /** Resolves the displayed car name AND class together — once a real car is

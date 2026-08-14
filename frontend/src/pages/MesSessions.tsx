@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { fetchCars, fetchLapShares, fetchLaps, fetchMyFiles, setFileVisibility, setLapVisibility, setSessionCar } from '../api';
-import type { CarCatalogEntry, FileRecord, LapInfo, LapVisibility, Visibility } from '../types';
+import { fetchLapShares, fetchLaps, fetchMyFiles, setFileVisibility, setLapVisibility, setSessionCar } from '../api';
+import type { FileRecord, LapInfo, LapVisibility, Visibility } from '../types';
 import { t } from '../i18n';
 import { CarPickerModal } from '../components/CarPickerModal';
 
@@ -11,14 +11,12 @@ export function MesSessions() {
   const [laps, setLaps] = useState<LapInfo[]>([]);
   const [lapShares, setLapShares] = useState<Record<number, LapVisibility>>({});
   const [lapsLoading, setLapsLoading] = useState(false);
-  const [cars, setCars] = useState<CarCatalogEntry[]>([]);
   const [carPickerFor, setCarPickerFor] = useState<string | null>(null);
 
   useEffect(() => {
     fetchMyFiles()
       .then(setFiles)
       .finally(() => setLoading(false));
-    fetchCars().then(setCars);
   }, []);
 
   async function handleVisibilityChange(filename: string, visibility: Visibility) {
@@ -29,7 +27,9 @@ export function MesSessions() {
   async function handleCarChange(filename: string, carSlug: string | null) {
     setCarPickerFor(null);
     await setSessionCar(filename, carSlug);
-    setFiles((prev) => prev.map((f) => (f.filename === filename ? { ...f, carSlug } : f)));
+    // Refetch rather than patch optimistically — the resolved display name
+    // (override vs. livery mapping vs. raw livery) is only known server-side.
+    setFiles(await fetchMyFiles());
   }
 
   async function toggleExpand(filename: string) {
@@ -72,8 +72,7 @@ export function MesSessions() {
             <div className="user-row">
               <button className="mes-sessions-name" onClick={() => toggleExpand(f.filename)}>
                 {f.track ?? f.filename}
-                {f.car ? ` — ${f.car}` : ''}
-                {f.carSlug && cars.find((c) => c.slug === f.carSlug) && ` (${cars.find((c) => c.slug === f.carSlug)!.name})`}
+                {f.resolvedCar ?? f.car ? ` — ${f.resolvedCar ?? f.car}` : ''}
               </button>
               <button className="modal-table-action" onClick={() => setCarPickerFor(f.filename)}>
                 {f.carSlug ? t('mesSessions.changeCar') : t('mesSessions.assignCar')}
