@@ -1365,12 +1365,10 @@ body {
   border-radius: var(--radius-md);
 }
 
-/* Track detail page (/tracks/:slug) — leaderboard is a placeholder (no
-   cached lap-time data or car-category taxonomy exists yet); the map
-   reuses a real public session's own GPS trace when one's available; the
-   hero photo is a real per-track static asset when one exists at
-   public/track-photos/<slug>.{jpg,png} (see TrackHeroPhoto), a plain
-   gradient otherwise. */
+/* Track detail page (/tracks/:slug) — the map reuses a real public session's
+   own GPS trace when one's available; the hero photo is a real per-track
+   static asset when one exists at public/track-photos/<slug>.{jpg,png} (see
+   TrackHeroPhoto), a plain gradient otherwise. */
 .track-hero {
   position: relative;
   height: 220px;
@@ -1620,14 +1618,12 @@ body {
   margin: 0;
 }
 
-.track-leaderboard-placeholder {
+.track-leaderboard-class {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 14px 16px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
 .social-search-form input {
@@ -3476,6 +3472,48 @@ input[type='range']::-moz-range-track {
   padding: 24px 10px;
 }
 
+/* Compact text action button that fits inline in a table row — .auth-submit
+   is full-width/glow, built for standalone forms, not a table cell. */
+.modal-table-action {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  padding: 4px 10px;
+  font-size: calc(1rem * 12 / 16);
+  font-weight: 600;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+}
+
+.modal-table-action:hover {
+  background: var(--accent-ring);
+}
+
+/* A driver-name row matched to the current viewer's own account. */
+.leaderboard-you {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* The "(site pseudo)" link next to a matched driver name — inherits the
+   surrounding text's color/weight instead of .user-row-name's larger,
+   bolder treatment, which is sized for its own standalone row, not an
+   inline parenthetical inside a table cell. */
+.driver-matched-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.driver-matched-link:hover {
+  text-decoration: underline;
+}
+
 .modal-table-delete {
   background: none;
   border: 1px solid var(--border);
@@ -3659,6 +3697,10 @@ input[type='range']::-moz-range-track {
 }
 
 .shared-lap-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 16px;
 }
 

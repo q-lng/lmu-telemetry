@@ -7,6 +7,7 @@ import {
   findUserByPseudo,
   findUserById,
   toPublicUser,
+  updateOwnProfile,
   updatePasswordHash,
   updateProfileVisibility,
   type ProfileVisibility,
@@ -58,6 +59,27 @@ function validateSignupInput(body: unknown): { email: string; pseudo: string; no
     return 'INVALID_PASSWORD';
   }
   return { email: email.trim().toLowerCase(), pseudo: pseudo.trim(), nom: nom.trim(), prenom: prenom.trim(), password };
+}
+
+function validateProfilePatch(
+  body: unknown,
+): { nom?: string; prenom?: string; lmuPseudo?: string | null } | string {
+  if (typeof body !== 'object' || body === null) return 'INVALID_REQUEST';
+  const { nom, prenom, lmuPseudo } = body as Record<string, unknown>;
+  const patch: { nom?: string; prenom?: string; lmuPseudo?: string | null } = {};
+  if (nom !== undefined) {
+    if (typeof nom !== 'string' || nom.trim().length === 0 || nom.length > 100) return 'INVALID_LAST_NAME';
+    patch.nom = nom.trim();
+  }
+  if (prenom !== undefined) {
+    if (typeof prenom !== 'string' || prenom.trim().length === 0 || prenom.length > 100) return 'INVALID_FIRST_NAME';
+    patch.prenom = prenom.trim();
+  }
+  if (lmuPseudo !== undefined) {
+    if (typeof lmuPseudo !== 'string' || lmuPseudo.length > 100) return 'INVALID_LMU_PSEUDO';
+    patch.lmuPseudo = lmuPseudo.trim() || null; // empty string clears it back to unset
+  }
+  return patch;
 }
 
 function validateLoginInput(body: unknown): { email: string; password: string } | string {
@@ -163,6 +185,20 @@ export async function registerAuth(app: FastifyInstance): Promise<void> {
     }
     await updateProfileVisibility(req.userId, visibility as ProfileVisibility);
     const user = await findUserById(req.userId);
+    reply.send({ user: toPublicUser(user!) });
+  });
+
+  app.put<{ Body: { nom?: string; prenom?: string; lmuPseudo?: string } }>('/api/auth/profile', async (req, reply) => {
+    if (!req.userId) {
+      reply.code(401).send({ error: 'NOT_AUTHENTICATED' });
+      return;
+    }
+    const patch = validateProfilePatch(req.body);
+    if (typeof patch === 'string') {
+      reply.code(400).send({ error: patch });
+      return;
+    }
+    const user = await updateOwnProfile(req.userId, patch);
     reply.send({ user: toPublicUser(user!) });
   });
 

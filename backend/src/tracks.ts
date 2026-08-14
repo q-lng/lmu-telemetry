@@ -3,6 +3,7 @@ import path from 'node:path';
 import { pgQuery } from './pg.js';
 import { DATA_DIR } from './db.js';
 import { resolveImageExt, serveImage, type ImageExt } from './imageAssets.js';
+import { computeTrackTopLaps } from './leaderboard.js';
 
 export type { ImageExt };
 
@@ -112,6 +113,15 @@ export async function registerTracks(app: FastifyInstance): Promise<void> {
       return;
     }
     reply.send(entry);
+  });
+
+  app.get<{ Params: { slug: string } }>('/api/tracks/:slug/leaderboard', async (req, reply) => {
+    const entry = await findTrackBySlug(req.params.slug);
+    if (!entry) {
+      reply.code(404).send({ error: 'TRACK_NOT_FOUND' });
+      return;
+    }
+    reply.send({ classes: await computeTrackTopLaps(entry.name) });
   });
 
   app.get<{ Params: { filename: string } }>('/api/track-photos/:filename', async (req, reply) => {

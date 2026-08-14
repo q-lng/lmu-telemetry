@@ -15,6 +15,7 @@ export interface User {
   isAdmin: boolean;
   isActive: boolean;
   profileVisibility: ProfileVisibility;
+  lmuPseudo: string | null;
 }
 
 export interface PublicUser {
@@ -27,6 +28,7 @@ export interface PublicUser {
   isAdmin: boolean;
   isActive: boolean;
   profileVisibility: ProfileVisibility;
+  lmuPseudo: string | null;
 }
 
 interface UserRow {
@@ -41,6 +43,7 @@ interface UserRow {
   is_admin: boolean;
   is_active: boolean;
   profile_visibility: ProfileVisibility;
+  lmu_pseudo: string | null;
 }
 
 function fromRow(r: UserRow): User {
@@ -56,6 +59,7 @@ function fromRow(r: UserRow): User {
     isAdmin: r.is_admin,
     isActive: r.is_active,
     profileVisibility: r.profile_visibility,
+    lmuPseudo: r.lmu_pseudo,
   };
 }
 
@@ -70,6 +74,7 @@ export function toPublicUser(u: User): PublicUser {
     isAdmin: u.isAdmin,
     isActive: u.isActive,
     profileVisibility: u.profileVisibility,
+    lmuPseudo: u.lmuPseudo,
   };
 }
 
@@ -83,7 +88,7 @@ export async function createUser(input: {
   const rows = await pgQuery<UserRow>(
     `INSERT INTO users (email, pseudo, nom, prenom, password_hash)
      VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, email, pseudo, nom, prenom, password_hash, created_at, plan, is_admin, is_active, profile_visibility`,
+     RETURNING id, email, pseudo, nom, prenom, password_hash, created_at, plan, is_admin, is_active, profile_visibility, lmu_pseudo`,
     [input.email, input.pseudo, input.nom, input.prenom, input.passwordHash],
   );
   return fromRow(rows[0]);
@@ -91,6 +96,45 @@ export async function createUser(input: {
 
 export async function updateProfileVisibility(userId: number, visibility: ProfileVisibility): Promise<void> {
   await pgQuery(`UPDATE users SET profile_visibility = $2 WHERE id = $1`, [userId, visibility]);
+}
+
+export interface OwnProfilePatch {
+  nom?: string;
+  prenom?: string;
+  lmuPseudo?: string | null;
+}
+
+/** Self-service profile edit — deliberately narrower than updateUserByAdmin's
+ * AdminUserPatch: no pseudo/email/plan/role here, those have bigger
+ * implications (uniqueness, URLs, login credential) and aren't self-service. */
+export async function updateOwnProfile(userId: number, patch: OwnProfilePatch): Promise<User | null> {
+  const sets: string[] = [];
+  const params: unknown[] = [userId];
+  if (patch.nom !== undefined) {
+    params.push(patch.nom);
+    sets.push(`nom = $${params.length}`);
+  }
+  if (patch.prenom !== undefined) {
+    params.push(patch.prenom);
+    sets.push(`prenom = $${params.length}`);
+  }
+  if (patch.lmuPseudo !== undefined) {
+    params.push(patch.lmuPseudo);
+    sets.push(`lmu_pseudo = $${params.length}`);
+  }
+  if (sets.length === 0) return findUserById(userId);
+  const rows = await pgQuery<UserRow>(`UPDATE users SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, params);
+  return rows[0] ? fromRow(rows[0]) : null;
+}
+
+/** Maps a trimmed, lowercased lmu_pseudo to the registered site user it
+ * belongs to — used only by leaderboard.ts to spot when a telemetry file's
+ * free-text DriverName corresponds to a real account. */
+export async function listLmuPseudoMatches(): Promise<Map<string, { id: number; pseudo: string }>> {
+  const rows = await pgQuery<{ id: number; pseudo: string; lmu_pseudo: string }>(
+    `SELECT id, pseudo, lmu_pseudo FROM users WHERE lmu_pseudo IS NOT NULL AND lmu_pseudo <> ''`,
+  );
+  return new Map(rows.map((r) => [r.lmu_pseudo.trim().toLowerCase(), { id: r.id, pseudo: r.pseudo }]));
 }
 
 /** Full user list for the admin panel — small personal-scale app, no paging. */

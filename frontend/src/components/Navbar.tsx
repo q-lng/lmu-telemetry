@@ -209,6 +209,9 @@ export function Navbar() {
               <Link to="/browse" aria-current={pathname === '/browse' ? 'page' : undefined}>
                 {t('nav.browse')}
               </Link>
+              <Link to="/leaderboard" aria-current={pathname === '/leaderboard' ? 'page' : undefined}>
+                {t('nav.leaderboard')}
+              </Link>
               <ContentMenu />
               {user && (
                 <Link to="/my-sessions" aria-current={pathname === '/my-sessions' ? 'page' : undefined}>

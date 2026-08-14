@@ -27,6 +27,7 @@ import { resampleContinuous, resampleStep } from '../resample';
 import { useAuth } from '../AuthContext';
 import { usePreferences } from '../PreferencesContext';
 import { t } from '../i18n';
+import { formatLapTime } from '../lapTime';
 
 const COMPARED_LAP_COLOR_SLOTS = 9;
 
@@ -1766,7 +1767,7 @@ export default function TelemetryViewer() {
                 return (
                   <tr key={l.lap}>
                     <td>
-                      {t('lap.number', { n: l.lap })} — {lt.seconds.toFixed(3)}s{lt.official ? '' : t('lap.invalidSuffix')}
+                      {t('lap.number', { n: l.lap })} — {formatLapTime(lt.seconds)}{lt.official ? '' : t('lap.invalidSuffix')}
                       {l.lap === fastestLapOf(laps)?.lap ? t('lap.fastestSuffix') : ''}
                     </td>
                     <td>
@@ -1884,7 +1885,7 @@ export default function TelemetryViewer() {
                           checked={isLapCompared(source.id, l.lap)}
                           onChange={() => toggleComparedLap(source.id, l.lap)}
                         />
-                        {t('lap.number', { n: l.lap })} — {lt.seconds.toFixed(3)}s{lt.official ? '' : t('lap.invalidSuffix')}
+                        {t('lap.number', { n: l.lap })} — {formatLapTime(lt.seconds)}{lt.official ? '' : t('lap.invalidSuffix')}
                         {l.lap === sourceFastest?.lap ? t('lap.fastestSuffix') : ''}
                       </label>
                     );

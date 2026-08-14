@@ -34,6 +34,11 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_visibility TEXT NOT NULL DEFA
 -- flooded with every historical follower as "new" the first time this ships.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS notifications_seen_at TIMESTAMPTZ NOT NULL DEFAULT now();
 
+-- In-game LMU/RaceControl display name — deliberately separate from the site
+-- `pseudo` above (no reason the two match), used to match this user against
+-- the free-text DriverName recorded in telemetry files (see leaderboard.ts).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS lmu_pseudo TEXT;
+
 -- Login sessions (not telemetry sessions — named auth_sessions to avoid confusion
 -- with data/*.duckdb "sessions").
 CREATE TABLE IF NOT EXISTS auth_sessions (

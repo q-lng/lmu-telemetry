@@ -109,6 +109,10 @@ export interface PublicUser {
   isAdmin: boolean;
   isActive: boolean;
   profileVisibility: ProfileVisibility;
+  // In-game LMU/RaceControl display name, deliberately separate from `pseudo`
+  // (the site account username) — used to match this user against the
+  // free-text DriverName recorded in telemetry files (see LeaderboardEntry).
+  lmuPseudo: string | null;
 }
 
 export interface AdminUserSummary extends PublicUser {
@@ -221,6 +225,26 @@ export interface SharedLapResult {
   lapNumber: number;
   track: string | null;
   car: string | null;
+}
+
+// Not the same taxonomy as CarCategory (which distinguishes lmp2-wec/lmp2-elms
+// via the cars catalog) — this comes from the DuckDB file's own metadata.CarClass
+// value, normalized by a small alias map in backend/src/leaderboard.ts. LMP2 is
+// intentionally one flat bucket here since telemetry can't tell WEC from ELMS.
+export type LeaderboardClass = 'hypercar' | 'lmp2' | 'lmp3' | 'gte' | 'gt3' | 'unknown';
+
+export interface LeaderboardEntry {
+  track: string;
+  carClass: LeaderboardClass;
+  car: string | null;
+  driverName: string | null;
+  lapTime: number;
+  lapNumber: number;
+  filename: string;
+  uploadedAt: string;
+  // Set when driverName matches a registered user's lmuPseudo — lets the UI
+  // link to that account and highlight when it's the current viewer.
+  matchedUser: { pseudo: string } | null;
 }
 
 export interface ColumnStyle {

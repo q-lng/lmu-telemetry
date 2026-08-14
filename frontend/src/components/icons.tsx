@@ -6,6 +6,16 @@ interface IconProps {
   size?: number;
 }
 
+/** "That's you" marker — a matched driver-name row that belongs to the
+ * current viewer's own account (see LeaderboardEntry.matchedUser). */
+export function CheckIcon({ size = 14 }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
 export function CloseIcon({ size = 14 }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

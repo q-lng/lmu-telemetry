@@ -14,6 +14,7 @@ const Social = lazy(() => import('./pages/Social').then((m) => ({ default: m.Soc
 const Profile = lazy(() => import('./pages/Profile').then((m) => ({ default: m.Profile })));
 const MesSessions = lazy(() => import('./pages/MesSessions').then((m) => ({ default: m.MesSessions })));
 const Browse = lazy(() => import('./pages/Browse').then((m) => ({ default: m.Browse })));
+const Leaderboard = lazy(() => import('./pages/Leaderboard').then((m) => ({ default: m.Leaderboard })));
 const TrackPage = lazy(() => import('./pages/TrackPage').then((m) => ({ default: m.TrackPage })));
 const TracksPage = lazy(() => import('./pages/TracksPage').then((m) => ({ default: m.TracksPage })));
 const CarsPage = lazy(() => import('./pages/CarsPage').then((m) => ({ default: m.CarsPage })));
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="forgot-password" element={<ForgotPassword />} />
         <Route path="reset-password" element={<ResetPassword />} />
         <Route path="browse" element={<Browse />} />
+        <Route path="leaderboard" element={<Leaderboard />} />
         <Route path="tracks" element={<TracksPage />} />
         <Route path="tracks/:slug" element={<TrackPage />} />
         <Route path="cars" element={<CarsPage />} />
