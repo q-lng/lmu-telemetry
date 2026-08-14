@@ -52,12 +52,18 @@ function catalogCategoryToLeaderboardClass(category: string): LeaderboardClass {
   return 'unknown';
 }
 
-/** Real car → class, from the catalog — takes priority over the CarClass
- * alias-map guess whenever a session's car is known (via a per-session
- * override or an admin-maintained livery mapping, see resolveCarSlug). */
-async function listCarCategories(): Promise<Map<string, LeaderboardClass>> {
-  const rows = await pgQuery<{ slug: string; category: string }>(`SELECT slug, category FROM cars`);
-  return new Map(rows.map((r) => [r.slug, catalogCategoryToLeaderboardClass(r.category)]));
+interface CarInfo {
+  name: string;
+  category: LeaderboardClass;
+}
+
+/** Real car name + class, from the catalog — takes priority over the raw
+ * livery string / CarClass alias-map guess whenever a session's car is
+ * known (via a per-session override or an admin-maintained livery mapping,
+ * see resolveCarSlug). */
+async function listCarInfo(): Promise<Map<string, CarInfo>> {
+  const rows = await pgQuery<{ slug: string; name: string; category: string }>(`SELECT slug, name, category FROM cars`);
+  return new Map(rows.map((r) => [r.slug, { name: r.name, category: catalogCategoryToLeaderboardClass(r.category) }]));
 }
 
 /** Admin-maintained livery (telemetry_files.car, free text) → real car —
@@ -78,13 +84,19 @@ function resolveCarSlug(f: { car: string | null; carSlug: string | null }, liver
   return null;
 }
 
-function resolveCarClass(
+/** Resolves the displayed car name AND class together — once a real car is
+ * known (via carSlug), its catalog name replaces the raw livery string
+ * everywhere the class guess would also have been replaced, so a mapped
+ * session's "car" column shows the real model instead of the team skin. */
+function resolveCar(
   carSlug: string | null,
+  rawCarName: string | null,
   rawCarClass: string | undefined,
-  categories: Map<string, LeaderboardClass>,
-): LeaderboardClass {
-  const fromCatalog = carSlug ? categories.get(carSlug) : undefined;
-  return fromCatalog ?? normalizeCarClass(rawCarClass);
+  carInfo: Map<string, CarInfo>,
+): { car: string | null; carClass: LeaderboardClass } {
+  const info = carSlug ? carInfo.get(carSlug) : undefined;
+  if (info) return { car: info.name, carClass: info.category };
+  return { car: rawCarName, carClass: normalizeCarClass(rawCarClass) };
 }
 
 function bestValidLap(laps: LapInfo[]): LapInfo | null {
@@ -124,7 +136,7 @@ async function listPublicFiles(track?: string): Promise<PublicFile[]> {
 
 async function buildEntry(
   f: PublicFile,
-  categories: Map<string, LeaderboardClass>,
+  carInfo: Map<string, CarInfo>,
   liveryMap: Map<string, string>,
 ): Promise<LeaderboardEntry | null> {
   const [meta, laps] = await Promise.all([
@@ -137,10 +149,11 @@ async function buildEntry(
   const best = bestValidLap(laps);
   if (!best) return null; // zero valid laps in this session — contributes nothing
   const carSlug = resolveCarSlug(f, liveryMap);
+  const { car, carClass } = resolveCar(carSlug, meta.info.CarName ?? null, meta.info.CarClass, carInfo);
   return {
     track,
-    carClass: resolveCarClass(carSlug, meta.info.CarClass, categories),
-    car: meta.info.CarName ?? null,
+    carClass,
+    car,
     driverName: meta.info.DriverName ?? null,
     lapTime: best.lapTime!,
     lapNumber: best.lap,
@@ -157,7 +170,7 @@ async function buildEntry(
  * file's single best. */
 async function buildAllValidEntries(
   f: PublicFile,
-  categories: Map<string, LeaderboardClass>,
+  carInfo: Map<string, CarInfo>,
   liveryMap: Map<string, string>,
 ): Promise<LeaderboardEntry[]> {
   const [meta, laps] = await Promise.all([
@@ -168,8 +181,7 @@ async function buildAllValidEntries(
   const track = meta.info.TrackName;
   if (!track) return [];
   const carSlug = resolveCarSlug(f, liveryMap);
-  const carClass = resolveCarClass(carSlug, meta.info.CarClass, categories);
-  const car = meta.info.CarName ?? null;
+  const { car, carClass } = resolveCar(carSlug, meta.info.CarName ?? null, meta.info.CarClass, carInfo);
   const driverName = meta.info.DriverName ?? null;
   return laps
     .filter((l) => l.lapTime) // excludes null and 0 (game-invalidated)
@@ -202,12 +214,12 @@ async function resolveMatchedUsers(entries: LeaderboardEntry[]): Promise<void> {
 }
 
 export async function computeLeaderboard(): Promise<LeaderboardEntry[]> {
-  const [files, categories, liveryMap] = await Promise.all([
+  const [files, carInfo, liveryMap] = await Promise.all([
     listPublicFiles(),
-    listCarCategories(),
+    listCarInfo(),
     listLiveryToCarSlug(),
   ]);
-  const perFile = await Promise.all(files.map((f) => buildEntry(f, categories, liveryMap)));
+  const perFile = await Promise.all(files.map((f) => buildEntry(f, carInfo, liveryMap)));
 
   const bestByGroup = new Map<string, LeaderboardEntry>();
   for (const entry of perFile) {
@@ -231,12 +243,12 @@ export async function computeTrackTopLaps(
   trackName: string,
   limit = 10,
 ): Promise<Partial<Record<LeaderboardClass, LeaderboardEntry[]>>> {
-  const [files, categories, liveryMap] = await Promise.all([
+  const [files, carInfo, liveryMap] = await Promise.all([
     listPublicFiles(trackName),
-    listCarCategories(),
+    listCarInfo(),
     listLiveryToCarSlug(),
   ]);
-  const perFile = await Promise.all(files.map((f) => buildAllValidEntries(f, categories, liveryMap)));
+  const perFile = await Promise.all(files.map((f) => buildAllValidEntries(f, carInfo, liveryMap)));
   const flat = perFile.flat();
   await resolveMatchedUsers(flat);
 
