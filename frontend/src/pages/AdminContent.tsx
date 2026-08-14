@@ -4,8 +4,9 @@ import { t } from '../i18n';
 import { DlcsAdminPanel } from './AdminDlcs';
 import { TracksAdminPanel } from './AdminTracks';
 import { CarsAdminPanel } from './AdminCars';
+import { LiveriesAdminPanel } from './AdminLiveries';
 
-const TABS = ['dlc', 'tracks', 'cars'] as const;
+const TABS = ['dlc', 'tracks', 'cars', 'liveries'] as const;
 type Tab = (typeof TABS)[number];
 
 function isTab(value: string | undefined): value is Tab {
@@ -15,7 +16,8 @@ function isTab(value: string | undefined): value is Tab {
 function tabLabel(tabKey: Tab): string {
   if (tabKey === 'dlc') return t('adminContent.tabDlc');
   if (tabKey === 'tracks') return t('adminContent.tabTracks');
-  return t('adminContent.tabCars');
+  if (tabKey === 'cars') return t('adminContent.tabCars');
+  return t('adminContent.tabLiveries');
 }
 
 /** /admin/content — merges what used to be 3 standalone pages
@@ -61,6 +63,7 @@ export function AdminContent() {
       <div style={{ display: activeTab === 'dlc' ? 'block' : 'none' }}>{visited.has('dlc') && <DlcsAdminPanel />}</div>
       <div style={{ display: activeTab === 'tracks' ? 'block' : 'none' }}>{visited.has('tracks') && <TracksAdminPanel />}</div>
       <div style={{ display: activeTab === 'cars' ? 'block' : 'none' }}>{visited.has('cars') && <CarsAdminPanel />}</div>
+      <div style={{ display: activeTab === 'liveries' ? 'block' : 'none' }}>{visited.has('liveries') && <LiveriesAdminPanel />}</div>
     </div>
   );
 }

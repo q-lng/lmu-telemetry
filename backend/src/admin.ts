@@ -41,6 +41,7 @@ import {
   MANUFACTURER_PHOTOS_DIR,
 } from './manufacturers.js';
 import { createDlc, findDlcBySlug, listDlcs, updateDlc } from './dlcs.js';
+import { listDistinctCarNames, listLiveryMappings, setLiveryMapping } from './liveryMappings.js';
 import { UPLOAD_CONTENT_TYPES, writeImageAtomic } from './imageAssets.js';
 
 const PSEUDO_RE = /^[a-zA-Z0-9_-]{3,32}$/;
@@ -462,6 +463,25 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
       if (await handleImageUpload(req, reply, CAR_PHOTOS_DIR, req.params.slug)) {
         reply.send(await findCarBySlug(req.params.slug));
       }
+    },
+  );
+
+  app.get('/api/admin/livery-mappings', { preHandler: requireAdmin }, async (_req, reply) => {
+    const [liveries, mappings] = await Promise.all([listDistinctCarNames(), listLiveryMappings()]);
+    reply.send({ liveries, mappings });
+  });
+
+  app.put<{ Params: { liveryName: string }; Body: { carSlug: string | null } }>(
+    '/api/admin/livery-mappings/:liveryName',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const carSlug = req.body?.carSlug ?? null;
+      if (carSlug !== null && !(await findCarBySlug(carSlug))) {
+        reply.code(400).send({ error: 'INVALID_CAR' });
+        return;
+      }
+      await setLiveryMapping(req.params.liveryName, carSlug);
+      reply.code(204).send();
     },
   );
 

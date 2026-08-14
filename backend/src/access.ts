@@ -10,6 +10,10 @@ export interface FileRecord {
   visibility: Visibility;
   track: string | null;
   car: string | null;
+  // Real car assigned by the owner from the cars catalog — separate from
+  // `car` above (the free-text livery/team-skin name read from the telemetry
+  // file itself, which has no reliable mapping to a real car model).
+  carSlug: string | null;
   uploadedAt: string;
 }
 
@@ -19,6 +23,7 @@ interface FileRow {
   visibility: Visibility;
   track: string | null;
   car: string | null;
+  car_slug: string | null;
   uploaded_at: string;
 }
 
@@ -29,6 +34,7 @@ function fromRow(r: FileRow): FileRecord {
     visibility: r.visibility,
     track: r.track,
     car: r.car,
+    carSlug: r.car_slug,
     uploadedAt: r.uploaded_at,
   };
 }
@@ -54,6 +60,12 @@ export async function upsertFileRecord(
 
 export async function setFileVisibility(filename: string, visibility: Visibility): Promise<void> {
   await pgQuery(`UPDATE telemetry_files SET visibility = $2 WHERE filename = $1`, [filename, visibility]);
+}
+
+/** Manually assigns (or clears, with carSlug=null) the real car for a
+ * session — see FileRecord.carSlug. */
+export async function setCarSlug(filename: string, carSlug: string | null): Promise<void> {
+  await pgQuery(`UPDATE telemetry_files SET car_slug = $2 WHERE filename = $1`, [filename, carSlug]);
 }
 
 /** Removes the file's record (lap_shares cascade) — the caller is responsible

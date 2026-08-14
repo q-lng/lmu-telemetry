@@ -214,6 +214,13 @@ export const en = {
   'mesSessions.noFiles': 'No files uploaded yet.',
   'mesSessions.loadingLaps': 'Loading laps…',
   'mesSessions.followsFile': 'Follows the file',
+  'mesSessions.assignCar': 'Assign car',
+  'mesSessions.changeCar': 'Change car',
+
+  'carPicker.title': 'Assign a car',
+  'carPicker.close': 'Close',
+  'carPicker.filterPlaceholder': 'Filter by car or manufacturer…',
+  'carPicker.clearOverride': 'Clear override',
 
   'browse.title': 'Browse',
   'browse.subtitle': 'Search sessions or shared laps by track or car.',
@@ -295,6 +302,13 @@ export const en = {
   'adminContent.tabDlc': 'DLC',
   'adminContent.tabTracks': 'Tracks',
   'adminContent.tabCars': 'Cars',
+  'adminContent.tabLiveries': 'Liveries',
+
+  'adminLiveries.subtitle': 'Map a raw in-game livery name to a real car once — every session sharing that exact livery resolves automatically, no per-session action needed.',
+  'adminLiveries.empty': 'No livery has been uploaded yet.',
+  'adminLiveries.colLivery': 'Livery (as recorded in-game)',
+  'adminLiveries.colCar': 'Real car',
+  'adminLiveries.unmappedOption': '— Unmapped —',
 
   'adminDlcs.title': 'DLC',
   'adminDlcs.subtitle': 'Manage the DLC packs tracks/cars can be tagged with.',
@@ -457,6 +471,7 @@ export const en = {
   'errors.INVALID_COLOR': 'Invalid color',
   'errors.FILE_NOT_FOUND': 'File not found',
   'errors.INVALID_VISIBILITY': 'Invalid visibility',
+  'errors.INVALID_CAR': 'Invalid car',
   'errors.ACCESS_DENIED': 'Access denied',
   'errors.LAP_NOT_FOUND': 'Lap not found',
   'errors.NO_FILE_PROVIDED': 'No file provided',

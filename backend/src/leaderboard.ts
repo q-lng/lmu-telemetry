@@ -42,6 +42,51 @@ function normalizeCarClass(raw: string | undefined): LeaderboardClass {
   return CAR_CLASS_ALIASES[raw.trim()] ?? 'unknown';
 }
 
+/** Collapses the cars catalog's category enum onto LeaderboardClass —
+ * identical for gte/gt3/lmp3/hypercar, lmp2-wec/lmp2-elms both flatten to
+ * the same 'lmp2' bucket this feature already uses (telemetry-derived
+ * classing can't distinguish the two anyway, see normalizeCarClass above). */
+function catalogCategoryToLeaderboardClass(category: string): LeaderboardClass {
+  if (category === 'lmp2-wec' || category === 'lmp2-elms') return 'lmp2';
+  if (category === 'gte' || category === 'gt3' || category === 'lmp3' || category === 'hypercar') return category;
+  return 'unknown';
+}
+
+/** Real car → class, from the catalog — takes priority over the CarClass
+ * alias-map guess whenever a session's car is known (via a per-session
+ * override or an admin-maintained livery mapping, see resolveCarSlug). */
+async function listCarCategories(): Promise<Map<string, LeaderboardClass>> {
+  const rows = await pgQuery<{ slug: string; category: string }>(`SELECT slug, category FROM cars`);
+  return new Map(rows.map((r) => [r.slug, catalogCategoryToLeaderboardClass(r.category)]));
+}
+
+/** Admin-maintained livery (telemetry_files.car, free text) → real car —
+ * see backend/src/liveryMappings.ts. Resolves every session sharing that
+ * exact livery string, without per-session action. */
+async function listLiveryToCarSlug(): Promise<Map<string, string>> {
+  const rows = await pgQuery<{ livery_name: string; car_slug: string }>(
+    `SELECT livery_name, car_slug FROM livery_car_mappings`,
+  );
+  return new Map(rows.map((r) => [r.livery_name, r.car_slug]));
+}
+
+/** Per-session override (telemetry_files.car_slug) wins when set; otherwise
+ * falls back to the admin livery mapping for this session's raw car string. */
+function resolveCarSlug(f: { car: string | null; carSlug: string | null }, liveryMap: Map<string, string>): string | null {
+  if (f.carSlug) return f.carSlug;
+  if (f.car) return liveryMap.get(f.car.trim()) ?? null;
+  return null;
+}
+
+function resolveCarClass(
+  carSlug: string | null,
+  rawCarClass: string | undefined,
+  categories: Map<string, LeaderboardClass>,
+): LeaderboardClass {
+  const fromCatalog = carSlug ? categories.get(carSlug) : undefined;
+  return fromCatalog ?? normalizeCarClass(rawCarClass);
+}
+
 function bestValidLap(laps: LapInfo[]): LapInfo | null {
   let best: LapInfo | null = null;
   for (const lap of laps) {
@@ -56,21 +101,32 @@ function bestValidLap(laps: LapInfo[]): LapInfo | null {
  * that helper's viewer-aware behavior might evolve for unrelated reasons.
  * `track`, when given, uses the same ILIKE-substring convention as
  * access.ts's listVisibleFiles/searchTrackNames — not a new one. */
-async function listPublicFiles(track?: string): Promise<{ filename: string; uploadedAt: string }[]> {
+interface PublicFile {
+  filename: string;
+  uploadedAt: string;
+  car: string | null;
+  carSlug: string | null;
+}
+
+async function listPublicFiles(track?: string): Promise<PublicFile[]> {
   const params: unknown[] = [];
   let where = `visibility = 'public'`;
   if (track) {
     params.push(`%${track}%`);
     where += ` AND track ILIKE $${params.length}`;
   }
-  const rows = await pgQuery<{ filename: string; uploaded_at: string }>(
-    `SELECT filename, uploaded_at FROM telemetry_files WHERE ${where}`,
+  const rows = await pgQuery<{ filename: string; uploaded_at: string; car: string | null; car_slug: string | null }>(
+    `SELECT filename, uploaded_at, car, car_slug FROM telemetry_files WHERE ${where}`,
     params,
   );
-  return rows.map((r) => ({ filename: r.filename, uploadedAt: r.uploaded_at }));
+  return rows.map((r) => ({ filename: r.filename, uploadedAt: r.uploaded_at, car: r.car, carSlug: r.car_slug }));
 }
 
-async function buildEntry(f: { filename: string; uploadedAt: string }): Promise<LeaderboardEntry | null> {
+async function buildEntry(
+  f: PublicFile,
+  categories: Map<string, LeaderboardClass>,
+  liveryMap: Map<string, string>,
+): Promise<LeaderboardEntry | null> {
   const [meta, laps] = await Promise.all([
     getSessionMetadata(f.filename).catch(() => null),
     getLaps(f.filename).catch(() => []),
@@ -80,9 +136,10 @@ async function buildEntry(f: { filename: string; uploadedAt: string }): Promise<
   if (!track) return null;
   const best = bestValidLap(laps);
   if (!best) return null; // zero valid laps in this session — contributes nothing
+  const carSlug = resolveCarSlug(f, liveryMap);
   return {
     track,
-    carClass: normalizeCarClass(meta.info.CarClass),
+    carClass: resolveCarClass(carSlug, meta.info.CarClass, categories),
     car: meta.info.CarName ?? null,
     driverName: meta.info.DriverName ?? null,
     lapTime: best.lapTime!,
@@ -98,7 +155,11 @@ async function buildEntry(f: { filename: string; uploadedAt: string }): Promise<
  * e.g. several of one driver's own laps beating everyone else's), unlike
  * computeLeaderboard's one-record-per-group which only ever wants each
  * file's single best. */
-async function buildAllValidEntries(f: { filename: string; uploadedAt: string }): Promise<LeaderboardEntry[]> {
+async function buildAllValidEntries(
+  f: PublicFile,
+  categories: Map<string, LeaderboardClass>,
+  liveryMap: Map<string, string>,
+): Promise<LeaderboardEntry[]> {
   const [meta, laps] = await Promise.all([
     getSessionMetadata(f.filename).catch(() => null),
     getLaps(f.filename).catch(() => []),
@@ -106,7 +167,8 @@ async function buildAllValidEntries(f: { filename: string; uploadedAt: string })
   if (!meta) return [];
   const track = meta.info.TrackName;
   if (!track) return [];
-  const carClass = normalizeCarClass(meta.info.CarClass);
+  const carSlug = resolveCarSlug(f, liveryMap);
+  const carClass = resolveCarClass(carSlug, meta.info.CarClass, categories);
   const car = meta.info.CarName ?? null;
   const driverName = meta.info.DriverName ?? null;
   return laps
@@ -140,8 +202,12 @@ async function resolveMatchedUsers(entries: LeaderboardEntry[]): Promise<void> {
 }
 
 export async function computeLeaderboard(): Promise<LeaderboardEntry[]> {
-  const files = await listPublicFiles();
-  const perFile = await Promise.all(files.map(buildEntry));
+  const [files, categories, liveryMap] = await Promise.all([
+    listPublicFiles(),
+    listCarCategories(),
+    listLiveryToCarSlug(),
+  ]);
+  const perFile = await Promise.all(files.map((f) => buildEntry(f, categories, liveryMap)));
 
   const bestByGroup = new Map<string, LeaderboardEntry>();
   for (const entry of perFile) {
@@ -165,8 +231,12 @@ export async function computeTrackTopLaps(
   trackName: string,
   limit = 10,
 ): Promise<Partial<Record<LeaderboardClass, LeaderboardEntry[]>>> {
-  const files = await listPublicFiles(trackName);
-  const perFile = await Promise.all(files.map(buildAllValidEntries));
+  const [files, categories, liveryMap] = await Promise.all([
+    listPublicFiles(trackName),
+    listCarCategories(),
+    listLiveryToCarSlug(),
+  ]);
+  const perFile = await Promise.all(files.map((f) => buildAllValidEntries(f, categories, liveryMap)));
   const flat = perFile.flat();
   await resolveMatchedUsers(flat);
 

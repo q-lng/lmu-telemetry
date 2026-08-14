@@ -213,6 +213,14 @@ export interface FileRecord {
   visibility: Visibility;
   track: string | null;
   car: string | null;
+  // Real car manually assigned by the owner, overriding the admin livery
+  // mapping for this specific session — see backend/src/leaderboard.ts.
+  carSlug: string | null;
+}
+
+export interface LiveryMapping {
+  liveryName: string;
+  carSlug: string;
 }
 
 export interface LapShare {

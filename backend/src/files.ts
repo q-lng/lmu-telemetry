@@ -7,6 +7,7 @@ import { getSessionMetadata, type SessionMetadata, type SessionSummary } from '.
 import { DATA_DIR, evictDb, NotFoundError } from './db.js';
 import { requireAuth } from './auth.js';
 import { findUsersByIds } from './users.js';
+import { findCarBySlug } from './cars.js';
 import {
   canViewFile,
   canViewLap,
@@ -15,6 +16,7 @@ import {
   listLapShares,
   listVisibleFiles,
   searchSharedLaps,
+  setCarSlug,
   setFileVisibility,
   setLapVisibility,
   upsertFileRecord,
@@ -94,6 +96,25 @@ export async function registerFiles(app: FastifyInstance): Promise<void> {
         return;
       }
       await setFileVisibility(req.params.file, req.body!.visibility as Visibility);
+      reply.code(204).send();
+    },
+  );
+
+  app.post<{ Params: { file: string }; Body: { carSlug: string | null } }>(
+    '/api/sessions/:file/car',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const record = await getFileRecord(req.params.file);
+      if (!record || record.ownerId !== req.userId) {
+        reply.code(404).send({ error: 'FILE_NOT_FOUND' });
+        return;
+      }
+      const carSlug = req.body?.carSlug ?? null;
+      if (carSlug !== null && !(await findCarBySlug(carSlug))) {
+        reply.code(400).send({ error: 'INVALID_CAR' });
+        return;
+      }
+      await setCarSlug(req.params.file, carSlug);
       reply.code(204).send();
     },
   );
