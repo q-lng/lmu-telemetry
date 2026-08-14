@@ -7,6 +7,8 @@ import { getSessionMetadata, type SessionMetadata, type SessionSummary } from '.
 import { DATA_DIR, evictDb, NotFoundError } from './db.js';
 import { requireAuth } from './auth.js';
 import { findUsersByIds } from './users.js';
+import { findCarBySlug } from './cars.js';
+import { listCarNames, listLiveryToCarSlug, resolveCarName, resolveCarSlug } from './carResolution.js';
 import {
   canViewFile,
   canViewLap,
@@ -15,12 +17,27 @@ import {
   listLapShares,
   listVisibleFiles,
   searchSharedLaps,
+  setCarSlug,
   setFileVisibility,
   setLapVisibility,
   upsertFileRecord,
   type LapVisibility,
   type Visibility,
 } from './access.js';
+
+/** Resolves the real car for a single file's metadata response — fetches its
+ * FileRecord (for the per-session override) plus the catalog/livery maps
+ * fresh each time, since this is a one-off single-file lookup (unlike the
+ * leaderboard's batched resolution across many files at once). */
+async function resolveSessionCarName(filename: string, rawCarName: string | null): Promise<string | null> {
+  const [record, carNames, liveryMap] = await Promise.all([
+    getFileRecord(filename),
+    listCarNames(),
+    listLiveryToCarSlug(),
+  ]);
+  const carSlug = resolveCarSlug({ car: rawCarName, carSlug: record?.carSlug ?? null }, liveryMap);
+  return resolveCarName(rawCarName, carSlug, carNames);
+}
 
 function isVisibility(v: unknown): v is Visibility {
   return v === 'private' || v === 'friends' || v === 'public';
@@ -49,8 +66,11 @@ export async function registerFiles(app: FastifyInstance): Promise<void> {
       { track: req.query.track, car: req.query.car },
       { publicOnly: req.query.excludeMine === 'true' },
     );
-    const ownerIds = [...new Set(files.map((f) => f.ownerId).filter((id): id is number => id !== null))];
-    const owners = await findUsersByIds(ownerIds);
+    const [owners, carNames, liveryMap] = await Promise.all([
+      findUsersByIds([...new Set(files.map((f) => f.ownerId).filter((id): id is number => id !== null))]),
+      listCarNames(),
+      listLiveryToCarSlug(),
+    ]);
     const pseudoById = new Map(owners.map((u) => [u.id, u.pseudo]));
     return Promise.all(
       files.map(async (f): Promise<SessionSummary> => {
@@ -58,6 +78,7 @@ export async function registerFiles(app: FastifyInstance): Promise<void> {
           getSessionMetadata(f.filename).catch(() => null),
           getLaps(f.filename).catch(() => []),
         ]);
+        const carSlug = resolveCarSlug(f, liveryMap);
         return {
           file: f.filename,
           ownerId: f.ownerId,
@@ -66,7 +87,7 @@ export async function registerFiles(app: FastifyInstance): Promise<void> {
           track: meta?.info.TrackName,
           sessionType: meta?.info.SessionType,
           driverName: meta?.info.DriverName,
-          carName: meta?.info.CarName,
+          carName: resolveCarName(meta?.info.CarName ?? null, carSlug, carNames) ?? undefined,
           recordingTime: meta?.info.RecordingTime,
           lapCount: laps.length,
           durationSeconds: laps.length > 0 ? laps[laps.length - 1].endTs - laps[0].startTs : undefined,
@@ -76,8 +97,16 @@ export async function registerFiles(app: FastifyInstance): Promise<void> {
   });
 
   app.get('/api/sessions/mine', { preHandler: requireAuth }, async (req) => {
-    const files = await listVisibleFiles(req.userId);
-    return { files: files.filter((f) => f.ownerId === req.userId) };
+    const [files, carNames, liveryMap] = await Promise.all([
+      listVisibleFiles(req.userId),
+      listCarNames(),
+      listLiveryToCarSlug(),
+    ]);
+    return {
+      files: files
+        .filter((f) => f.ownerId === req.userId)
+        .map((f) => ({ ...f, resolvedCar: resolveCarName(f.car, resolveCarSlug(f, liveryMap), carNames) })),
+    };
   });
 
   app.post<{ Params: { file: string }; Body: { visibility?: string } }>(
@@ -94,6 +123,25 @@ export async function registerFiles(app: FastifyInstance): Promise<void> {
         return;
       }
       await setFileVisibility(req.params.file, req.body!.visibility as Visibility);
+      reply.code(204).send();
+    },
+  );
+
+  app.post<{ Params: { file: string }; Body: { carSlug: string | null } }>(
+    '/api/sessions/:file/car',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const record = await getFileRecord(req.params.file);
+      if (!record || record.ownerId !== req.userId) {
+        reply.code(404).send({ error: 'FILE_NOT_FOUND' });
+        return;
+      }
+      const carSlug = req.body?.carSlug ?? null;
+      if (carSlug !== null && !(await findCarBySlug(carSlug))) {
+        reply.code(400).send({ error: 'INVALID_CAR' });
+        return;
+      }
+      await setCarSlug(req.params.file, carSlug);
       reply.code(204).send();
     },
   );
@@ -191,7 +239,8 @@ export async function registerFiles(app: FastifyInstance): Promise<void> {
       return;
     }
     try {
-      return await getSessionMetadata(req.params.file);
+      const meta = await getSessionMetadata(req.params.file);
+      return { ...meta, resolvedCar: await resolveSessionCarName(req.params.file, meta.info.CarName ?? null) };
     } catch (err) {
       handleReadError(app, reply, err);
     }
@@ -248,7 +297,8 @@ export async function registerFiles(app: FastifyInstance): Promise<void> {
       return;
     }
     try {
-      return await getSessionMetadata(req.params.file);
+      const meta = await getSessionMetadata(req.params.file);
+      return { ...meta, resolvedCar: await resolveSessionCarName(req.params.file, meta.info.CarName ?? null) };
     } catch (err) {
       handleReadError(app, reply, err);
     }

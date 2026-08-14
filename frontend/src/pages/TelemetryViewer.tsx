@@ -1696,7 +1696,7 @@ export default function TelemetryViewer() {
               <strong>{t('tv.infoTrack')}</strong> {metadata.info.TrackName}
             </div>
             <div>
-              <strong>{t('tv.infoCar')}</strong> {metadata.info.CarName} ({metadata.info.CarClass})
+              <strong>{t('tv.infoCar')}</strong> {metadata.resolvedCar ?? metadata.info.CarName} ({metadata.info.CarClass})
             </div>
             <div>
               <strong>{t('tv.infoWeather')}</strong> {metadata.info.WeatherConditions}

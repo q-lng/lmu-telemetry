@@ -156,7 +156,7 @@ export function SharedLap() {
             {metadata?.info.TrackName ?? file} — {t('lap.number', { n: lapNumber })}
           </h1>
           <p>
-            {metadata?.info.CarName}
+            {metadata?.resolvedCar ?? metadata?.info.CarName}
             {metadata?.info.DriverName ? ` · ${metadata.info.DriverName}` : ''}
           </p>
         </div>

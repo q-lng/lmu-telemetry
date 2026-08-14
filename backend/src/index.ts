@@ -12,6 +12,7 @@ import {
   initCarsSchema,
   initManufacturersSchema,
   initDlcSchema,
+  initLiveryMappingsSchema,
 } from './pg.js';
 import { registerAuth } from './auth.js';
 import { registerSocial } from './social.js';
@@ -40,6 +41,7 @@ await initTracksSchema();
 await initCarsSchema();
 await initManufacturersSchema();
 await initDlcSchema();
+await initLiveryMappingsSchema();
 await backfillMissingFileSizes();
 await registerAuth(app);
 await registerSocial(app);

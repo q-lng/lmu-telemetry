@@ -8,6 +8,7 @@ import type {
   FriendRequestSummary,
   LapInfo,
   LapShare,
+  LiveryMapping,
   LapVisibility,
   LeaderboardClass,
   LeaderboardEntry,
@@ -288,6 +289,10 @@ export function fetchStorageUsage(): Promise<StorageUsage> {
   return getJson('/api/storage');
 }
 
+export function setSessionCar(filename: string, carSlug: string | null): Promise<void> {
+  return postJson(`/api/sessions/${encodeURIComponent(filename)}/car`, { carSlug });
+}
+
 export function setFileVisibility(filename: string, visibility: Visibility): Promise<void> {
   return postJson(`/api/sessions/${encodeURIComponent(filename)}/visibility`, { visibility });
 }
@@ -422,6 +427,14 @@ export function fetchCarCatalogEntry(slug: string): Promise<CarCatalogEntry> {
 
 export function fetchAdminCars(): Promise<CarCatalogEntry[]> {
   return getJson<{ cars: CarCatalogEntry[] }>('/api/admin/cars').then((r) => r.cars);
+}
+
+export function fetchAdminLiveryMappings(): Promise<{ liveries: string[]; mappings: LiveryMapping[] }> {
+  return getJson('/api/admin/livery-mappings');
+}
+
+export function setAdminLiveryMapping(liveryName: string, carSlug: string | null): Promise<void> {
+  return putJson(`/api/admin/livery-mappings/${encodeURIComponent(liveryName)}`, { carSlug });
 }
 
 export function createAdminCar(entry: {

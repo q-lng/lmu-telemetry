@@ -74,6 +74,12 @@ export async function initDlcSchema(): Promise<void> {
   await runSchemaFile('dlcSchema.sql');
 }
 
+/** Runs the idempotent livery→car mapping schema DDL at startup — must run
+ * after initCarsSchema, since it FK-references cars(slug). */
+export async function initLiveryMappingsSchema(): Promise<void> {
+  await runSchemaFile('liveryMappingsSchema.sql');
+}
+
 /** Runs `fn` inside a single client transaction, committing on success and rolling
  * back on any thrown error — needed for multi-statement mutations (e.g. accepting a
  * friend request: delete the request row + insert the friendship row atomically). */

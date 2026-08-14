@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { fetchLapShares, fetchLaps, fetchMyFiles, setFileVisibility, setLapVisibility } from '../api';
+import { fetchLapShares, fetchLaps, fetchMyFiles, setFileVisibility, setLapVisibility, setSessionCar } from '../api';
 import type { FileRecord, LapInfo, LapVisibility, Visibility } from '../types';
 import { t } from '../i18n';
+import { CarPickerModal } from '../components/CarPickerModal';
 
 export function MesSessions() {
   const [files, setFiles] = useState<FileRecord[]>([]);
@@ -10,6 +11,7 @@ export function MesSessions() {
   const [laps, setLaps] = useState<LapInfo[]>([]);
   const [lapShares, setLapShares] = useState<Record<number, LapVisibility>>({});
   const [lapsLoading, setLapsLoading] = useState(false);
+  const [carPickerFor, setCarPickerFor] = useState<string | null>(null);
 
   useEffect(() => {
     fetchMyFiles()
@@ -20,6 +22,14 @@ export function MesSessions() {
   async function handleVisibilityChange(filename: string, visibility: Visibility) {
     await setFileVisibility(filename, visibility);
     setFiles((prev) => prev.map((f) => (f.filename === filename ? { ...f, visibility } : f)));
+  }
+
+  async function handleCarChange(filename: string, carSlug: string | null) {
+    setCarPickerFor(null);
+    await setSessionCar(filename, carSlug);
+    // Refetch rather than patch optimistically — the resolved display name
+    // (override vs. livery mapping vs. raw livery) is only known server-side.
+    setFiles(await fetchMyFiles());
   }
 
   async function toggleExpand(filename: string) {
@@ -62,7 +72,10 @@ export function MesSessions() {
             <div className="user-row">
               <button className="mes-sessions-name" onClick={() => toggleExpand(f.filename)}>
                 {f.track ?? f.filename}
-                {f.car ? ` — ${f.car}` : ''}
+                {f.resolvedCar ?? f.car ? ` — ${f.resolvedCar ?? f.car}` : ''}
+              </button>
+              <button className="modal-table-action" onClick={() => setCarPickerFor(f.filename)}>
+                {f.carSlug ? t('mesSessions.changeCar') : t('mesSessions.assignCar')}
               </button>
               <select
                 value={f.visibility}
@@ -96,6 +109,13 @@ export function MesSessions() {
           </div>
         ))}
       </div>
+
+      {carPickerFor && (
+        <CarPickerModal
+          onSelect={(carSlug) => handleCarChange(carPickerFor, carSlug)}
+          onClose={() => setCarPickerFor(null)}
+        />
+      )}
     </div>
   );
 }
