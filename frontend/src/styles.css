@@ -1668,6 +1668,13 @@ body {
   padding: 10px 12px;
 }
 
+.mes-sessions-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
 .user-row-name {
   color: var(--primary-ink);
   text-decoration: none;

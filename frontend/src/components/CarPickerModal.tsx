@@ -54,7 +54,7 @@ export function CarPickerModal({ onSelect, onClose }: Props) {
         />
 
         <button className="modal-table-action" onClick={() => onSelect(null)}>
-          {t('carPicker.clearOverride')}
+          {t('carPicker.clear')}
         </button>
 
         {!cars ? (
