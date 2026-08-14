@@ -47,16 +47,17 @@ export function CarPickerModal({ onSelect, onClose }: Props) {
           </button>
         </div>
 
-        <input
-          className="modal-filter"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          placeholder={t('carPicker.filterPlaceholder')}
-        />
-
-        <button className="modal-table-action" onClick={() => onSelect(null)}>
-          {t('carPicker.clear')}
-        </button>
+        <div className="modal-filter-row">
+          <input
+            className="modal-filter"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder={t('carPicker.filterPlaceholder')}
+          />
+          <button className="modal-table-action" onClick={() => onSelect(null)}>
+            {t('carPicker.clear')}
+          </button>
+        </div>
 
         {!cars ? (
           <div className="page-loading">

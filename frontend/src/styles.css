@@ -2750,6 +2750,18 @@ body {
   max-width: 320px;
 }
 
+.modal-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 20px;
+}
+
+.modal-filter-row .modal-filter {
+  flex: 1;
+  margin: 0;
+}
+
 .modal-filter {
   flex: 0 0 auto;
   margin: 14px 20px;
