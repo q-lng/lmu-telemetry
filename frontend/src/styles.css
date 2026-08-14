@@ -1675,6 +1675,12 @@ body {
   margin-left: auto;
 }
 
+.admin-liveries-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .user-row-name {
   color: var(--primary-ink);
   text-decoration: none;

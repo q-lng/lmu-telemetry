@@ -9,9 +9,10 @@ interface RowProps {
   carSlug: string;
   cars: CarCatalogEntry[];
   onPick: (liveryName: string) => void;
+  onClear: (liveryName: string) => void;
 }
 
-function LiveryRow({ liveryName, carSlug, cars, onPick }: RowProps) {
+function LiveryRow({ liveryName, carSlug, cars, onPick, onClear }: RowProps) {
   const mappedCar = cars.find((c) => c.slug === carSlug);
 
   return (
@@ -19,9 +20,16 @@ function LiveryRow({ liveryName, carSlug, cars, onPick }: RowProps) {
       <td>{liveryName}</td>
       <td>{mappedCar ? mappedCar.name : t('adminLiveries.unmappedOption')}</td>
       <td>
-        <button className="modal-table-action" onClick={() => onPick(liveryName)}>
-          {carSlug ? t('adminLiveries.changeCar') : t('adminLiveries.assignCar')}
-        </button>
+        <div className="admin-liveries-row-actions">
+          <button className="modal-table-action" onClick={() => onPick(liveryName)}>
+            {carSlug ? t('adminLiveries.changeCar') : t('adminLiveries.assignCar')}
+          </button>
+          {carSlug && (
+            <button className="modal-table-action" onClick={() => onClear(liveryName)}>
+              {t('carPicker.clear')}
+            </button>
+          )}
+        </div>
       </td>
     </tr>
   );
@@ -48,9 +56,7 @@ export function LiveriesAdminPanel() {
     fetchCars().then(setCars);
   }, []);
 
-  async function handlePick(carSlug: string | null) {
-    const liveryName = pickerFor!;
-    setPickerFor(null);
+  async function applyMapping(liveryName: string, carSlug: string | null) {
     setError(null);
     try {
       await setAdminLiveryMapping(liveryName, carSlug);
@@ -63,6 +69,12 @@ export function LiveriesAdminPanel() {
     } catch (err) {
       setError((err as Error).message);
     }
+  }
+
+  function handlePick(carSlug: string | null) {
+    const liveryName = pickerFor!;
+    setPickerFor(null);
+    applyMapping(liveryName, carSlug);
   }
 
   return (
@@ -94,6 +106,7 @@ export function LiveriesAdminPanel() {
                   carSlug={carSlugByLivery[liveryName] ?? ''}
                   cars={cars}
                   onPick={setPickerFor}
+                  onClear={(name) => applyMapping(name, null)}
                 />
               ))}
             </tbody>
