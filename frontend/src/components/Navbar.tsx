@@ -14,24 +14,7 @@ import { VipBadge } from './VipBadge';
 import { Flag } from './flags';
 import { Badge } from './Badge';
 import { CAR_CATEGORY_LABELS, CAR_CATEGORY_TONES } from '../carCategories';
-
-// Track/car search results get the entity's own photo pinned to the right
-// half of the row (a real <img> with object-fit: cover, same technique as
-// TrackHero/CarHero — a CSS background-size percentage would stretch it
-// instead of cropping to fit), with a gradient overlay sized to exactly that
-// same box so it reads as "starts at 50% of the row, ends at 100%": opaque
-// at the box's own left edge (blends into the row, right where the text
-// sits) fading to transparent at its right edge (revealing the photo fully
-// at the row's outer edge).
-function SearchResultPhoto({ url }: { url: string | null }) {
-  if (!url) return null;
-  return (
-    <>
-      <img className="navbar-search-result-photo" src={url} alt="" />
-      <span className="navbar-search-result-fade" aria-hidden="true" />
-    </>
-  );
-}
+import { SearchResultPhoto } from './SearchResultPhoto';
 
 // Client-side navigation (Link/useLocation) — the app used to force a real
 // full-page load on every navigation; that's what caused the white flash and

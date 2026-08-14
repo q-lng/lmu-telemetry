@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { fetchCars } from '../api';
 import type { CarCatalogEntry } from '../types';
 import { CAR_KANBAN_GROUPS } from '../carCategories';
 import { t } from '../i18n';
 import { CloseIcon } from './icons';
-import { CarHero } from './CarHero';
+import { SearchResultPhoto } from './SearchResultPhoto';
 
 interface Props {
   onSelect: (carSlug: string | null) => void;
@@ -66,11 +66,28 @@ export function CarPickerModal({ onSelect, onClose }: Props) {
             {columns.map(({ group, cars: columnCars }) => (
               <div key={group.label} className="cars-kanban-column">
                 <h3 className="social-subheading cars-kanban-column-header">{group.label}</h3>
-                {columnCars.map((car) => (
-                  <button key={car.slug} className="car-hero-card-link" onClick={() => onSelect(car.slug)}>
-                    <CarHero entry={car} headingTag="h4" compact />
-                  </button>
-                ))}
+                <div className="navbar-search-group">
+                  {columnCars.map((car, i) => (
+                    <Fragment key={car.slug}>
+                      {i > 0 && <div className="navbar-search-divider" />}
+                      <button className="navbar-search-result" onClick={() => onSelect(car.slug)}>
+                        <SearchResultPhoto url={car.photoExt ? `/api/car-photos/${car.slug}.${car.photoExt}` : null} />
+                        <span className="navbar-search-result-content">
+                          <span className="navbar-search-result-main">
+                            {car.manufacturerBadgeExt && (
+                              <img
+                                className="navbar-search-result-mfr-badge"
+                                src={`/api/manufacturer-photos/${car.manufacturerSlug}.${car.manufacturerBadgeExt}`}
+                                alt=""
+                              />
+                            )}
+                            {car.name}
+                          </span>
+                        </span>
+                      </button>
+                    </Fragment>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
