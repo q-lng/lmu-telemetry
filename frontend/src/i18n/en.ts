@@ -279,7 +279,7 @@ export const en = {
   'adminTrackCalibration.title': 'Calibrate map',
   'adminTrackCalibration.noMap': 'Upload a map image for this track first.',
   'adminTrackCalibration.noSession': 'No session recorded on this track yet — nothing to align the map against.',
-  'adminTrackCalibration.hint': 'The map and the trace are always centered — use rotation and scale to line them up, and zoom in for a precise fit.',
+  'adminTrackCalibration.hint': 'Drag the map to reposition it, use rotation and scale to line it up with the trace, and zoom in for a precise fit.',
   'adminTrackCalibration.zoom': 'Zoom',
   'adminTrackCalibration.rotation': 'Rotation',
   'adminTrackCalibration.scale': 'Scale',

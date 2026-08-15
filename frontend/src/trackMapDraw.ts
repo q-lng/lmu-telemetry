@@ -1,9 +1,14 @@
 import { nearestIndex } from './nearest';
 
-/** Both the map image and the trace are always centered in the canvas — only
- * rotation and scale are adjustable (see backend/src/tracksSchema.sql). */
+/** The trace is always centered in the canvas; the map image's position/scale
+ * are admin-adjustable *relative to that center* (as normalized fractions of
+ * the trace's own bounding box, not raw pixels) since the image's own crop
+ * rarely centers the track exactly the same way the trace's bounding box
+ * does — see backend/src/tracksSchema.sql. */
 export interface MapCalibration {
   rotationDeg: number;
+  offsetX: number;
+  offsetY: number;
   scale: number;
 }
 
@@ -80,9 +85,11 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOp
     }
     drawWidth *= mapCalibration.scale;
     drawHeight *= mapCalibration.scale;
+    const centerX = width / 2 + mapCalibration.offsetX * boxWidth;
+    const centerY = height / 2 + mapCalibration.offsetY * boxHeight;
 
     ctx.save();
-    ctx.translate(width / 2, height / 2);
+    ctx.translate(centerX, centerY);
     ctx.rotate((mapCalibration.rotationDeg * Math.PI) / 180);
     // Kept translucent so the trace on top — the thing that actually matters
     // moment to moment — never has to compete with the background image.

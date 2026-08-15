@@ -17,6 +17,8 @@ export interface TrackCatalogEntry {
   dlcName: string | null;
   dlcColor: string | null;
   mapRotationDeg: number;
+  mapOffsetX: number;
+  mapOffsetY: number;
   mapScale: number;
 }
 
@@ -28,6 +30,8 @@ interface TrackRow {
   dlc_name: string | null;
   dlc_color: string | null;
   map_rotation_deg: number;
+  map_offset_x: number;
+  map_offset_y: number;
   map_scale: number;
 }
 
@@ -37,7 +41,7 @@ export const SLUG_RE = /^[a-z0-9-]{1,64}$/;
 
 const SELECT_TRACK_SQL = `
   SELECT t.slug, t.name, t.country, t.dlc_slug, d.name AS dlc_name, d.color AS dlc_color,
-         t.map_rotation_deg, t.map_scale
+         t.map_rotation_deg, t.map_offset_x, t.map_offset_y, t.map_scale
   FROM tracks t
   LEFT JOIN dlcs d ON d.slug = t.dlc_slug
 `;
@@ -53,6 +57,8 @@ function withAssets(row: TrackRow): TrackCatalogEntry {
     dlcName: row.dlc_name,
     dlcColor: row.dlc_color,
     mapRotationDeg: row.map_rotation_deg,
+    mapOffsetX: row.map_offset_x,
+    mapOffsetY: row.map_offset_y,
     mapScale: row.map_scale,
   };
 }
@@ -107,6 +113,8 @@ export async function updateTrack(slug: string, patch: TrackPatch): Promise<Trac
 
 export interface TrackMapCalibrationPatch {
   rotationDeg?: number;
+  offsetX?: number;
+  offsetY?: number;
   scale?: number;
 }
 
@@ -116,6 +124,14 @@ export async function updateTrackMapCalibration(slug: string, patch: TrackMapCal
   if (patch.rotationDeg !== undefined) {
     params.push(patch.rotationDeg);
     sets.push(`map_rotation_deg = $${params.length}`);
+  }
+  if (patch.offsetX !== undefined) {
+    params.push(patch.offsetX);
+    sets.push(`map_offset_x = $${params.length}`);
+  }
+  if (patch.offsetY !== undefined) {
+    params.push(patch.offsetY);
+    sets.push(`map_offset_y = $${params.length}`);
   }
   if (patch.scale !== undefined) {
     params.push(patch.scale);

@@ -157,10 +157,12 @@ export interface TrackCatalogEntry {
   dlcSlug: string | null;
   dlcName: string | null;
   dlcColor: string | null;
-  // How map.png overlays behind a session's GPS trace on TrackMap — both are
-  // always centered, only rotation/scale are admin-adjustable. See
-  // frontend/src/trackMapDraw.ts.
+  // How map.png overlays behind a session's GPS trace on TrackMap — offset/
+  // scale are normalized fractions of the trace's own bounding box, not raw
+  // pixels. See frontend/src/trackMapDraw.ts.
   mapRotationDeg: number;
+  mapOffsetX: number;
+  mapOffsetY: number;
   mapScale: number;
 }
 
