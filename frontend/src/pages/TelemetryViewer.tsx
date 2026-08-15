@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, TouchEvent as ReactTouchEvent } from 'react';
 import { deleteSession, fetchSessions, fetchTrackByName, setFileVisibility, setLapVisibility, uploadSession } from '../api';
+import { loadOutlinedMapImage } from '../mapImageProcessing';
 import type {
   ChannelDescriptor,
   ChannelSeries,
@@ -485,7 +486,7 @@ export default function TelemetryViewer() {
   const [distRef, setDistRef] = useState<ChannelSeries | null>(null);
   const [gps, setGps] = useState<{ t: number[]; lat: number[]; lon: number[] } | null>(null);
   const [trackEntry, setTrackEntry] = useState<TrackCatalogEntry | null>(null);
-  const [mapImage, setMapImage] = useState<HTMLImageElement | null>(null);
+  const [mapImage, setMapImage] = useState<HTMLCanvasElement | null>(null);
 
   // Resolves the session's raw TrackName to a catalog entry (for its map
   // image + calibration) — a no-op, no-regression fallback when the track
@@ -501,11 +502,11 @@ export default function TelemetryViewer() {
       if (cancelled) return;
       setTrackEntry(entry);
       if (entry?.mapExt) {
-        const img = new Image();
-        img.onload = () => {
-          if (!cancelled) setMapImage(img);
-        };
-        img.src = `/api/track-photos/${entry.slug}-map.${entry.mapExt}`;
+        loadOutlinedMapImage(`/api/track-photos/${entry.slug}-map.${entry.mapExt}`)
+          .then((canvas) => {
+            if (!cancelled) setMapImage(canvas);
+          })
+          .catch(() => {});
       }
     });
     return () => {

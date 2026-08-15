@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { fetchSessions, fetchTrackCatalogEntry, updateAdminTrackMapCalibration } from '../api';
 import { createServerDataSource } from '../dataSource';
+import { loadOutlinedMapImage } from '../mapImageProcessing';
 import { drawTrackMap } from '../trackMapDraw';
 import type { TrackCatalogEntry } from '../types';
 import { t } from '../i18n';
@@ -29,7 +30,7 @@ export function AdminTrackCalibration() {
   const [notFound, setNotFound] = useState(false);
   const [gps, setGps] = useState<{ lat: number[]; lon: number[]; t: number[] } | null>(null);
   const [noSession, setNoSession] = useState(false);
-  const [mapImage, setMapImage] = useState<HTMLImageElement | null>(null);
+  const [mapImage, setMapImage] = useState<HTMLCanvasElement | null>(null);
 
   const [rotationDeg, setRotationDeg] = useState(0);
   const [offsetX, setOffsetX] = useState(0);
@@ -67,9 +68,15 @@ export function AdminTrackCalibration() {
       setMapImage(null);
       return;
     }
-    const img = new Image();
-    img.onload = () => setMapImage(img);
-    img.src = `/api/track-photos/${entry.slug}-map.${entry.mapExt}`;
+    let cancelled = false;
+    loadOutlinedMapImage(`/api/track-photos/${entry.slug}-map.${entry.mapExt}`)
+      .then((canvas) => {
+        if (!cancelled) setMapImage(canvas);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [entry]);
 
   // Reference trace: the first session (of any visibility this admin can
