@@ -35,16 +35,10 @@ export function TrackMap({ lat, lon, t, cursorT, viewRange, height = 260 }: Prop
     const pad = 16;
     const spanLat = maxLat - minLat || 1;
     const spanLon = maxLon - minLon || 1;
-    // A degree of longitude is only the same physical distance as a degree of
-    // latitude at the equator — it shrinks by cos(latitude) elsewhere. Without
-    // this, a track's shape reads flattened/stretched depending on the
-    // circuit's real-world latitude (e.g. very noticeable at Spa, ~50°N).
-    const lonCorrection = Math.cos((((minLat + maxLat) / 2) * Math.PI) / 180);
-    const spanLonCorrected = spanLon * lonCorrection || 1;
-    const scale = Math.min((width - 2 * pad) / spanLonCorrected, (height - 2 * pad) / spanLat);
+    const scale = Math.min((width - 2 * pad) / spanLon, (height - 2 * pad) / spanLat);
 
     const toXY = (la: number, lo_: number): [number, number] => {
-      const x = pad + (lo_ - minLon) * lonCorrection * scale;
+      const x = pad + (lo_ - minLon) * scale;
       const y = height - pad - (la - minLat) * scale;
       return [x, y];
     };
