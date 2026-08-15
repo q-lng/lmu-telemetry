@@ -14,10 +14,9 @@ export function CarHeroPhoto({ slug, ext }: { slug: string; ext: 'jpg' | 'png' |
 }
 
 // Manufacturer badge sits inline with the name, in the flag's spot (see
-// TrackHero's <Flag/> usage) — no invert() filter, unlike a track outline:
-// a manufacturer logo is shown as-is, already full-color artwork. Served from
-// /api/manufacturer-photos, not /api/car-photos — one badge per manufacturer,
-// reused across every model instead of re-uploaded per car.
+// TrackHero's <Flag/> usage). Served from /api/manufacturer-photos, not
+// /api/car-photos — one badge per manufacturer, reused across every model
+// instead of re-uploaded per car.
 function CarHeroBadgeInline({ manufacturerSlug, ext }: { manufacturerSlug: string; ext: 'jpg' | 'png' | null }) {
   if (!ext) return null;
   return <img className="car-hero-manufacturer-badge" src={`/api/manufacturer-photos/${manufacturerSlug}.${ext}`} alt="" />;

@@ -1441,14 +1441,10 @@ body {
   width: 160px;
 }
 
-/* These outlines are typically black line art on a transparent PNG —
-   inverted so the line art itself reads white instead of black. invert()
-   only touches RGB, so the transparent background stays transparent. */
 .track-hero-map {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  filter: invert(1);
 }
 
 /* Grid-card variant (see /tracks catalog page) — same hero, just narrower,
@@ -1559,8 +1555,7 @@ body {
   color: #ffffff;
 }
 
-/* Sits inline with the name, in the flag's spot (see TrackHero's <Flag/>) —
-   shown as-is, no invert filter (unlike the track map's black line art). */
+/* Sits inline with the name, in the flag's spot (see TrackHero's <Flag/>). */
 .car-hero-manufacturer-badge {
   height: 22px;
   width: auto;

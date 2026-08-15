@@ -19,10 +19,7 @@ export function TrackHeroPhoto({ slug, ext }: { slug: string; ext: 'jpg' | 'png'
 // Same pattern as TrackHeroPhoto, separate asset (<slug>-map.{png,jpg}) —
 // the real official track layout, not a telemetry-derived outline. Renders
 // nothing at all when there's no map, since it's a secondary decorative
-// element in the corner, not the hero's main content. The gradient lives on
-// the wrapper, not the <img> itself — filter: invert(1) applies to an
-// element's whole rendered output, so a black gradient painted on the same
-// element as the invert would come out white.
+// element in the corner, not the hero's main content.
 export function TrackHeroMap({ slug, ext }: { slug: string; ext: 'jpg' | 'png' | null }) {
   if (!ext) return null;
   return (
