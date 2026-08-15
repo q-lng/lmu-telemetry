@@ -31,27 +31,27 @@ export function CarsPage() {
       ) : cars.length === 0 ? (
         <div className="social-empty">{t('cars.empty')}</div>
       ) : (
-        // Kanban-style — one column per class, each just as tall as its own
-        // car count needs. A wrapping grid grouped by category forced wildly
-        // uneven sections (18 Hypercars vs. 1 LMP2 ELMS) to line up the same
-        // way; columns side by side don't have that problem.
-        <div className="cars-kanban-board">
-          {columns.map(({ group, cars: columnCars }) => (
-            <div key={group.label} className="cars-kanban-column">
-              <h2 className="social-subheading cars-kanban-column-header">
-                {/* LMP2 WEC/ELMS share this column but differ enough (power
+        // One section per class, stacked top to bottom — each section's own
+        // cars flow left-to-right and wrap onto new lines as needed.
+        <div className="car-catalog-groups">
+          {columns.map(({ group, cars: groupCars }) => (
+            <div key={group.label} className="car-catalog-group">
+              <h2 className="social-subheading car-catalog-group-header">
+                {/* LMP2 WEC/ELMS share this group but differ enough (power
                     level) that either one's specific tone here would
                     misrepresent the other — neutral tone instead, each car's
                     own badge below still shows its precise class. */}
                 <Badge tone={group.categories.length === 1 ? CAR_CATEGORY_TONES[group.categories[0]] : 'gray'}>
-                  {group.label} ({columnCars.length})
+                  {group.label} ({groupCars.length})
                 </Badge>
               </h2>
-              {columnCars.map((car) => (
-                <Link key={car.slug} to={`/cars/${car.slug}`} className="car-hero-card-link">
-                  <CarHero entry={car} headingTag="h3" compact />
-                </Link>
-              ))}
+              <div className="car-catalog-row">
+                {groupCars.map((car) => (
+                  <Link key={car.slug} to={`/cars/${car.slug}`} className="car-hero-card-link">
+                    <CarHero entry={car} headingTag="h3" compact />
+                  </Link>
+                ))}
+              </div>
             </div>
           ))}
         </div>

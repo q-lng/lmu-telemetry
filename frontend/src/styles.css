@@ -1587,6 +1587,7 @@ body {
 
 .car-hero-card-link {
   display: block;
+  flex: 0 0 260px;
   border-radius: var(--radius-md);
   transition: transform 0.15s ease;
 }
@@ -1595,26 +1596,55 @@ body {
   transform: translateY(-2px);
 }
 
-/* Kanban board — one column per category, each just as tall as its own car
-   count needs (see CarsPage.tsx). The board scrolls horizontally rather than
-   squeezing columns to fit, same tradeoff every kanban/board UI (Trello,
-   Notion, ...) makes. */
-.cars-kanban-board {
+/* One section per car category, stacked top to bottom — each section's own
+   cars/chips flow left-to-right and wrap onto new lines as needed, instead
+   of the old side-by-side kanban columns. */
+.car-catalog-groups {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 16px;
+  flex-direction: column;
+  gap: 24px;
 }
 
-.cars-kanban-column {
-  flex: 0 0 280px;
+.car-catalog-group {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.cars-kanban-column-header {
+.car-catalog-group-header {
   margin: 0;
+}
+
+.car-catalog-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Compact horizontal chip — CarPickerModal's car items, sized to content
+   (not a full-width list row) so many fit per line before wrapping. */
+.car-picker-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--primary-ink);
+  font-size: calc(1rem * 12 / 16);
+  white-space: nowrap;
+}
+
+.car-picker-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.car-picker-chip-badge {
+  height: 14px;
+  width: auto;
+  object-fit: contain;
 }
 
 .track-leaderboard-class {

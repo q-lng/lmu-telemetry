@@ -1,10 +1,9 @@
-import { Fragment, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchCars } from '../api';
 import type { CarCatalogEntry } from '../types';
 import { CAR_CATEGORY_TONES, CAR_KANBAN_GROUPS } from '../carCategories';
 import { t } from '../i18n';
 import { CloseIcon } from './icons';
-import { SearchResultPhoto } from './SearchResultPhoto';
 import { Badge } from './Badge';
 
 interface Props {
@@ -13,7 +12,8 @@ interface Props {
 }
 
 /** Manual per-session car override — see MesSessions.tsx. Same modal shell
- * as SessionPickerModal.tsx, same kanban grouping as CarsPage.tsx. */
+ * as SessionPickerModal.tsx, same per-category grouping as CarsPage.tsx
+ * (each category's cars flow horizontally as compact chips and wrap). */
 export function CarPickerModal({ onSelect, onClose }: Props) {
   const [cars, setCars] = useState<CarCatalogEntry[] | null>(null);
   const [filter, setFilter] = useState('');
@@ -64,34 +64,26 @@ export function CarPickerModal({ onSelect, onClose }: Props) {
             <span className="spinner" />
           </div>
         ) : (
-          <div className="cars-kanban-board">
-            {columns.map(({ group, cars: columnCars }) => (
-              <div key={group.label} className="cars-kanban-column">
-                <h3 className="social-subheading cars-kanban-column-header">
+          <div className="car-catalog-groups">
+            {columns.map(({ group, cars: groupCars }) => (
+              <div key={group.label} className="car-catalog-group">
+                <h3 className="social-subheading car-catalog-group-header">
                   <Badge tone={group.categories.length === 1 ? CAR_CATEGORY_TONES[group.categories[0]] : 'gray'}>
-                    {group.label} ({columnCars.length})
+                    {group.label} ({groupCars.length})
                   </Badge>
                 </h3>
-                <div className="navbar-search-group">
-                  {columnCars.map((car, i) => (
-                    <Fragment key={car.slug}>
-                      {i > 0 && <div className="navbar-search-divider" />}
-                      <button className="navbar-search-result" onClick={() => onSelect(car.slug)}>
-                        <SearchResultPhoto url={car.photoExt ? `/api/car-photos/${car.slug}.${car.photoExt}` : null} />
-                        <span className="navbar-search-result-content">
-                          <span className="navbar-search-result-main">
-                            {car.manufacturerBadgeExt && (
-                              <img
-                                className="navbar-search-result-mfr-badge"
-                                src={`/api/manufacturer-photos/${car.manufacturerSlug}.${car.manufacturerBadgeExt}`}
-                                alt=""
-                              />
-                            )}
-                            {car.name}
-                          </span>
-                        </span>
-                      </button>
-                    </Fragment>
+                <div className="car-catalog-row">
+                  {groupCars.map((car) => (
+                    <button key={car.slug} className="car-picker-chip" onClick={() => onSelect(car.slug)}>
+                      {car.manufacturerBadgeExt && (
+                        <img
+                          className="car-picker-chip-badge"
+                          src={`/api/manufacturer-photos/${car.manufacturerSlug}.${car.manufacturerBadgeExt}`}
+                          alt=""
+                        />
+                      )}
+                      {car.name}
+                    </button>
                   ))}
                 </div>
               </div>
