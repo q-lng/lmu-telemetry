@@ -2540,6 +2540,17 @@ body {
   border-radius: var(--radius-md);
 }
 
+.calibration-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calibration-slider-row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+}
+
 .telemetry-legend {
   background: var(--surface-1);
   border: 1px solid var(--border);

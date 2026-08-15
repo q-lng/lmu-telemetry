@@ -19,6 +19,17 @@ const BASE_HEIGHT = 420;
 // the full canvas).
 const BOX_PAD = 16;
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+// Avoids float drift (e.g. 0.1 + 0.2 !== 0.3) accumulating over repeated
+// +/- clicks on the same field.
+function roundTo(value: number, step: number): number {
+  const decimals = (step.toString().split('.')[1] ?? '').length;
+  return Number(value.toFixed(decimals));
+}
+
 /** Admin tool for matching a track's map.png to a real GPS trace — the trace
  * is always centered (see trackMapDraw.ts), and the map's position/rotation/
  * scale relative to that center are adjustable: drag the canvas to
@@ -226,19 +237,94 @@ export function AdminTrackCalibration() {
 
           <div className="field">
             <strong>{t('adminTrackCalibration.zoom')} ({zoom.toFixed(1)}×)</strong>
-            <input type="range" min={1} max={5} step={0.1} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} />
+            <div className="calibration-slider-row">
+              <button
+                type="button"
+                className="modal-table-action"
+                aria-label={t('adminTrackCalibration.decrease')}
+                onClick={() => setZoom((v) => clamp(roundTo(v - 0.1, 0.1), 1, 5))}
+              >
+                −
+              </button>
+              <input
+                type="range"
+                min={1}
+                max={5}
+                step={0.1}
+                value={zoom}
+                onChange={(e) => setZoom(Number(e.target.value))}
+              />
+              <button
+                type="button"
+                className="modal-table-action"
+                aria-label={t('adminTrackCalibration.increase')}
+                onClick={() => setZoom((v) => clamp(roundTo(v + 0.1, 0.1), 1, 5))}
+              >
+                +
+              </button>
+            </div>
           </div>
           <div className="field">
             <strong>
-              {t('adminTrackCalibration.rotation')} ({rotationDeg.toFixed(0)}°)
+              {t('adminTrackCalibration.rotation')} ({rotationDeg.toFixed(1)}°)
             </strong>
-            <input type="range" min={-180} max={180} step={1} value={rotationDeg} onChange={(e) => setRotationDeg(Number(e.target.value))} />
+            <div className="calibration-slider-row">
+              <button
+                type="button"
+                className="modal-table-action"
+                aria-label={t('adminTrackCalibration.decrease')}
+                onClick={() => setRotationDeg((v) => clamp(roundTo(v - 0.1, 0.1), -180, 180))}
+              >
+                −
+              </button>
+              <input
+                type="range"
+                min={-180}
+                max={180}
+                step={0.1}
+                value={rotationDeg}
+                onChange={(e) => setRotationDeg(Number(e.target.value))}
+              />
+              <button
+                type="button"
+                className="modal-table-action"
+                aria-label={t('adminTrackCalibration.increase')}
+                onClick={() => setRotationDeg((v) => clamp(roundTo(v + 0.1, 0.1), -180, 180))}
+              >
+                +
+              </button>
+            </div>
           </div>
           <div className="field">
             <strong>
               {t('adminTrackCalibration.scale')} ({scale.toFixed(2)}×)
             </strong>
-            <input type="range" min={0.2} max={3} step={0.01} value={scale} onChange={(e) => setScale(Number(e.target.value))} />
+            <div className="calibration-slider-row">
+              <button
+                type="button"
+                className="modal-table-action"
+                aria-label={t('adminTrackCalibration.decrease')}
+                onClick={() => setScale((v) => clamp(roundTo(v - 0.01, 0.01), 0.2, 3))}
+              >
+                −
+              </button>
+              <input
+                type="range"
+                min={0.2}
+                max={3}
+                step={0.01}
+                value={scale}
+                onChange={(e) => setScale(Number(e.target.value))}
+              />
+              <button
+                type="button"
+                className="modal-table-action"
+                aria-label={t('adminTrackCalibration.increase')}
+                onClick={() => setScale((v) => clamp(roundTo(v + 0.01, 0.01), 0.2, 3))}
+              >
+                +
+              </button>
+            </div>
           </div>
 
           {error && <div className="auth-error">{error}</div>}

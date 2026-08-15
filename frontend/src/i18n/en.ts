@@ -283,6 +283,8 @@ export const en = {
   'adminTrackCalibration.zoom': 'Zoom',
   'adminTrackCalibration.rotation': 'Rotation',
   'adminTrackCalibration.scale': 'Scale',
+  'adminTrackCalibration.decrease': 'Decrease',
+  'adminTrackCalibration.increase': 'Increase',
   'adminTrackCalibration.save': 'Save',
   'adminTrackCalibration.saving': 'Saving…',
   'adminTrackCalibration.saved': 'Saved.',
