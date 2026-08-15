@@ -51,13 +51,24 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOp
   const lonCorrection = Math.cos((((minLat + maxLat) / 2) * Math.PI) / 180);
   const spanLonCorrected = spanLon * lonCorrection || 1;
   const scale = Math.min((width - 2 * pad) / spanLonCorrected, (height - 2 * pad) / spanLat);
+  // The trace's own bounding box, in canvas pixels — its aspect ratio is
+  // fixed by the track's real shape (cos-corrected), independent of the
+  // canvas's own width/height. Calibration (offset/scale below) is expressed
+  // as a fraction of *this* box rather than of the full canvas box, so it
+  // transfers correctly between canvases of different aspect ratio — e.g.
+  // the admin tool's fixed 600x420 reference canvas vs. the telemetry
+  // viewer's responsive-width one. Using the canvas box instead made a
+  // calibration done in the admin tool land in the wrong place everywhere
+  // else, since the two boxes only coincide by accident.
+  const traceWidth = spanLonCorrected * scale;
+  const traceHeight = spanLat * scale;
   // Center the trace in the canvas rather than anchoring it to the pad — the
   // box the trace fits into isn't necessarily the same aspect ratio as the
   // canvas, so anchoring at (pad, height-pad) left it sitting bottom-left
   // instead of in the middle (very visible once a *centered* map image is
   // drawn behind it and the two don't line up).
-  const marginX = (width - spanLonCorrected * scale) / 2;
-  const marginY = (height - spanLat * scale) / 2;
+  const marginX = (width - traceWidth) / 2;
+  const marginY = (height - traceHeight) / 2;
 
   const toXY = (la: number, lo_: number): [number, number] => {
     const x = marginX + (lo_ - minLon) * lonCorrection * scale;
@@ -68,8 +79,8 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOp
   ctx.clearRect(0, 0, width, height);
 
   if (mapImage && mapCalibration && mapImage.naturalWidth > 0) {
-    const boxWidth = width - 2 * pad;
-    const boxHeight = height - 2 * pad;
+    const boxWidth = traceWidth;
+    const boxHeight = traceHeight;
     // Contain-fit the image's own aspect ratio within the same box the trace
     // fits into, then apply the admin-calibrated scale on top of that.
     const imgAspect = mapImage.naturalWidth / mapImage.naturalHeight;
