@@ -230,107 +230,111 @@ export function AdminTrackCalibration() {
       ) : (
         <>
           <p className="field-hint">{t('adminTrackCalibration.hint')}</p>
-          <div className="track-map-calibration-canvas-wrap" style={{ width: BASE_WIDTH, height: BASE_HEIGHT }}>
-            <canvas ref={canvasRef} style={{ width: BASE_WIDTH * zoom, height: BASE_HEIGHT * zoom, cursor: gps ? 'move' : 'default' }} />
-          </div>
+          <div className="track-map-calibration-layout">
+            <div className="track-map-calibration-canvas-wrap" style={{ width: BASE_WIDTH, height: BASE_HEIGHT }}>
+              <canvas ref={canvasRef} style={{ width: BASE_WIDTH * zoom, height: BASE_HEIGHT * zoom, cursor: gps ? 'move' : 'default' }} />
+            </div>
 
-          <div className="field">
-            <strong>{t('adminTrackCalibration.zoom')} ({zoom.toFixed(1)}×)</strong>
-            <div className="calibration-slider-row">
-              <button
-                type="button"
-                className="modal-table-action"
-                aria-label={t('adminTrackCalibration.decrease')}
-                onClick={() => setZoom((v) => clamp(roundTo(v - 0.1, 0.1), 1, 5))}
-              >
-                −
-              </button>
-              <input
-                type="range"
-                min={1}
-                max={5}
-                step={0.1}
-                value={zoom}
-                onChange={(e) => setZoom(Number(e.target.value))}
-              />
-              <button
-                type="button"
-                className="modal-table-action"
-                aria-label={t('adminTrackCalibration.increase')}
-                onClick={() => setZoom((v) => clamp(roundTo(v + 0.1, 0.1), 1, 5))}
-              >
-                +
-              </button>
-            </div>
-          </div>
-          <div className="field">
-            <strong>
-              {t('adminTrackCalibration.rotation')} ({rotationDeg.toFixed(1)}°)
-            </strong>
-            <div className="calibration-slider-row">
-              <button
-                type="button"
-                className="modal-table-action"
-                aria-label={t('adminTrackCalibration.decrease')}
-                onClick={() => setRotationDeg((v) => clamp(roundTo(v - 0.1, 0.1), -180, 180))}
-              >
-                −
-              </button>
-              <input
-                type="range"
-                min={-180}
-                max={180}
-                step={0.1}
-                value={rotationDeg}
-                onChange={(e) => setRotationDeg(Number(e.target.value))}
-              />
-              <button
-                type="button"
-                className="modal-table-action"
-                aria-label={t('adminTrackCalibration.increase')}
-                onClick={() => setRotationDeg((v) => clamp(roundTo(v + 0.1, 0.1), -180, 180))}
-              >
-                +
-              </button>
-            </div>
-          </div>
-          <div className="field">
-            <strong>
-              {t('adminTrackCalibration.scale')} ({scale.toFixed(2)}×)
-            </strong>
-            <div className="calibration-slider-row">
-              <button
-                type="button"
-                className="modal-table-action"
-                aria-label={t('adminTrackCalibration.decrease')}
-                onClick={() => setScale((v) => clamp(roundTo(v - 0.01, 0.01), 0.2, 3))}
-              >
-                −
-              </button>
-              <input
-                type="range"
-                min={0.2}
-                max={3}
-                step={0.01}
-                value={scale}
-                onChange={(e) => setScale(Number(e.target.value))}
-              />
-              <button
-                type="button"
-                className="modal-table-action"
-                aria-label={t('adminTrackCalibration.increase')}
-                onClick={() => setScale((v) => clamp(roundTo(v + 0.01, 0.01), 0.2, 3))}
-              >
-                +
-              </button>
-            </div>
-          </div>
+            <div className="track-map-calibration-controls">
+              <div className="field">
+                <strong>{t('adminTrackCalibration.zoom')} ({zoom.toFixed(1)}×)</strong>
+                <div className="calibration-slider-row">
+                  <button
+                    type="button"
+                    className="modal-table-action"
+                    aria-label={t('adminTrackCalibration.decrease')}
+                    onClick={() => setZoom((v) => clamp(roundTo(v - 0.1, 0.1), 1, 5))}
+                  >
+                    −
+                  </button>
+                  <input
+                    type="range"
+                    min={1}
+                    max={5}
+                    step={0.1}
+                    value={zoom}
+                    onChange={(e) => setZoom(Number(e.target.value))}
+                  />
+                  <button
+                    type="button"
+                    className="modal-table-action"
+                    aria-label={t('adminTrackCalibration.increase')}
+                    onClick={() => setZoom((v) => clamp(roundTo(v + 0.1, 0.1), 1, 5))}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <div className="field">
+                <strong>
+                  {t('adminTrackCalibration.rotation')} ({rotationDeg.toFixed(1)}°)
+                </strong>
+                <div className="calibration-slider-row">
+                  <button
+                    type="button"
+                    className="modal-table-action"
+                    aria-label={t('adminTrackCalibration.decrease')}
+                    onClick={() => setRotationDeg((v) => clamp(roundTo(v - 0.1, 0.1), -180, 180))}
+                  >
+                    −
+                  </button>
+                  <input
+                    type="range"
+                    min={-180}
+                    max={180}
+                    step={0.1}
+                    value={rotationDeg}
+                    onChange={(e) => setRotationDeg(Number(e.target.value))}
+                  />
+                  <button
+                    type="button"
+                    className="modal-table-action"
+                    aria-label={t('adminTrackCalibration.increase')}
+                    onClick={() => setRotationDeg((v) => clamp(roundTo(v + 0.1, 0.1), -180, 180))}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <div className="field">
+                <strong>
+                  {t('adminTrackCalibration.scale')} ({scale.toFixed(2)}×)
+                </strong>
+                <div className="calibration-slider-row">
+                  <button
+                    type="button"
+                    className="modal-table-action"
+                    aria-label={t('adminTrackCalibration.decrease')}
+                    onClick={() => setScale((v) => clamp(roundTo(v - 0.01, 0.01), 0.2, 3))}
+                  >
+                    −
+                  </button>
+                  <input
+                    type="range"
+                    min={0.2}
+                    max={3}
+                    step={0.01}
+                    value={scale}
+                    onChange={(e) => setScale(Number(e.target.value))}
+                  />
+                  <button
+                    type="button"
+                    className="modal-table-action"
+                    aria-label={t('adminTrackCalibration.increase')}
+                    onClick={() => setScale((v) => clamp(roundTo(v + 0.01, 0.01), 0.2, 3))}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
 
-          {error && <div className="auth-error">{error}</div>}
-          <button className="auth-submit" disabled={saving} onClick={handleSave}>
-            {saving ? t('adminTrackCalibration.saving') : t('adminTrackCalibration.save')}
-          </button>
-          {saved && !saving && <p className="field-hint">{t('adminTrackCalibration.saved')}</p>}
+              {error && <div className="auth-error">{error}</div>}
+              <button className="auth-submit" disabled={saving} onClick={handleSave}>
+                {saving ? t('adminTrackCalibration.saving') : t('adminTrackCalibration.save')}
+              </button>
+              {saved && !saving && <p className="field-hint">{t('adminTrackCalibration.saved')}</p>}
+            </div>
+          </div>
         </>
       )}
     </div>

@@ -2525,6 +2525,24 @@ body {
   padding: 6px;
 }
 
+/* Canvas on the left, sliders/save stacked to its right — see
+   AdminTrackCalibration.tsx. Falls back to stacked (canvas above controls)
+   once there isn't room for both side by side. */
+.track-map-calibration-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.track-map-calibration-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  min-width: 260px;
+}
+
 /* Scrolls to pan around once the canvas (BASE_WIDTH/HEIGHT * zoom) grows
    past this wrapper's own size — see AdminTrackCalibration.tsx. Drag-resizable
    (the native browser resize handle) so the work area itself can be made
