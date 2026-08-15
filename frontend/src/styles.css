@@ -1437,20 +1437,25 @@ body {
    itself (its right-hand band), not here — this is just sizing. Sized off
    height (not a fixed width) so the map always fills the hero's height —
    most track outlines are wider than tall, so fitting to a fixed width left
-   them small with empty space above/below; width follows from the image's
-   own aspect ratio instead, capped so a very wide track doesn't crowd out
-   the title. */
+   them small with empty space above/below.
+   flex-shrink is 1 here (not the usual 0 0 auto for a fixed-size sidebar
+   element) so the frame gives way to the title on narrow layouts instead of
+   overflowing past the hero's edge (clipped by its overflow:hidden, which
+   read as the map "sticking out" on the right) — combined with the img's
+   own width:auto + max-width:100%, this lets the browser's normal replaced-
+   element sizing shrink both dimensions together, in proportion, whenever
+   width is the binding constraint, and only fill the full height when
+   there's room. No fixed max-width guess needed. */
 .track-hero-map-frame {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   align-self: stretch;
-  max-width: 220px;
+  min-width: 0;
 }
 
 .track-hero-map {
   height: 100%;
   width: auto;
   max-width: 100%;
-  object-fit: contain;
 }
 
 /* Grid-card variant (see /tracks catalog page) — same hero, just narrower,
@@ -1468,10 +1473,6 @@ body {
 .track-hero--card .track-hero-title h2 {
   gap: 6px;
   font-size: calc(1rem * 15 / 16);
-}
-
-.track-hero--card .track-hero-map-frame {
-  max-width: 100px;
 }
 
 .tracks-grid {
