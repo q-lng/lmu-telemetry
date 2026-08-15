@@ -74,17 +74,19 @@ export function MesSessions() {
                 {f.track ?? f.filename}
                 {f.resolvedCar ?? f.car ? ` — ${f.resolvedCar ?? f.car}` : ''}
               </button>
-              <button className="modal-table-action" onClick={() => setCarPickerFor(f.filename)}>
-                {f.carSlug ? t('mesSessions.changeCar') : t('mesSessions.assignCar')}
-              </button>
-              <select
-                value={f.visibility}
-                onChange={(e) => handleVisibilityChange(f.filename, e.target.value as Visibility)}
-              >
-                <option value="private">{t('visibility.private')}</option>
-                <option value="friends">{t('visibility.friends')}</option>
-                <option value="public">{t('visibility.public')}</option>
-              </select>
+              <div className="mes-sessions-row-actions">
+                <button className="modal-table-action" onClick={() => setCarPickerFor(f.filename)}>
+                  {f.carSlug ? t('mesSessions.changeCar') : t('mesSessions.assignCar')}
+                </button>
+                <select
+                  value={f.visibility}
+                  onChange={(e) => handleVisibilityChange(f.filename, e.target.value as Visibility)}
+                >
+                  <option value="private">{t('visibility.private')}</option>
+                  <option value="friends">{t('visibility.friends')}</option>
+                  <option value="public">{t('visibility.public')}</option>
+                </select>
+              </div>
             </div>
 
             {expanded === f.filename && (

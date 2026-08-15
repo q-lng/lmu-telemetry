@@ -2,45 +2,35 @@ import { useEffect, useState } from 'react';
 import { fetchAdminLiveryMappings, fetchCars, setAdminLiveryMapping } from '../api';
 import type { CarCatalogEntry } from '../types';
 import { t } from '../i18n';
+import { CarPickerModal } from '../components/CarPickerModal';
 
 interface RowProps {
   liveryName: string;
   carSlug: string;
   cars: CarCatalogEntry[];
-  onChange: (liveryName: string, carSlug: string) => void;
+  onPick: (liveryName: string) => void;
+  onClear: (liveryName: string) => void;
 }
 
-function LiveryRow({ liveryName, carSlug, cars, onChange }: RowProps) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function save(nextSlug: string) {
-    setBusy(true);
-    setError(null);
-    try {
-      await setAdminLiveryMapping(liveryName, nextSlug || null);
-      onChange(liveryName, nextSlug);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
+function LiveryRow({ liveryName, carSlug, cars, onPick, onClear }: RowProps) {
+  const mappedCar = cars.find((c) => c.slug === carSlug);
 
   return (
     <tr>
       <td>{liveryName}</td>
+      <td>{mappedCar ? mappedCar.name : t('adminLiveries.unmappedOption')}</td>
       <td>
-        <select value={carSlug} disabled={busy} onChange={(e) => save(e.target.value)}>
-          <option value="">{t('adminLiveries.unmappedOption')}</option>
-          {cars.map((car) => (
-            <option key={car.slug} value={car.slug}>
-              {car.name}
-            </option>
-          ))}
-        </select>
+        <div className="admin-liveries-row-actions">
+          <button className="modal-table-action" onClick={() => onPick(liveryName)}>
+            {carSlug ? t('adminLiveries.changeCar') : t('adminLiveries.assignCar')}
+          </button>
+          {carSlug && (
+            <button className="modal-table-action" onClick={() => onClear(liveryName)}>
+              {t('carPicker.clear')}
+            </button>
+          )}
+        </div>
       </td>
-      <td>{error && <div className="auth-error">{error}</div>}</td>
     </tr>
   );
 }
@@ -54,6 +44,7 @@ export function LiveriesAdminPanel() {
   const [carSlugByLivery, setCarSlugByLivery] = useState<Record<string, string>>({});
   const [cars, setCars] = useState<CarCatalogEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [pickerFor, setPickerFor] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAdminLiveryMappings()
@@ -65,13 +56,25 @@ export function LiveriesAdminPanel() {
     fetchCars().then(setCars);
   }, []);
 
-  function handleChange(liveryName: string, carSlug: string) {
-    setCarSlugByLivery((prev) => {
-      const next = { ...prev };
-      if (carSlug) next[liveryName] = carSlug;
-      else delete next[liveryName];
-      return next;
-    });
+  async function applyMapping(liveryName: string, carSlug: string | null) {
+    setError(null);
+    try {
+      await setAdminLiveryMapping(liveryName, carSlug);
+      setCarSlugByLivery((prev) => {
+        const next = { ...prev };
+        if (carSlug) next[liveryName] = carSlug;
+        else delete next[liveryName];
+        return next;
+      });
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  function handlePick(carSlug: string | null) {
+    const liveryName = pickerFor!;
+    setPickerFor(null);
+    applyMapping(liveryName, carSlug);
   }
 
   return (
@@ -102,13 +105,16 @@ export function LiveriesAdminPanel() {
                   liveryName={liveryName}
                   carSlug={carSlugByLivery[liveryName] ?? ''}
                   cars={cars}
-                  onChange={handleChange}
+                  onPick={setPickerFor}
+                  onClear={(name) => applyMapping(name, null)}
                 />
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      {pickerFor && <CarPickerModal onSelect={handlePick} onClose={() => setPickerFor(null)} />}
     </div>
   );
 }

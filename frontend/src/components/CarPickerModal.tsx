@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { fetchCars } from '../api';
 import type { CarCatalogEntry } from '../types';
-import { CAR_KANBAN_GROUPS } from '../carCategories';
+import { CAR_CATEGORY_TONES, CAR_KANBAN_GROUPS } from '../carCategories';
 import { t } from '../i18n';
 import { CloseIcon } from './icons';
-import { CarHero } from './CarHero';
+import { Badge } from './Badge';
 
 interface Props {
   onSelect: (carSlug: string | null) => void;
@@ -12,7 +12,8 @@ interface Props {
 }
 
 /** Manual per-session car override — see MesSessions.tsx. Same modal shell
- * as SessionPickerModal.tsx, same kanban grouping as CarsPage.tsx. */
+ * as SessionPickerModal.tsx, same per-category grouping as CarsPage.tsx
+ * (each category's cars flow horizontally as compact chips and wrap). */
 export function CarPickerModal({ onSelect, onClose }: Props) {
   const [cars, setCars] = useState<CarCatalogEntry[] | null>(null);
   const [filter, setFilter] = useState('');
@@ -46,31 +47,45 @@ export function CarPickerModal({ onSelect, onClose }: Props) {
           </button>
         </div>
 
-        <input
-          className="modal-filter"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          placeholder={t('carPicker.filterPlaceholder')}
-        />
-
-        <button className="modal-table-action" onClick={() => onSelect(null)}>
-          {t('carPicker.clearOverride')}
-        </button>
+        <div className="modal-filter-row">
+          <input
+            className="modal-filter"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder={t('carPicker.filterPlaceholder')}
+          />
+          <button className="modal-table-action" onClick={() => onSelect(null)}>
+            {t('carPicker.clear')}
+          </button>
+        </div>
 
         {!cars ? (
           <div className="page-loading">
             <span className="spinner" />
           </div>
         ) : (
-          <div className="cars-kanban-board">
-            {columns.map(({ group, cars: columnCars }) => (
-              <div key={group.label} className="cars-kanban-column">
-                <h3 className="social-subheading cars-kanban-column-header">{group.label}</h3>
-                {columnCars.map((car) => (
-                  <button key={car.slug} className="car-hero-card-link" onClick={() => onSelect(car.slug)}>
-                    <CarHero entry={car} headingTag="h4" compact />
-                  </button>
-                ))}
+          <div className="car-catalog-groups">
+            {columns.map(({ group, cars: groupCars }) => (
+              <div key={group.label} className="car-catalog-group">
+                <h3 className="social-subheading car-catalog-group-header">
+                  <Badge tone={group.categories.length === 1 ? CAR_CATEGORY_TONES[group.categories[0]] : 'gray'}>
+                    {group.label} ({groupCars.length})
+                  </Badge>
+                </h3>
+                <div className="car-catalog-row">
+                  {groupCars.map((car) => (
+                    <button key={car.slug} className="car-picker-chip" onClick={() => onSelect(car.slug)}>
+                      {car.manufacturerBadgeExt && (
+                        <img
+                          className="car-picker-chip-badge"
+                          src={`/api/manufacturer-photos/${car.manufacturerSlug}.${car.manufacturerBadgeExt}`}
+                          alt=""
+                        />
+                      )}
+                      {car.name}
+                    </button>
+                  ))}
+                </div>
               </div>
             ))}
           </div>

@@ -220,7 +220,7 @@ export const en = {
   'carPicker.title': 'Assign a car',
   'carPicker.close': 'Close',
   'carPicker.filterPlaceholder': 'Filter by car or manufacturer…',
-  'carPicker.clearOverride': 'Clear override',
+  'carPicker.clear': 'Clear assignment',
 
   'browse.title': 'Browse',
   'browse.subtitle': 'Search sessions or shared laps by track or car.',
@@ -308,6 +308,8 @@ export const en = {
   'adminLiveries.empty': 'No livery has been uploaded yet.',
   'adminLiveries.colLivery': 'Livery (as recorded in-game)',
   'adminLiveries.colCar': 'Real car',
+  'adminLiveries.assignCar': 'Assign car',
+  'adminLiveries.changeCar': 'Change car',
   'adminLiveries.unmappedOption': '— Unmapped —',
 
   'adminDlcs.title': 'DLC',
