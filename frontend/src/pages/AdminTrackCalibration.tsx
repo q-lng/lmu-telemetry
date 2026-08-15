@@ -160,7 +160,11 @@ export function AdminTrackCalibration() {
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
     };
-  }, []);
+    // The canvas only exists in the DOM once `entry` has loaded (async) and
+    // `noSession` has resolved — deps: [] would run this once, immediately on
+    // mount, while canvasRef.current is still null (nothing rendered yet),
+    // and never attach once the real canvas element shows up.
+  }, [entry?.slug, entry?.mapExt, noSession]);
 
   async function handleSave() {
     setSaving(true);
