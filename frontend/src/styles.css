@@ -1601,10 +1601,9 @@ body {
    Notion, ...) makes. */
 .cars-kanban-board {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: 16px;
-  overflow-x: auto;
-  padding-bottom: 8px;
 }
 
 .cars-kanban-column {
