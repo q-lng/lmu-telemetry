@@ -1402,7 +1402,6 @@ body {
   inset: 0;
   display: flex;
   align-items: flex-end;
-  justify-content: space-between;
   gap: 16px;
   padding: 20px;
   /* Two stacked gradients: the bottom fade for title legibility, plus a
@@ -1431,31 +1430,33 @@ body {
   color: #ffffff;
 }
 
-/* Real official track layout (see TrackHeroMap) — sits opposite the title,
-   spanning the hero's full height. Renders nothing if the asset doesn't
-   exist. The blend-into-the-hero gradient lives on .track-hero-overlay
-   itself (its right-hand band), not here — this is just sizing. Sized off
-   height (not a fixed width) so the map always fills the hero's height —
-   most track outlines are wider than tall, so fitting to a fixed width left
-   them small with empty space above/below.
-   flex-shrink is 1 here (not the usual 0 0 auto for a fixed-size sidebar
-   element) so the frame gives way to the title on narrow layouts instead of
-   overflowing past the hero's edge (clipped by its overflow:hidden, which
-   read as the map "sticking out" on the right) — combined with the img's
-   own width:auto + max-width:100%, this lets the browser's normal replaced-
-   element sizing shrink both dimensions together, in proportion, whenever
-   width is the binding constraint, and only fill the full height when
-   there's room. No fixed max-width guess needed. */
+/* Real official track layout (see TrackHeroMap) — pinned to the overlay's
+   right edge, spanning its full height. Renders nothing if the asset
+   doesn't exist. The blend-into-the-hero gradient lives on
+   .track-hero-overlay itself (its right-hand band), not here.
+   Taken out of the title's flex row and absolutely positioned instead of
+   flexed alongside it — a flex item stretched to the cross size (for
+   height:100% on the img inside) while also being auto-sized on the main
+   axis (for width:auto, to get height-driven sizing rather than a fixed
+   width) hits a genuine cross-browser circular-sizing snag: the browser
+   can't reliably compute "how wide should this shrink-to-fit item be"
+   without already knowing its stretched height, and vice versa — in
+   practice this rendered as the frame blowing up to claim the entire row.
+   Absolute positioning (top/bottom pinned to the overlay's own padding)
+   gives the frame a plain, non-circular definite height to size the image
+   against, and pins it to the right by construction — no flex/justify-
+   content needed at all. */
 .track-hero-map-frame {
-  flex: 0 1 auto;
-  align-self: stretch;
-  min-width: 0;
+  position: absolute;
+  top: 20px;
+  bottom: 20px;
+  right: 20px;
 }
 
 .track-hero-map {
   height: 100%;
   width: auto;
-  max-width: 100%;
+  max-width: 260px;
 }
 
 /* Grid-card variant (see /tracks catalog page) — same hero, just narrower,
@@ -1473,6 +1474,16 @@ body {
 .track-hero--card .track-hero-title h2 {
   gap: 6px;
   font-size: calc(1rem * 15 / 16);
+}
+
+.track-hero--card .track-hero-map-frame {
+  top: 12px;
+  bottom: 12px;
+  right: 12px;
+}
+
+.track-hero--card .track-hero-map {
+  max-width: 120px;
 }
 
 .tracks-grid {
