@@ -2526,9 +2526,15 @@ body {
 }
 
 /* Scrolls to pan around once the canvas (BASE_WIDTH/HEIGHT * zoom) grows
-   past this wrapper's own fixed size — see AdminTrackCalibration.tsx. */
+   past this wrapper's own size — see AdminTrackCalibration.tsx. Drag-resizable
+   (the native browser resize handle) so the work area itself can be made
+   bigger, independently of the zoom slider that magnifies the canvas content. */
 .track-map-calibration-canvas-wrap {
   overflow: auto;
+  resize: both;
+  min-width: 320px;
+  min-height: 220px;
+  max-width: 100%;
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);

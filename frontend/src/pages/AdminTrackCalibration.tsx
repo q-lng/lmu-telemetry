@@ -213,7 +213,7 @@ export function AdminTrackCalibration() {
       ) : (
         <>
           <p className="field-hint">{t('adminTrackCalibration.hint')}</p>
-          <div className="track-map-calibration-canvas-wrap" style={{ maxWidth: BASE_WIDTH, maxHeight: BASE_HEIGHT }}>
+          <div className="track-map-calibration-canvas-wrap" style={{ width: BASE_WIDTH, height: BASE_HEIGHT }}>
             <canvas ref={canvasRef} style={{ width: BASE_WIDTH * zoom, height: BASE_HEIGHT * zoom, cursor: gps ? 'move' : 'default' }} />
           </div>
 
