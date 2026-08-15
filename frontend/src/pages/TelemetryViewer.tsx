@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, TouchEvent as ReactTouchEvent } from 'react';
-import { deleteSession, fetchSessions, setFileVisibility, setLapVisibility, uploadSession } from '../api';
+import { deleteSession, fetchSessions, fetchTrackByName, setFileVisibility, setLapVisibility, uploadSession } from '../api';
 import type {
   ChannelDescriptor,
   ChannelSeries,
@@ -12,6 +12,7 @@ import type {
   LapVisibility,
   SessionMetadata,
   SessionSummary,
+  TrackCatalogEntry,
 } from '../types';
 import { createServerDataSource, createWasmDataSource, type DataSource } from '../dataSource';
 import { ChannelPlot } from '../components/ChannelPlot';
@@ -483,6 +484,34 @@ export default function TelemetryViewer() {
   const [deltaByLapId, setDeltaByLapId] = useState<Record<string, (number | null)[]>>({});
   const [distRef, setDistRef] = useState<ChannelSeries | null>(null);
   const [gps, setGps] = useState<{ t: number[]; lat: number[]; lon: number[] } | null>(null);
+  const [trackEntry, setTrackEntry] = useState<TrackCatalogEntry | null>(null);
+  const [mapImage, setMapImage] = useState<HTMLImageElement | null>(null);
+
+  // Resolves the session's raw TrackName to a catalog entry (for its map
+  // image + calibration) — a no-op, no-regression fallback when the track
+  // isn't catalogued or has no map uploaded yet (see TrackMap.tsx's optional
+  // mapImage/mapCalibration props).
+  useEffect(() => {
+    const trackName = metadata?.info.TrackName;
+    setTrackEntry(null);
+    setMapImage(null);
+    if (!trackName) return;
+    let cancelled = false;
+    fetchTrackByName(trackName).then((entry) => {
+      if (cancelled) return;
+      setTrackEntry(entry);
+      if (entry?.mapExt) {
+        const img = new Image();
+        img.onload = () => {
+          if (!cancelled) setMapImage(img);
+        };
+        img.src = `/api/track-photos/${entry.slug}-map.${entry.mapExt}`;
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [metadata?.info.TrackName]);
   const [cursorT, setCursorT] = useState<number | null>(null);
   // Click-to-freeze: a click on any graph pins the cursor there so the legend/
   // in-graph values/track map keep showing that point after the mouse moves
@@ -2116,7 +2145,25 @@ export default function TelemetryViewer() {
       <main className="main">
         <div className="content-row">
           <div className="map-column">
-            {gps && <TrackMap lat={gps.lat} lon={gps.lon} t={gpsX} cursorT={cursorT} viewRange={viewRange} height={340} />}
+            {gps && (
+              <TrackMap
+                lat={gps.lat}
+                lon={gps.lon}
+                t={gpsX}
+                cursorT={cursorT}
+                viewRange={viewRange}
+                height={340}
+                mapImage={mapImage}
+                mapCalibration={
+                  trackEntry && {
+                    rotationDeg: trackEntry.mapRotationDeg,
+                    offsetX: trackEntry.mapOffsetX,
+                    offsetY: trackEntry.mapOffsetY,
+                    scale: trackEntry.mapScale,
+                  }
+                }
+              />
+            )}
             {cursorLocked && (
               <button className="cursor-lock-hint" onClick={() => setCursorLocked(false)}>
                 {t('tv.cursorLockedHint')}

@@ -225,6 +225,19 @@ export function fetchTrackCatalogEntry(slug: string): Promise<TrackCatalogEntry>
   return getJson<TrackCatalogEntry>(`/api/tracks/${encodeURIComponent(slug)}`);
 }
 
+// 404 just means this session's TrackName has no catalog entry (or the
+// catalog is incomplete, see access.ts's searchTrackNames comment) — treated
+// as "no map background available", not an error to surface.
+export async function fetchTrackByName(name: string): Promise<TrackCatalogEntry | null> {
+  const res = await fetch(`/api/tracks/by-name?name=${encodeURIComponent(name)}`);
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const parsed = await res.json().catch(() => ({}));
+    throw new Error(tError((parsed as { error?: string }).error));
+  }
+  return res.json() as Promise<TrackCatalogEntry>;
+}
+
 export function fetchTracks(): Promise<TrackCatalogEntry[]> {
   return getJson<{ tracks: TrackCatalogEntry[] }>('/api/tracks').then((r) => r.tracks);
 }
@@ -396,6 +409,13 @@ export function updateAdminTrack(
   patch: { name?: string; country?: string; dlcSlug?: string },
 ): Promise<TrackCatalogEntry> {
   return patchJson<TrackCatalogEntry>(`/api/admin/tracks/${encodeURIComponent(slug)}`, patch);
+}
+
+export function updateAdminTrackMapCalibration(
+  slug: string,
+  patch: { rotationDeg?: number; offsetX?: number; offsetY?: number; scale?: number },
+): Promise<TrackCatalogEntry> {
+  return patchJson<TrackCatalogEntry>(`/api/admin/tracks/${encodeURIComponent(slug)}/map-calibration`, patch);
 }
 
 async function uploadImage<T>(url: string, file: File): Promise<T> {

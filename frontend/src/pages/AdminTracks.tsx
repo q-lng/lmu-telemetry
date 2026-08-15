@@ -169,6 +169,11 @@ function TrackRow({ track, dlcs, onChange }: RowProps) {
             src={track.mapExt ? `/api/track-photos/${track.slug}-map.${track.mapExt}?v=${photoVersion}` : null}
           />
           <UploadButton label={t('adminTracks.uploadMap')} busy={busy === 'map'} onFile={handleMap} />
+          {track.mapExt && (
+            <Link to={`/admin/content/tracks/${track.slug}/calibrate`} className="modal-table-action">
+              {t('adminTracks.calibrateMap')}
+            </Link>
+          )}
         </div>
       </td>
       <td>{error && <div className="auth-error">{error}</div>}</td>

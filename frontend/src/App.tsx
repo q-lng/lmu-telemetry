@@ -28,6 +28,9 @@ const AdminHome = lazy(() => import('./pages/AdminHome').then((m) => ({ default:
 const AdminUsers = lazy(() => import('./pages/AdminUsers').then((m) => ({ default: m.AdminUsers })));
 const AdminDisplay = lazy(() => import('./pages/AdminDisplay').then((m) => ({ default: m.AdminDisplay })));
 const AdminContent = lazy(() => import('./pages/AdminContent').then((m) => ({ default: m.AdminContent })));
+const AdminTrackCalibration = lazy(() =>
+  import('./pages/AdminTrackCalibration').then((m) => ({ default: m.AdminTrackCalibration })),
+);
 const AdminManufacturers = lazy(() => import('./pages/AdminManufacturers').then((m) => ({ default: m.AdminManufacturers })));
 const LegalNotice = lazy(() => import('./pages/LegalNotice').then((m) => ({ default: m.LegalNotice })));
 const TermsOfService = lazy(() => import('./pages/TermsOfService').then((m) => ({ default: m.TermsOfService })));
@@ -119,6 +122,14 @@ export default function App() {
           element={
             <RequireAdmin>
               <AdminContent />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="admin/content/tracks/:slug/calibrate"
+          element={
+            <RequireAdmin>
+              <AdminTrackCalibration />
             </RequireAdmin>
           }
         />

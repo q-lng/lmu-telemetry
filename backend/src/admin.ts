@@ -23,7 +23,15 @@ import {
   type TelemetryFontMode,
   type SiteSettingsPatch,
 } from './siteSettings.js';
-import { createTrack, findTrackBySlug, listTracks, updateTrack, SLUG_RE, TRACK_PHOTOS_DIR } from './tracks.js';
+import {
+  createTrack,
+  findTrackBySlug,
+  listTracks,
+  updateTrack,
+  updateTrackMapCalibration,
+  SLUG_RE,
+  TRACK_PHOTOS_DIR,
+} from './tracks.js';
 import {
   createCar,
   findCarBySlug,
@@ -320,6 +328,26 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
         patch.dlcSlug = dlcSlug === '' ? null : dlcSlug;
       }
       const updated = await updateTrack(req.params.slug, patch);
+      reply.send(updated);
+    },
+  );
+
+  app.patch<{ Params: { slug: string }; Body: { rotationDeg?: number; offsetX?: number; offsetY?: number; scale?: number } }>(
+    '/api/admin/tracks/:slug/map-calibration',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      if (!(await findTrackBySlug(req.params.slug))) {
+        reply.code(404).send({ error: 'TRACK_NOT_FOUND' });
+        return;
+      }
+      const { rotationDeg, offsetX, offsetY, scale } = req.body ?? {};
+      for (const value of [rotationDeg, offsetX, offsetY, scale]) {
+        if (value !== undefined && !Number.isFinite(value)) {
+          reply.code(400).send({ error: 'INVALID_MAP_CALIBRATION' });
+          return;
+        }
+      }
+      const updated = await updateTrackMapCalibration(req.params.slug, { rotationDeg, offsetX, offsetY, scale });
       reply.send(updated);
     },
   );
