@@ -1482,10 +1482,6 @@ body {
   right: 12px;
 }
 
-.track-hero--card .track-hero-map {
-  max-width: 120px;
-}
-
 .tracks-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
