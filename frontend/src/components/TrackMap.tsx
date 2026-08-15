@@ -11,12 +11,11 @@ interface Props {
    * currently focused on. Null / spanning the full range = no highlight. */
   viewRange: { min: number; max: number } | null;
   height?: number;
-  /** The track's official map image (pre-recolored, see mapImageProcessing.ts)
-   * + its admin-calibrated rotation/position/scale, when known — see
-   * TelemetryViewer.tsx/SharedLap.tsx for how it's resolved from the
-   * session's TrackName. Omitted/null = trace only, exactly today's
-   * behavior. */
-  mapImage?: HTMLCanvasElement | null;
+  /** The track's official map image + its admin-calibrated rotation/
+   * position/scale, when known — see TelemetryViewer.tsx/SharedLap.tsx for
+   * how it's resolved from the session's TrackName. Omitted/null = trace
+   * only, exactly today's behavior. */
+  mapImage?: HTMLImageElement | null;
   mapCalibration?: MapCalibration | null;
 }
 

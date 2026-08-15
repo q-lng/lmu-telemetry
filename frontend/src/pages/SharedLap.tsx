@@ -7,7 +7,6 @@ import { TrackMap } from '../components/TrackMap';
 import { TelemetryLegend } from '../components/TelemetryLegend';
 import { channelColor } from '../palette';
 import { fetchTrackByName } from '../api';
-import { loadOutlinedMapImage } from '../mapImageProcessing';
 import { t } from '../i18n';
 
 // Fixed default channel set — this is a minimal read-only view for a single shared
@@ -23,7 +22,7 @@ export function SharedLap() {
   const [seriesByName, setSeriesByName] = useState<Record<string, ChannelSeries>>({});
   const [gps, setGps] = useState<{ t: number[]; lat: number[]; lon: number[] } | null>(null);
   const [trackEntry, setTrackEntry] = useState<TrackCatalogEntry | null>(null);
-  const [mapImage, setMapImage] = useState<HTMLCanvasElement | null>(null);
+  const [mapImage, setMapImage] = useState<HTMLImageElement | null>(null);
   const [cursorT, setCursorT] = useState<number | null>(null);
   const [cursorLocked, setCursorLocked] = useState(false);
   const [viewRange, setViewRange] = useState<{ min: number; max: number } | null>(null);
@@ -100,11 +99,11 @@ export function SharedLap() {
       if (cancelled) return;
       setTrackEntry(entry);
       if (entry?.mapExt) {
-        loadOutlinedMapImage(`/api/track-photos/${entry.slug}-map.${entry.mapExt}`)
-          .then((canvas) => {
-            if (!cancelled) setMapImage(canvas);
-          })
-          .catch(() => {});
+        const img = new Image();
+        img.onload = () => {
+          if (!cancelled) setMapImage(img);
+        };
+        img.src = `/api/track-photos/${entry.slug}-map.${entry.mapExt}`;
       }
     });
     return () => {

@@ -24,10 +24,7 @@ export interface DrawTrackMapOptions {
    * graphs are currently focused on. Null / spanning the full range = no
    * highlight. */
   viewRange: { min: number; max: number } | null;
-  // Pre-recolored (white/black-outline) canvas — see mapImageProcessing.ts —
-  // not the raw uploaded image, so this draw call never has to redo pixel
-  // processing itself.
-  mapImage?: HTMLCanvasElement | null;
+  mapImage?: HTMLImageElement | null;
   mapCalibration?: MapCalibration | null;
 }
 
@@ -81,12 +78,12 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOp
 
   ctx.clearRect(0, 0, width, height);
 
-  if (mapImage && mapCalibration && mapImage.width > 0) {
+  if (mapImage && mapCalibration && mapImage.naturalWidth > 0) {
     const boxWidth = traceWidth;
     const boxHeight = traceHeight;
     // Contain-fit the image's own aspect ratio within the same box the trace
     // fits into, then apply the admin-calibrated scale on top of that.
-    const imgAspect = mapImage.width / mapImage.height;
+    const imgAspect = mapImage.naturalWidth / mapImage.naturalHeight;
     const boxAspect = boxWidth / boxHeight;
     let drawWidth: number;
     let drawHeight: number;
