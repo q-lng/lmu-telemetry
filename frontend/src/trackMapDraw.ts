@@ -118,7 +118,7 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOp
   const isZoomed = !!viewRange && (viewRange.min > fullMin + tolerance || viewRange.max < fullMax - tolerance);
 
   ctx.strokeStyle = isZoomed ? 'rgba(57, 135, 229, 0.25)' : '#3987e5';
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1.25;
   ctx.beginPath();
   lat.forEach((la, i) => {
     const [x, y] = toXY(la, lon[i]);
@@ -129,7 +129,7 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOp
 
   if (isZoomed && viewRange) {
     ctx.strokeStyle = '#3987e5';
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
     let penDown = false;
     lat.forEach((la, i) => {
@@ -154,7 +154,7 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOp
     const [x, y] = toXY(lat[idx], lon[idx]);
     ctx.fillStyle = '#d95926';
     ctx.beginPath();
-    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
     ctx.fill();
   }
 }
