@@ -332,7 +332,7 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
     },
   );
 
-  app.patch<{ Params: { slug: string }; Body: { rotationDeg?: number; offsetX?: number; offsetY?: number; scale?: number } }>(
+  app.patch<{ Params: { slug: string }; Body: { rotationDeg?: number; scale?: number } }>(
     '/api/admin/tracks/:slug/map-calibration',
     { preHandler: requireAdmin },
     async (req, reply) => {
@@ -340,14 +340,14 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
         reply.code(404).send({ error: 'TRACK_NOT_FOUND' });
         return;
       }
-      const { rotationDeg, offsetX, offsetY, scale } = req.body ?? {};
-      for (const value of [rotationDeg, offsetX, offsetY, scale]) {
+      const { rotationDeg, scale } = req.body ?? {};
+      for (const value of [rotationDeg, scale]) {
         if (value !== undefined && !Number.isFinite(value)) {
           reply.code(400).send({ error: 'INVALID_MAP_CALIBRATION' });
           return;
         }
       }
-      const updated = await updateTrackMapCalibration(req.params.slug, { rotationDeg, offsetX, offsetY, scale });
+      const updated = await updateTrackMapCalibration(req.params.slug, { rotationDeg, scale });
       reply.send(updated);
     },
   );

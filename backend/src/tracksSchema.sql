@@ -14,10 +14,7 @@ INSERT INTO tracks (slug, name, country) VALUES
 ON CONFLICT (slug) DO NOTHING;
 
 -- How the track's map.png overlays behind a session's GPS trace on TrackMap
--- (see frontend/src/trackMapDraw.ts) — offset/scale are normalized fractions
--- of the trace's own bounding box, not raw pixels, so they stay correct
--- regardless of the canvas size the map is actually rendered at.
+-- (see frontend/src/trackMapDraw.ts) — both the map and the trace are always
+-- centered in the canvas, only rotation/scale are admin-adjustable.
 ALTER TABLE tracks ADD COLUMN IF NOT EXISTS map_rotation_deg DOUBLE PRECISION NOT NULL DEFAULT 0;
-ALTER TABLE tracks ADD COLUMN IF NOT EXISTS map_offset_x DOUBLE PRECISION NOT NULL DEFAULT 0;
-ALTER TABLE tracks ADD COLUMN IF NOT EXISTS map_offset_y DOUBLE PRECISION NOT NULL DEFAULT 0;
 ALTER TABLE tracks ADD COLUMN IF NOT EXISTS map_scale DOUBLE PRECISION NOT NULL DEFAULT 1;

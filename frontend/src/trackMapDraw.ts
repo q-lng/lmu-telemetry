@@ -1,12 +1,9 @@
 import { nearestIndex } from './nearest';
 
-/** Position/scale are normalized fractions of the trace's own bounding box
- * (not raw pixels) so the same calibration looks right at any canvas size —
- * see backend/src/tracksSchema.sql's map_offset_x/y/scale comment. */
+/** Both the map image and the trace are always centered in the canvas — only
+ * rotation and scale are adjustable (see backend/src/tracksSchema.sql). */
 export interface MapCalibration {
   rotationDeg: number;
-  offsetX: number;
-  offsetY: number;
   scale: number;
 }
 
@@ -49,10 +46,17 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOp
   const lonCorrection = Math.cos((((minLat + maxLat) / 2) * Math.PI) / 180);
   const spanLonCorrected = spanLon * lonCorrection || 1;
   const scale = Math.min((width - 2 * pad) / spanLonCorrected, (height - 2 * pad) / spanLat);
+  // Center the trace in the canvas rather than anchoring it to the pad — the
+  // box the trace fits into isn't necessarily the same aspect ratio as the
+  // canvas, so anchoring at (pad, height-pad) left it sitting bottom-left
+  // instead of in the middle (very visible once a *centered* map image is
+  // drawn behind it and the two don't line up).
+  const marginX = (width - spanLonCorrected * scale) / 2;
+  const marginY = (height - spanLat * scale) / 2;
 
   const toXY = (la: number, lo_: number): [number, number] => {
-    const x = pad + (lo_ - minLon) * lonCorrection * scale;
-    const y = height - pad - (la - minLat) * scale;
+    const x = marginX + (lo_ - minLon) * lonCorrection * scale;
+    const y = height - marginY - (la - minLat) * scale;
     return [x, y];
   };
 
@@ -76,11 +80,9 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOp
     }
     drawWidth *= mapCalibration.scale;
     drawHeight *= mapCalibration.scale;
-    const centerX = width / 2 + mapCalibration.offsetX * boxWidth;
-    const centerY = height / 2 + mapCalibration.offsetY * boxHeight;
 
     ctx.save();
-    ctx.translate(centerX, centerY);
+    ctx.translate(width / 2, height / 2);
     ctx.rotate((mapCalibration.rotationDeg * Math.PI) / 180);
     // Kept translucent so the trace on top — the thing that actually matters
     // moment to moment — never has to compete with the background image.

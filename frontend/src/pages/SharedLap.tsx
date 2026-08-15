@@ -205,12 +205,7 @@ export function SharedLap() {
           height={260}
           mapImage={mapImage}
           mapCalibration={
-            trackEntry && {
-              rotationDeg: trackEntry.mapRotationDeg,
-              offsetX: trackEntry.mapOffsetX,
-              offsetY: trackEntry.mapOffsetY,
-              scale: trackEntry.mapScale,
-            }
+            trackEntry && { rotationDeg: trackEntry.mapRotationDeg, scale: trackEntry.mapScale }
           }
         />
       )}

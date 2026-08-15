@@ -413,7 +413,7 @@ export function updateAdminTrack(
 
 export function updateAdminTrackMapCalibration(
   slug: string,
-  patch: { rotationDeg?: number; offsetX?: number; offsetY?: number; scale?: number },
+  patch: { rotationDeg?: number; scale?: number },
 ): Promise<TrackCatalogEntry> {
   return patchJson<TrackCatalogEntry>(`/api/admin/tracks/${encodeURIComponent(slug)}/map-calibration`, patch);
 }

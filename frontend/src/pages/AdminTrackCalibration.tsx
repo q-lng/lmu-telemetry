@@ -6,14 +6,18 @@ import { drawTrackMap } from '../trackMapDraw';
 import type { TrackCatalogEntry } from '../types';
 import { t } from '../i18n';
 
-const CANVAS_HEIGHT = 420;
-const BOX_PAD = 16;
+// Fixed reference size for the calibration canvas (unlike TrackMap.tsx's
+// responsive width) — decoupled from the container so `zoom` can scale the
+// canvas's own backing store/CSS size without measuring its own already-
+// zoomed clientWidth back into the next redraw (a feedback loop).
+const BASE_WIDTH = 600;
+const BASE_HEIGHT = 420;
 
-/** Admin tool for aligning a track's map.png with a real GPS trace — see
- * frontend/src/trackMapDraw.ts for the shared drawing logic (also used
- * read-only by TrackMap.tsx), and backend/src/tracksSchema.sql for why
- * offset/scale are normalized fractions of the trace's bounding box rather
- * than raw pixels. */
+/** Admin tool for matching a track's map.png rotation/scale to a real GPS
+ * trace — both the map and the trace are always centered (see
+ * trackMapDraw.ts), only rotation and scale are adjustable. `zoom` only
+ * magnifies the view for precise alignment, it isn't part of the saved
+ * calibration. */
 export function AdminTrackCalibration() {
   const { slug = '' } = useParams<{ slug: string }>();
   const [entry, setEntry] = useState<TrackCatalogEntry | null>(null);
@@ -23,27 +27,19 @@ export function AdminTrackCalibration() {
   const [mapImage, setMapImage] = useState<HTMLImageElement | null>(null);
 
   const [rotationDeg, setRotationDeg] = useState(0);
-  const [offsetX, setOffsetX] = useState(0);
-  const [offsetY, setOffsetY] = useState(0);
   const [scale, setScale] = useState(1);
+  const [zoom, setZoom] = useState(1);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  // Mirrors offsetX/offsetY on every render so the mount-only drag effect
-  // below can read the latest value at drag start without depending on it
-  // (which would force re-attaching the listeners mid-gesture).
-  const offsetRef = useRef({ offsetX, offsetY });
-  offsetRef.current = { offsetX, offsetY };
 
   useEffect(() => {
     fetchTrackCatalogEntry(slug)
       .then((e) => {
         setEntry(e);
         setRotationDeg(e.mapRotationDeg);
-        setOffsetX(e.mapOffsetX);
-        setOffsetY(e.mapOffsetY);
         setScale(e.mapScale);
       })
       .catch(() => setNotFound(true));
@@ -87,70 +83,38 @@ export function AdminTrackCalibration() {
     };
   }, [entry]);
 
-  // Redraws on every visual change — a single canvas draw is cheap enough to
-  // just re-run from scratch rather than diffing.
+  // Redraws on every visual change. `zoom` scales the canvas's own backing
+  // store and CSS size, not the logical width/height drawTrackMap works
+  // with — the drawing itself is always computed at BASE_WIDTH x
+  // BASE_HEIGHT, just rendered bigger/crisper (not blurrily stretched).
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !gps) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const width = canvas.clientWidth;
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = width * dpr;
-    canvas.height = CANVAS_HEIGHT * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    canvas.width = BASE_WIDTH * zoom * dpr;
+    canvas.height = BASE_HEIGHT * zoom * dpr;
+    ctx.setTransform(dpr * zoom, 0, 0, dpr * zoom, 0, 0);
     drawTrackMap(ctx, {
-      width,
-      height: CANVAS_HEIGHT,
+      width: BASE_WIDTH,
+      height: BASE_HEIGHT,
       lat: gps.lat,
       lon: gps.lon,
       t: gps.t,
       cursorT: null,
       viewRange: null,
       mapImage,
-      mapCalibration: { rotationDeg, offsetX, offsetY, scale },
+      mapCalibration: { rotationDeg, scale },
     });
-  }, [gps, mapImage, rotationDeg, offsetX, offsetY, scale]);
-
-  // Drag-to-position — set up once (mount-only deps), same document-level
-  // mousemove/mouseup pattern as ChannelPlot.tsx's pan, so the listeners
-  // never need to be re-attached mid-drag just because offsetX/Y changed.
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    let dragStart: { x: number; y: number; offsetX0: number; offsetY0: number } | null = null;
-
-    function onMouseMove(e: MouseEvent) {
-      if (!dragStart || !canvas) return;
-      const boxWidth = canvas.clientWidth - 2 * BOX_PAD;
-      const boxHeight = CANVAS_HEIGHT - 2 * BOX_PAD;
-      setOffsetX(dragStart.offsetX0 + (e.clientX - dragStart.x) / boxWidth);
-      setOffsetY(dragStart.offsetY0 + (e.clientY - dragStart.y) / boxHeight);
-    }
-    function onMouseUp() {
-      dragStart = null;
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-    }
-    function onMouseDown(e: MouseEvent) {
-      dragStart = { x: e.clientX, y: e.clientY, offsetX0: offsetRef.current.offsetX, offsetY0: offsetRef.current.offsetY };
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
-    }
-    canvas.addEventListener('mousedown', onMouseDown);
-    return () => {
-      canvas.removeEventListener('mousedown', onMouseDown);
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-    };
-  }, []);
+  }, [gps, mapImage, rotationDeg, scale, zoom]);
 
   async function handleSave() {
     setSaving(true);
     setError(null);
     setSaved(false);
     try {
-      await updateAdminTrackMapCalibration(slug, { rotationDeg, offsetX, offsetY, scale });
+      await updateAdminTrackMapCalibration(slug, { rotationDeg, scale });
       setSaved(true);
     } catch (err) {
       setError((err as Error).message);
@@ -191,11 +155,15 @@ export function AdminTrackCalibration() {
         <div className="social-empty">{t('adminTrackCalibration.noSession')}</div>
       ) : (
         <>
-          <p className="field-hint">{t('adminTrackCalibration.dragHint')}</p>
-          <div className="track-map">
-            <canvas ref={canvasRef} style={{ width: '100%', height: CANVAS_HEIGHT, cursor: gps ? 'move' : 'default' }} />
+          <p className="field-hint">{t('adminTrackCalibration.hint')}</p>
+          <div className="track-map-calibration-canvas-wrap" style={{ maxWidth: BASE_WIDTH, maxHeight: BASE_HEIGHT }}>
+            <canvas ref={canvasRef} style={{ width: BASE_WIDTH * zoom, height: BASE_HEIGHT * zoom }} />
           </div>
 
+          <div className="field">
+            <strong>{t('adminTrackCalibration.zoom')} ({zoom.toFixed(1)}×)</strong>
+            <input type="range" min={1} max={5} step={0.1} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} />
+          </div>
           <div className="field">
             <strong>
               {t('adminTrackCalibration.rotation')} ({rotationDeg.toFixed(0)}°)

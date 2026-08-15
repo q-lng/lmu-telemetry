@@ -2525,6 +2525,15 @@ body {
   padding: 6px;
 }
 
+/* Scrolls to pan around once the canvas (BASE_WIDTH/HEIGHT * zoom) grows
+   past this wrapper's own fixed size — see AdminTrackCalibration.tsx. */
+.track-map-calibration-canvas-wrap {
+  overflow: auto;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
 .telemetry-legend {
   background: var(--surface-1);
   border: 1px solid var(--border);
