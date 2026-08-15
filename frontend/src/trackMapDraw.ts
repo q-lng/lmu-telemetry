@@ -115,7 +115,7 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOp
   const isZoomed = !!viewRange && (viewRange.min > fullMin + tolerance || viewRange.max < fullMax - tolerance);
 
   ctx.strokeStyle = isZoomed ? 'rgba(57, 135, 229, 0.25)' : '#3987e5';
-  ctx.lineWidth = 1.25;
+  ctx.lineWidth = 1;
   ctx.beginPath();
   lat.forEach((la, i) => {
     const [x, y] = toXY(la, lon[i]);
