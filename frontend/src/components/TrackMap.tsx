@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { nearestIndex } from '../nearest';
+import { useEffect, useRef, useState } from 'react';
+import { drawTrackMap, type ExtraTrace, type MapCalibration } from '../trackMapDraw';
 
 interface Props {
   lat: number[];
@@ -11,10 +11,32 @@ interface Props {
    * currently focused on. Null / spanning the full range = no highlight. */
   viewRange: { min: number; max: number } | null;
   height?: number;
+  /** The track's official map image + its admin-calibrated rotation/
+   * position/scale, when known — see TelemetryViewer.tsx/SharedLap.tsx for
+   * how it's resolved from the session's TrackName. Omitted/null = trace
+   * only, exactly today's behavior. */
+  mapImage?: HTMLImageElement | null;
+  mapCalibration?: MapCalibration | null;
+  /** Other laps currently being compared, each in its own color — see
+   * TelemetryViewer.tsx's comparedLaps/comparedLapColorAt. */
+  extraTraces?: ExtraTrace[];
 }
 
-export function TrackMap({ lat, lon, t, cursorT, viewRange, height = 260 }: Props) {
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 6;
+
+export function TrackMap({ lat, lon, t, cursorT, viewRange, height = 260, mapImage, mapCalibration, extraTraces }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  // Mirrors zoom/pan every render so the mount-only wheel/drag effect below
+  // can read their current values without needing to re-attach its
+  // listeners (and without going stale) — same pattern as
+  // AdminTrackCalibration.tsx's drag handling.
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  const panRef = useRef(pan);
+  panRef.current = pan;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -27,80 +49,75 @@ export function TrackMap({ lat, lon, t, cursorT, viewRange, height = 260 }: Prop
     canvas.width = width * dpr;
     canvas.height = height * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Interactive zoom/pan is just a transform wrapped around the same
+    // drawing call used everywhere else — drawTrackMap itself always draws
+    // at the canvas's logical width/height, unaware this exists.
+    ctx.translate(pan.x, pan.y);
+    ctx.scale(zoom, zoom);
 
-    const minLat = Math.min(...lat);
-    const maxLat = Math.max(...lat);
-    const minLon = Math.min(...lon);
-    const maxLon = Math.max(...lon);
-    const pad = 16;
-    const spanLat = maxLat - minLat || 1;
-    const spanLon = maxLon - minLon || 1;
-    // A degree of longitude is only the same physical distance as a degree of
-    // latitude at the equator — it shrinks by cos(latitude) elsewhere. Without
-    // this, a track's shape reads flattened/stretched depending on the
-    // circuit's real-world latitude (e.g. very noticeable at Spa, ~50°N).
-    const lonCorrection = Math.cos((((minLat + maxLat) / 2) * Math.PI) / 180);
-    const spanLonCorrected = spanLon * lonCorrection || 1;
-    const scale = Math.min((width - 2 * pad) / spanLonCorrected, (height - 2 * pad) / spanLat);
+    drawTrackMap(ctx, { width, height, lat, lon, t, cursorT, viewRange, mapImage, mapCalibration, extraTraces });
+  }, [lat, lon, t, cursorT, viewRange, height, mapImage, mapCalibration, extraTraces, zoom, pan]);
 
-    const toXY = (la: number, lo_: number): [number, number] => {
-      const x = pad + (lo_ - minLon) * lonCorrection * scale;
-      const y = height - pad - (la - minLat) * scale;
-      return [x, y];
+  // Wheel-to-zoom (centered on the cursor) + drag-to-pan once zoomed in — a
+  // mount-once effect (stable listeners) using refs for the current
+  // zoom/pan so it never needs to re-attach mid-gesture despite calling
+  // setState on every wheel tick / mousemove.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // `const ... = (...) => {}` rather than `function` declarations — TS's
+    // narrowing of `canvas` (from the `if (!canvas) return;` above) doesn't
+    // propagate into hoisted function declarations, only into closures
+    // defined after the check.
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+      const nextZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoomRef.current * factor));
+      if (nextZoom === zoomRef.current) return;
+      // Keep the point under the cursor fixed on screen while zooming, like
+      // any interactive map.
+      const worldX = (mx - panRef.current.x) / zoomRef.current;
+      const worldY = (my - panRef.current.y) / zoomRef.current;
+      const nextPan =
+        nextZoom <= MIN_ZOOM + 0.0001 ? { x: 0, y: 0 } : { x: mx - worldX * nextZoom, y: my - worldY * nextZoom };
+      setZoom(nextZoom);
+      setPan(nextPan);
     };
 
-    ctx.clearRect(0, 0, width, height);
+    let dragStart: { x: number; y: number; panX0: number; panY0: number } | null = null;
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragStart) return;
+      setPan({ x: dragStart.panX0 + (e.clientX - dragStart.x), y: dragStart.panY0 + (e.clientY - dragStart.y) });
+    };
+    const onMouseUp = () => {
+      dragStart = null;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+    const onMouseDown = (e: MouseEvent) => {
+      if (zoomRef.current <= MIN_ZOOM + 0.0001) return;
+      dragStart = { x: e.clientX, y: e.clientY, panX0: panRef.current.x, panY0: panRef.current.y };
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    };
 
-    const fullMin = t[0];
-    const fullMax = t[t.length - 1];
-    const tolerance = (fullMax - fullMin) * 0.005;
-    const isZoomed = !!viewRange && (viewRange.min > fullMin + tolerance || viewRange.max < fullMax - tolerance);
-
-    ctx.strokeStyle = isZoomed ? 'rgba(57, 135, 229, 0.25)' : '#3987e5';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    lat.forEach((la, i) => {
-      const [x, y] = toXY(la, lon[i]);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-
-    if (isZoomed && viewRange) {
-      ctx.strokeStyle = '#3987e5';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      let penDown = false;
-      lat.forEach((la, i) => {
-        const inRange = t[i] >= viewRange.min && t[i] <= viewRange.max;
-        if (!inRange) {
-          penDown = false;
-          return;
-        }
-        const [x, y] = toXY(la, lon[i]);
-        if (!penDown) {
-          ctx.moveTo(x, y);
-          penDown = true;
-        } else {
-          ctx.lineTo(x, y);
-        }
-      });
-      ctx.stroke();
-    }
-
-    if (cursorT !== null && t.length > 0) {
-      const idx = nearestIndex(t, cursorT);
-      const [x, y] = toXY(lat[idx], lon[idx]);
-      ctx.fillStyle = '#d95926';
-      ctx.beginPath();
-      ctx.arc(x, y, 5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }, [lat, lon, t, cursorT, viewRange, height]);
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    canvas.addEventListener('mousedown', onMouseDown);
+    return () => {
+      canvas.removeEventListener('wheel', onWheel);
+      canvas.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
 
   return (
     <div className="track-map">
-      <canvas ref={canvasRef} style={{ width: '100%', height }} />
+      <canvas ref={canvasRef} style={{ width: '100%', height, cursor: zoom > MIN_ZOOM + 0.0001 ? 'grab' : 'default' }} />
     </div>
   );
 }

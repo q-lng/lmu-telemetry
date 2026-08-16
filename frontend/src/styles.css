@@ -1402,7 +1402,6 @@ body {
   inset: 0;
   display: flex;
   align-items: flex-end;
-  justify-content: space-between;
   gap: 16px;
   padding: 20px;
   /* Two stacked gradients: the bottom fade for title legibility, plus a
@@ -1431,24 +1430,33 @@ body {
   color: #ffffff;
 }
 
-/* Real official track layout (see TrackHeroMap) — sits opposite the title,
-   spanning the hero's full height. Renders nothing if the asset doesn't
-   exist. The blend-into-the-hero gradient lives on .track-hero-overlay
-   itself (its right-hand band), not here — this is just sizing. */
+/* Real official track layout (see TrackHeroMap) — pinned to the overlay's
+   right edge, spanning its full height. Renders nothing if the asset
+   doesn't exist. The blend-into-the-hero gradient lives on
+   .track-hero-overlay itself (its right-hand band), not here.
+   Taken out of the title's flex row and absolutely positioned instead of
+   flexed alongside it — a flex item stretched to the cross size (for
+   height:100% on the img inside) while also being auto-sized on the main
+   axis (for width:auto, to get height-driven sizing rather than a fixed
+   width) hits a genuine cross-browser circular-sizing snag: the browser
+   can't reliably compute "how wide should this shrink-to-fit item be"
+   without already knowing its stretched height, and vice versa — in
+   practice this rendered as the frame blowing up to claim the entire row.
+   Absolute positioning (top/bottom pinned to the overlay's own padding)
+   gives the frame a plain, non-circular definite height to size the image
+   against, and pins it to the right by construction — no flex/justify-
+   content needed at all. */
 .track-hero-map-frame {
-  flex: 0 0 auto;
-  align-self: stretch;
-  width: 160px;
+  position: absolute;
+  top: 20px;
+  bottom: 20px;
+  right: 20px;
 }
 
-/* These outlines are typically black line art on a transparent PNG —
-   inverted so the line art itself reads white instead of black. invert()
-   only touches RGB, so the transparent background stays transparent. */
 .track-hero-map {
-  width: 100%;
   height: 100%;
-  object-fit: contain;
-  filter: invert(1);
+  width: auto;
+  max-width: 260px;
 }
 
 /* Grid-card variant (see /tracks catalog page) — same hero, just narrower,
@@ -1469,7 +1477,9 @@ body {
 }
 
 .track-hero--card .track-hero-map-frame {
-  width: 70px;
+  top: 12px;
+  bottom: 12px;
+  right: 12px;
 }
 
 .tracks-grid {
@@ -1559,8 +1569,7 @@ body {
   color: #ffffff;
 }
 
-/* Sits inline with the name, in the flag's spot (see TrackHero's <Flag/>) —
-   shown as-is, no invert filter (unlike the track map's black line art). */
+/* Sits inline with the name, in the flag's spot (see TrackHero's <Flag/>). */
 .car-hero-manufacturer-badge {
   height: 22px;
   width: auto;
@@ -2523,6 +2532,50 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 6px;
+}
+
+/* Canvas on the left, sliders/save stacked to its right — see
+   AdminTrackCalibration.tsx. Falls back to stacked (canvas above controls)
+   once there isn't room for both side by side. */
+.track-map-calibration-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.track-map-calibration-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  min-width: 260px;
+}
+
+/* Scrolls to pan around once the canvas (BASE_WIDTH/HEIGHT * zoom) grows
+   past this wrapper's own size — see AdminTrackCalibration.tsx. Drag-resizable
+   (the native browser resize handle) so the work area itself can be made
+   bigger, independently of the zoom slider that magnifies the canvas content. */
+.track-map-calibration-canvas-wrap {
+  overflow: auto;
+  resize: both;
+  min-width: 320px;
+  min-height: 220px;
+  max-width: 100%;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.calibration-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calibration-slider-row input[type="range"] {
+  flex: 1;
+  min-width: 0;
 }
 
 .telemetry-legend {

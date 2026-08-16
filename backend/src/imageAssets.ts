@@ -1,12 +1,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export type ImageExt = 'jpg' | 'png';
+// 'svg' is server-generated only (from an uploaded .mas track file, see
+// masTrack.ts) — never a raw upload mimetype, so it's absent from
+// UPLOAD_CONTENT_TYPES but still a valid resolved/served extension.
+export type ImageExt = 'jpg' | 'png' | 'svg';
 
 export const UPLOAD_CONTENT_TYPES: Record<string, ImageExt> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
 };
+
+// Every extension writeImageAtomic should treat as "stale" once one of the
+// others is (re)written — kept separate from UPLOAD_CONTENT_TYPES since that
+// one only lists raw-upload mimetypes, not server-generated ones like svg.
+const ALL_IMAGE_EXTS: ImageExt[] = ['jpg', 'png', 'svg'];
 
 // Shared by tracks.ts and cars.ts — both catalogs resolve which extension
 // actually exists on disk server-side rather than having the client guess
@@ -15,6 +23,7 @@ export const UPLOAD_CONTENT_TYPES: Record<string, ImageExt> = {
 export function resolveImageExt(dir: string, baseName: string): ImageExt | null {
   if (fs.existsSync(path.join(dir, `${baseName}.jpg`))) return 'jpg';
   if (fs.existsSync(path.join(dir, `${baseName}.png`))) return 'png';
+  if (fs.existsSync(path.join(dir, `${baseName}.svg`))) return 'svg';
   return null;
 }
 
@@ -31,7 +40,7 @@ export function writeImageAtomic(dir: string, baseName: string, ext: ImageExt, b
   const tmpDest = `${dest}.uploading`;
   fs.writeFileSync(tmpDest, buffer);
   fs.renameSync(tmpDest, dest);
-  for (const otherExt of Object.values(UPLOAD_CONTENT_TYPES)) {
+  for (const otherExt of ALL_IMAGE_EXTS) {
     if (otherExt === ext) continue;
     fs.rmSync(path.join(dir, `${baseName}.${otherExt}`), { force: true });
   }
@@ -41,6 +50,7 @@ const CONTENT_TYPES_BY_EXT: Record<string, string> = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
 };
 
 /** Shared GET handler for serving an uploaded image by filename — used for

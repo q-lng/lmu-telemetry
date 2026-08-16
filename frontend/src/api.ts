@@ -225,6 +225,19 @@ export function fetchTrackCatalogEntry(slug: string): Promise<TrackCatalogEntry>
   return getJson<TrackCatalogEntry>(`/api/tracks/${encodeURIComponent(slug)}`);
 }
 
+// 404 just means this session's TrackName has no catalog entry (or the
+// catalog is incomplete, see access.ts's searchTrackNames comment) — treated
+// as "no map background available", not an error to surface.
+export async function fetchTrackByName(name: string): Promise<TrackCatalogEntry | null> {
+  const res = await fetch(`/api/tracks/by-name?name=${encodeURIComponent(name)}`);
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const parsed = await res.json().catch(() => ({}));
+    throw new Error(tError((parsed as { error?: string }).error));
+  }
+  return res.json() as Promise<TrackCatalogEntry>;
+}
+
 export function fetchTracks(): Promise<TrackCatalogEntry[]> {
   return getJson<{ tracks: TrackCatalogEntry[] }>('/api/tracks').then((r) => r.tracks);
 }
@@ -398,6 +411,13 @@ export function updateAdminTrack(
   return patchJson<TrackCatalogEntry>(`/api/admin/tracks/${encodeURIComponent(slug)}`, patch);
 }
 
+export function updateAdminTrackMapCalibration(
+  slug: string,
+  patch: { rotationDeg?: number; offsetX?: number; offsetY?: number; scale?: number },
+): Promise<TrackCatalogEntry> {
+  return patchJson<TrackCatalogEntry>(`/api/admin/tracks/${encodeURIComponent(slug)}/map-calibration`, patch);
+}
+
 async function uploadImage<T>(url: string, file: File): Promise<T> {
   const form = new FormData();
   form.append('file', file, file.name);
@@ -415,6 +435,31 @@ export function uploadTrackPhoto(slug: string, file: File): Promise<TrackCatalog
 
 export function uploadTrackMap(slug: string, file: File): Promise<TrackCatalogEntry> {
   return uploadImage(`/api/admin/tracks/${encodeURIComponent(slug)}/map`, file);
+}
+
+// Not an image upload — the file is the track's .mas game content file,
+// parsed server-side into an SVG map (see backend/src/masTrack.ts). Reuses
+// uploadImage's generic FormData/error-handling plumbing regardless.
+export function uploadTrackMapFromMas(slug: string, file: File): Promise<TrackCatalogEntry> {
+  return uploadImage(`/api/admin/tracks/${encodeURIComponent(slug)}/map-from-mas`, file);
+}
+
+// Flips between the two styles generated from a .mas upload ('band'/'edges'
+// — see masTrack.ts) without re-uploading the file. 400s if the current map
+// wasn't generated from a .mas (no alt style stashed alongside it).
+export async function swapTrackMapStyle(slug: string): Promise<TrackCatalogEntry> {
+  const res = await fetch(`/api/admin/tracks/${encodeURIComponent(slug)}/map-swap-style`, { method: 'POST' });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(tError((body as { error?: string }).error));
+  }
+  return res.json();
+}
+
+// Recolors the ideal-line overlay generated alongside the map from a .mas
+// upload — 400s if this track has no ideal-line SVG yet.
+export function setTrackIdealLineColor(slug: string, color: string): Promise<TrackCatalogEntry> {
+  return patchJson<TrackCatalogEntry>(`/api/admin/tracks/${encodeURIComponent(slug)}/ideal-line-color`, { color });
 }
 
 export function fetchCars(): Promise<CarCatalogEntry[]> {

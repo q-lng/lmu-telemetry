@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { createSharedLapDataSource } from '../dataSource';
-import type { ChannelSeries, Lane, SessionMetadata } from '../types';
+import type { ChannelSeries, Lane, SessionMetadata, TrackCatalogEntry } from '../types';
 import { ChannelPlot } from '../components/ChannelPlot';
 import { TrackMap } from '../components/TrackMap';
 import { TelemetryLegend } from '../components/TelemetryLegend';
 import { channelColor } from '../palette';
+import { fetchTrackByName } from '../api';
 import { t } from '../i18n';
 
 // Fixed default channel set — this is a minimal read-only view for a single shared
@@ -20,6 +21,8 @@ export function SharedLap() {
   const [metadata, setMetadata] = useState<SessionMetadata | null>(null);
   const [seriesByName, setSeriesByName] = useState<Record<string, ChannelSeries>>({});
   const [gps, setGps] = useState<{ t: number[]; lat: number[]; lon: number[] } | null>(null);
+  const [trackEntry, setTrackEntry] = useState<TrackCatalogEntry | null>(null);
+  const [mapImage, setMapImage] = useState<HTMLImageElement | null>(null);
   const [cursorT, setCursorT] = useState<number | null>(null);
   const [cursorLocked, setCursorLocked] = useState(false);
   const [viewRange, setViewRange] = useState<{ min: number; max: number } | null>(null);
@@ -83,6 +86,30 @@ export function SharedLap() {
       cancelled = true;
     };
   }, [dataSource]);
+
+  // Same track-name → catalog resolution as TelemetryViewer.tsx — no-op,
+  // no-regression fallback when the track isn't catalogued or has no map.
+  useEffect(() => {
+    const trackName = metadata?.info.TrackName;
+    setTrackEntry(null);
+    setMapImage(null);
+    if (!trackName) return;
+    let cancelled = false;
+    fetchTrackByName(trackName).then((entry) => {
+      if (cancelled) return;
+      setTrackEntry(entry);
+      if (entry?.mapExt) {
+        const img = new Image();
+        img.onload = () => {
+          if (!cancelled) setMapImage(img);
+        };
+        img.src = `/api/track-photos/${entry.slug}-map.${entry.mapExt}`;
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [metadata?.info.TrackName]);
 
   const lanes: Lane[] = useMemo(() => {
     const result: Lane[] = [];
@@ -168,7 +195,25 @@ export function SharedLap() {
         </Link>
       </div>
 
-      {gps && <TrackMap lat={gps.lat} lon={gps.lon} t={gps.t} cursorT={cursorT} viewRange={viewRange} height={260} />}
+      {gps && (
+        <TrackMap
+          lat={gps.lat}
+          lon={gps.lon}
+          t={gps.t}
+          cursorT={cursorT}
+          viewRange={viewRange}
+          height={260}
+          mapImage={mapImage}
+          mapCalibration={
+            trackEntry && {
+              rotationDeg: trackEntry.mapRotationDeg,
+              offsetX: trackEntry.mapOffsetX,
+              offsetY: trackEntry.mapOffsetY,
+              scale: trackEntry.mapScale,
+            }
+          }
+        />
+      )}
 
       {cursorLocked && (
         <button className="cursor-lock-hint" onClick={() => setCursorLocked(false)}>

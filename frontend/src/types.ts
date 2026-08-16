@@ -146,7 +146,10 @@ export interface SearchResults {
   cars: CarCatalogEntry[];
 }
 
-export type ImageExt = 'jpg' | 'png';
+// 'svg' covers track maps generated server-side from an uploaded .mas file
+// (see AdminTrackCalibration/AdminTracks and the backend's masTrack.ts) —
+// never a raw upload for photos, only ever a resolved/served map extension.
+export type ImageExt = 'jpg' | 'png' | 'svg';
 
 export interface TrackCatalogEntry {
   slug: string;
@@ -157,6 +160,17 @@ export interface TrackCatalogEntry {
   dlcSlug: string | null;
   dlcName: string | null;
   dlcColor: string | null;
+  // How map.png overlays behind a session's GPS trace on TrackMap — offset/
+  // scale are normalized fractions of the trace's own bounding box, not raw
+  // pixels. See frontend/src/trackMapDraw.ts.
+  mapRotationDeg: number;
+  mapOffsetX: number;
+  mapOffsetY: number;
+  mapScale: number;
+  // Color of <slug>-idealline.svg (the game's own FASTEST-path racing line,
+  // generated alongside the map from a .mas upload — see
+  // backend/src/masTrack.ts) — null when no ideal-line overlay exists yet.
+  idealLineColor: string | null;
 }
 
 export interface CarCatalogEntry {

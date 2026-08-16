@@ -1,12 +1,12 @@
 import type { ElementType } from 'react';
-import type { CarCatalogEntry } from '../types';
+import type { CarCatalogEntry, ImageExt } from '../types';
 import { CAR_CATEGORY_LABELS, CAR_CATEGORY_TONES } from '../carCategories';
 import { t } from '../i18n';
 import { Badge } from './Badge';
 
 // Same resolve-on-the-backend pattern as TrackHeroPhoto (see components/TrackHero.tsx)
 // — no client-side extension guessing.
-export function CarHeroPhoto({ slug, ext }: { slug: string; ext: 'jpg' | 'png' | null }) {
+export function CarHeroPhoto({ slug, ext }: { slug: string; ext: ImageExt | null }) {
   if (!ext) {
     return <div className="car-hero-fallback">{t('car.photoComingSoon')}</div>;
   }
@@ -14,11 +14,10 @@ export function CarHeroPhoto({ slug, ext }: { slug: string; ext: 'jpg' | 'png' |
 }
 
 // Manufacturer badge sits inline with the name, in the flag's spot (see
-// TrackHero's <Flag/> usage) — no invert() filter, unlike a track outline:
-// a manufacturer logo is shown as-is, already full-color artwork. Served from
-// /api/manufacturer-photos, not /api/car-photos — one badge per manufacturer,
-// reused across every model instead of re-uploaded per car.
-function CarHeroBadgeInline({ manufacturerSlug, ext }: { manufacturerSlug: string; ext: 'jpg' | 'png' | null }) {
+// TrackHero's <Flag/> usage). Served from /api/manufacturer-photos, not
+// /api/car-photos — one badge per manufacturer, reused across every model
+// instead of re-uploaded per car.
+function CarHeroBadgeInline({ manufacturerSlug, ext }: { manufacturerSlug: string; ext: ImageExt | null }) {
   if (!ext) return null;
   return <img className="car-hero-manufacturer-badge" src={`/api/manufacturer-photos/${manufacturerSlug}.${ext}`} alt="" />;
 }

@@ -23,7 +23,15 @@ import {
   type TelemetryFontMode,
   type SiteSettingsPatch,
 } from './siteSettings.js';
-import { createTrack, findTrackBySlug, listTracks, updateTrack, SLUG_RE, TRACK_PHOTOS_DIR } from './tracks.js';
+import {
+  createTrack,
+  findTrackBySlug,
+  listTracks,
+  updateTrack,
+  updateTrackMapCalibration,
+  SLUG_RE,
+  TRACK_PHOTOS_DIR,
+} from './tracks.js';
 import {
   createCar,
   findCarBySlug,
@@ -42,7 +50,16 @@ import {
 } from './manufacturers.js';
 import { createDlc, findDlcBySlug, listDlcs, updateDlc } from './dlcs.js';
 import { listDistinctCarNames, listLiveryMappings, setLiveryMapping } from './liveryMappings.js';
+import fs from 'node:fs';
+import path from 'node:path';
 import { UPLOAD_CONTENT_TYPES, writeImageAtomic } from './imageAssets.js';
+import {
+  extractMasContent,
+  parseMasWaypoints,
+  generateTrackMapSvg,
+  generateIdealLineSvg,
+  recolorIdealLineSvg,
+} from './masTrack.js';
 
 const PSEUDO_RE = /^[a-zA-Z0-9_-]{3,32}$/;
 const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
@@ -324,6 +341,26 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
     },
   );
 
+  app.patch<{ Params: { slug: string }; Body: { rotationDeg?: number; offsetX?: number; offsetY?: number; scale?: number } }>(
+    '/api/admin/tracks/:slug/map-calibration',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      if (!(await findTrackBySlug(req.params.slug))) {
+        reply.code(404).send({ error: 'TRACK_NOT_FOUND' });
+        return;
+      }
+      const { rotationDeg, offsetX, offsetY, scale } = req.body ?? {};
+      for (const value of [rotationDeg, offsetX, offsetY, scale]) {
+        if (value !== undefined && !Number.isFinite(value)) {
+          reply.code(400).send({ error: 'INVALID_MAP_CALIBRATION' });
+          return;
+        }
+      }
+      const updated = await updateTrackMapCalibration(req.params.slug, { rotationDeg, offsetX, offsetY, scale });
+      reply.send(updated);
+    },
+  );
+
   // Shared by every photo/map/badge upload route below (tracks and cars) —
   // same small-file pattern, just a different destination dir/filename.
   /** Returns true on a successful write; false after already sending an error reply. */
@@ -365,9 +402,106 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
         reply.code(404).send({ error: 'TRACK_NOT_FOUND' });
         return;
       }
+      // A manually-uploaded image replaces whatever was there — including a
+      // previously .mas-generated map's "alt style" file, which writeImageAtomic
+      // doesn't know about (different basename). Left behind, it'd make the
+      // swap-style button below appear to work on a map that's no longer the
+      // one it was generated alongside.
+      fs.rmSync(path.join(TRACK_PHOTOS_DIR, `${req.params.slug}-map-alt.svg`), { force: true });
       if (await handleImageUpload(req, reply, TRACK_PHOTOS_DIR, `${req.params.slug}-map`)) {
         reply.send(await findTrackBySlug(req.params.slug));
       }
+    },
+  );
+
+  // Generates the map instead of accepting one directly — the upload is the
+  // track's own .mas content file (game data, not an image), parsed for its
+  // [Waypoint] path. See masTrack.ts for the format, the coordinate mapping
+  // verified against a real recorded GPS trace, and the two render styles
+  // ('band': true road-width ribbon, 'edges': two edge lines + centerline).
+  // Both are generated up front — 'band' becomes the active map, 'edges' is
+  // stashed as "-map-alt.svg" so the swap-style route below can flip between
+  // them without needing the original .mas file again.
+  app.post<{ Params: { slug: string } }>(
+    '/api/admin/tracks/:slug/map-from-mas',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      if (!(await findTrackBySlug(req.params.slug))) {
+        reply.code(404).send({ error: 'TRACK_NOT_FOUND' });
+        return;
+      }
+      const data = await req.file();
+      if (!data) {
+        reply.code(400).send({ error: 'NO_FILE_PROVIDED' });
+        return;
+      }
+      if (!data.filename.toLowerCase().endsWith('.mas')) {
+        reply.code(400).send({ error: 'INVALID_MAS_FILE' });
+        return;
+      }
+      const buffer = await data.toBuffer();
+      let bandSvg: string;
+      let edgesSvg: string;
+      let idealLineSvg: string;
+      try {
+        const track = parseMasWaypoints(extractMasContent(buffer).toString('utf8'));
+        bandSvg = generateTrackMapSvg(track, 'band');
+        edgesSvg = generateTrackMapSvg(track, 'edges');
+        idealLineSvg = generateIdealLineSvg(track);
+      } catch {
+        reply.code(400).send({ error: 'INVALID_MAS_FILE' });
+        return;
+      }
+      writeImageAtomic(TRACK_PHOTOS_DIR, `${req.params.slug}-map`, 'svg', Buffer.from(bandSvg, 'utf8'));
+      fs.writeFileSync(path.join(TRACK_PHOTOS_DIR, `${req.params.slug}-map-alt.svg`), edgesSvg, 'utf8');
+      fs.writeFileSync(path.join(TRACK_PHOTOS_DIR, `${req.params.slug}-idealline.svg`), idealLineSvg, 'utf8');
+      reply.send(await findTrackBySlug(req.params.slug));
+    },
+  );
+
+  app.patch<{ Params: { slug: string }; Body: { color?: string } }>(
+    '/api/admin/tracks/:slug/ideal-line-color',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      if (!(await findTrackBySlug(req.params.slug))) {
+        reply.code(404).send({ error: 'TRACK_NOT_FOUND' });
+        return;
+      }
+      const color = req.body?.color;
+      if (!color || !/^#[0-9a-fA-F]{6}$/.test(color)) {
+        reply.code(400).send({ error: 'INVALID_COLOR' });
+        return;
+      }
+      const filePath = path.join(TRACK_PHOTOS_DIR, `${req.params.slug}-idealline.svg`);
+      if (!fs.existsSync(filePath)) {
+        reply.code(400).send({ error: 'NO_IDEAL_LINE' });
+        return;
+      }
+      const recolored = recolorIdealLineSvg(fs.readFileSync(filePath, 'utf8'), color);
+      fs.writeFileSync(filePath, recolored, 'utf8');
+      reply.send(await findTrackBySlug(req.params.slug));
+    },
+  );
+
+  app.post<{ Params: { slug: string } }>(
+    '/api/admin/tracks/:slug/map-swap-style',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      if (!(await findTrackBySlug(req.params.slug))) {
+        reply.code(404).send({ error: 'TRACK_NOT_FOUND' });
+        return;
+      }
+      const activePath = path.join(TRACK_PHOTOS_DIR, `${req.params.slug}-map.svg`);
+      const altPath = path.join(TRACK_PHOTOS_DIR, `${req.params.slug}-map-alt.svg`);
+      if (!fs.existsSync(activePath) || !fs.existsSync(altPath)) {
+        reply.code(400).send({ error: 'NO_ALT_MAP_STYLE' });
+        return;
+      }
+      const tmpPath = `${activePath}.swaptmp`;
+      fs.renameSync(activePath, tmpPath);
+      fs.renameSync(altPath, activePath);
+      fs.renameSync(tmpPath, altPath);
+      reply.send(await findTrackBySlug(req.params.slug));
     },
   );
 

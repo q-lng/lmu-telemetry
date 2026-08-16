@@ -1,0 +1,483 @@
+import { useEffect, useRef, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { fetchSessions, fetchTrackCatalogEntry, setTrackIdealLineColor, updateAdminTrackMapCalibration } from '../api';
+import { createServerDataSource } from '../dataSource';
+import { drawTrackMap } from '../trackMapDraw';
+import { formatLapTime } from '../lapTime';
+import type { LapInfo, SessionSummary, TrackCatalogEntry } from '../types';
+import { t } from '../i18n';
+
+// Fixed reference size for the calibration canvas (unlike TrackMap.tsx's
+// responsive width) — decoupled from the container so `zoom` can scale the
+// canvas's own backing store/CSS size without measuring its own already-
+// zoomed clientWidth back into the next redraw (a feedback loop).
+const BASE_WIDTH = 600;
+const BASE_HEIGHT = 420;
+// Matches the `pad` constant in trackMapDraw.ts — needed here independently
+// to convert a drag's pixel delta into the same normalized-offset fraction
+// drawTrackMap expects (a fraction of the trace's own bounding box, not of
+// the full canvas).
+const BOX_PAD = 16;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+// Avoids float drift (e.g. 0.1 + 0.2 !== 0.3) accumulating over repeated
+// +/- clicks on the same field.
+function roundTo(value: number, step: number): number {
+  const decimals = (step.toString().split('.')[1] ?? '').length;
+  return Number(value.toFixed(decimals));
+}
+
+/** Admin tool for matching a track's map.png to a real GPS trace — the trace
+ * is always centered (see trackMapDraw.ts), and the map's position/rotation/
+ * scale relative to that center are adjustable: drag the canvas to
+ * reposition, use the sliders for rotation/scale. `zoom` only magnifies the
+ * view for precise alignment, it isn't part of the saved calibration. */
+export function AdminTrackCalibration() {
+  const { slug = '' } = useParams<{ slug: string }>();
+  const [entry, setEntry] = useState<TrackCatalogEntry | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  const [gps, setGps] = useState<{ lat: number[]; lon: number[]; t: number[] } | null>(null);
+  const [noSession, setNoSession] = useState(false);
+  const [mapImage, setMapImage] = useState<HTMLImageElement | null>(null);
+  // Separate overlay file (the game's own ideal/fastest racing line, see
+  // masTrack.ts) — shown/hidden here only for now, not on the public
+  // telemetry viewer.
+  const [idealLineImage, setIdealLineImage] = useState<HTMLImageElement | null>(null);
+  const [showIdealLine, setShowIdealLine] = useState(true);
+  const [idealLineSaving, setIdealLineSaving] = useState(false);
+
+  // Reference trace source: which session (of any visibility this admin can
+  // see, matching the track's catalog name) and which single lap within it
+  // — defaults to the first of each, but picking one lap instead of the
+  // whole session avoids overlapping out-laps/in-laps/pit visits muddying
+  // the shape.
+  const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [laps, setLaps] = useState<LapInfo[] | null>(null);
+  const [selectedLap, setSelectedLap] = useState<number | 'full' | null>(null);
+
+  const [rotationDeg, setRotationDeg] = useState(0);
+  const [offsetX, setOffsetX] = useState(0);
+  const [offsetY, setOffsetY] = useState(0);
+  const [scale, setScale] = useState(1);
+  const [zoom, setZoom] = useState(1);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Mirrors offsetX/offsetY/zoom every render so the mount-only drag effect
+  // below can read their current values without needing to re-attach its
+  // listeners (and without going stale) — same pattern as ChannelPlot.tsx's
+  // pan/zoom handling.
+  const offsetRef = useRef({ offsetX, offsetY });
+  offsetRef.current = { offsetX, offsetY };
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+
+  useEffect(() => {
+    fetchTrackCatalogEntry(slug)
+      .then((e) => {
+        setEntry(e);
+        setRotationDeg(e.mapRotationDeg);
+        setOffsetX(e.mapOffsetX);
+        setOffsetY(e.mapOffsetY);
+        setScale(e.mapScale);
+      })
+      .catch(() => setNotFound(true));
+  }, [slug]);
+
+  useEffect(() => {
+    if (!entry?.mapExt) {
+      setMapImage(null);
+      return;
+    }
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (!cancelled) setMapImage(img);
+    };
+    img.src = `/api/track-photos/${entry.slug}-map.${entry.mapExt}`;
+    return () => {
+      cancelled = true;
+    };
+  }, [entry]);
+
+  useEffect(() => {
+    if (!entry?.idealLineColor) {
+      setIdealLineImage(null);
+      return;
+    }
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (!cancelled) setIdealLineImage(img);
+    };
+    // Cache-busted on the color itself — the filename never changes, only
+    // its content, and the color string is already a natural version marker.
+    img.src = `/api/track-photos/${entry.slug}-idealline.svg?c=${encodeURIComponent(entry.idealLineColor)}`;
+    return () => {
+      cancelled = true;
+    };
+  }, [entry?.slug, entry?.idealLineColor]);
+
+  async function handleIdealLineColorChange(color: string) {
+    setIdealLineSaving(true);
+    setError(null);
+    try {
+      setEntry(await setTrackIdealLineColor(slug, color));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIdealLineSaving(false);
+    }
+  }
+
+  // Sessions matching the track's catalog name — same free-text match every
+  // other track-scoped query in the app already relies on. Defaults the
+  // picker to the first one found.
+  useEffect(() => {
+    if (!entry) return;
+    let cancelled = false;
+    setNoSession(false);
+    setSessions(null);
+    setSelectedFile(null);
+    fetchSessions({ track: entry.name })
+      .then((list) => {
+        if (cancelled) return;
+        if (list.length === 0) {
+          setNoSession(true);
+          return;
+        }
+        setSessions(list);
+        setSelectedFile(list[0].file);
+      })
+      .catch(() => {
+        if (!cancelled) setNoSession(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [entry]);
+
+  // Laps within the selected session — defaults the picker to the first
+  // lap (falling back to the whole session if it has none).
+  useEffect(() => {
+    if (!selectedFile) {
+      setLaps(null);
+      setSelectedLap(null);
+      return;
+    }
+    let cancelled = false;
+    setLaps(null);
+    setSelectedLap(null);
+    createServerDataSource(selectedFile)
+      .fetchLaps()
+      .then((list) => {
+        if (cancelled) return;
+        setLaps(list);
+        setSelectedLap(list.length > 0 ? list[0].lap : 'full');
+      })
+      .catch(() => {
+        if (!cancelled) setLaps([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedFile]);
+
+  // The reference trace itself, scoped to the selected lap's time range
+  // (or the whole session when 'full' is picked / no laps exist).
+  useEffect(() => {
+    if (!selectedFile || selectedLap === null) return;
+    let cancelled = false;
+    setGps(null);
+    const lap = selectedLap !== 'full' ? laps?.find((l) => l.lap === selectedLap) : undefined;
+    const range = lap ? { from: lap.startTs, to: lap.endTs } : undefined;
+    const ds = createServerDataSource(selectedFile);
+    Promise.all([ds.fetchChannelSeries('GPS Latitude', range), ds.fetchChannelSeries('GPS Longitude', range)])
+      .then(([latS, lonS]) => {
+        if (cancelled) return;
+        setGps({ lat: latS.values.value as number[], lon: lonS.values.value as number[], t: latS.t });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedFile, selectedLap, laps]);
+
+  // Redraws on every visual change. `zoom` scales the canvas's own backing
+  // store and CSS size, not the logical width/height drawTrackMap works
+  // with — the drawing itself is always computed at BASE_WIDTH x
+  // BASE_HEIGHT, just rendered bigger/crisper (not blurrily stretched).
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !gps) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = BASE_WIDTH * zoom * dpr;
+    canvas.height = BASE_HEIGHT * zoom * dpr;
+    ctx.setTransform(dpr * zoom, 0, 0, dpr * zoom, 0, 0);
+    drawTrackMap(ctx, {
+      width: BASE_WIDTH,
+      height: BASE_HEIGHT,
+      lat: gps.lat,
+      lon: gps.lon,
+      t: gps.t,
+      cursorT: null,
+      viewRange: null,
+      mapImage,
+      idealLineImage: showIdealLine ? idealLineImage : null,
+      mapCalibration: { rotationDeg, offsetX, offsetY, scale },
+    });
+  }, [gps, mapImage, idealLineImage, showIdealLine, rotationDeg, offsetX, offsetY, scale, zoom]);
+
+  // Drag-to-reposition — a mount-only effect (stable listeners) using
+  // closure-local drag state and the refs above for current offset/zoom, so
+  // it never needs to re-attach mid-gesture despite calling setState on
+  // every mousemove.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    let dragStart: { x: number; y: number; offsetX0: number; offsetY0: number } | null = null;
+
+    function onMouseMove(e: MouseEvent) {
+      if (!dragStart) return;
+      const boxWidth = BASE_WIDTH - 2 * BOX_PAD;
+      const boxHeight = BASE_HEIGHT - 2 * BOX_PAD;
+      const dx = (e.clientX - dragStart.x) / zoomRef.current;
+      const dy = (e.clientY - dragStart.y) / zoomRef.current;
+      setOffsetX(dragStart.offsetX0 + dx / boxWidth);
+      setOffsetY(dragStart.offsetY0 + dy / boxHeight);
+    }
+    function onMouseUp() {
+      dragStart = null;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    }
+    function onMouseDown(e: MouseEvent) {
+      dragStart = { x: e.clientX, y: e.clientY, offsetX0: offsetRef.current.offsetX, offsetY0: offsetRef.current.offsetY };
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    }
+    canvas.addEventListener('mousedown', onMouseDown);
+    return () => {
+      canvas.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+    // The canvas only exists in the DOM once `entry` has loaded (async) and
+    // `noSession` has resolved — deps: [] would run this once, immediately on
+    // mount, while canvasRef.current is still null (nothing rendered yet),
+    // and never attach once the real canvas element shows up.
+  }, [entry?.slug, entry?.mapExt, noSession]);
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      await updateAdminTrackMapCalibration(slug, { rotationDeg, offsetX, offsetY, scale });
+      setSaved(true);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (notFound) {
+    return (
+      <div className="page-shell">
+        <div className="social-empty">{t('track.notFound')}</div>
+      </div>
+    );
+  }
+
+  if (!entry) {
+    return (
+      <div className="page-loading">
+        <span className="spinner" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="page-shell">
+      <Link to="/admin/content/tracks" className="admin-back-link">
+        {t('admin.backToAdmin')}
+      </Link>
+      <div className="auth-heading">
+        <h1>{t('adminTrackCalibration.title')}</h1>
+        <p>{entry.name}</p>
+      </div>
+
+      {!entry.mapExt ? (
+        <div className="social-empty">{t('adminTrackCalibration.noMap')}</div>
+      ) : noSession ? (
+        <div className="social-empty">{t('adminTrackCalibration.noSession')}</div>
+      ) : (
+        <>
+          <p className="field-hint">{t('adminTrackCalibration.hint')}</p>
+
+          <div className="calibration-slider-row">
+            <div className="field">
+              <strong>{t('adminTrackCalibration.session')}</strong>
+              <select value={selectedFile ?? ''} onChange={(e) => setSelectedFile(e.target.value)}>
+                {sessions?.map((s) => (
+                  <option key={s.file} value={s.file}>
+                    {new Date(s.uploadedAt).toLocaleDateString()} — {s.driverName ?? s.ownerPseudo ?? '?'} ({s.lapCount ?? '?'})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <strong>{t('adminTrackCalibration.lap')}</strong>
+              <select
+                value={selectedLap === null ? '' : String(selectedLap)}
+                onChange={(e) => setSelectedLap(e.target.value === 'full' ? 'full' : Number(e.target.value))}
+              >
+                <option value="full">{t('adminTrackCalibration.fullSession')}</option>
+                {laps?.map((l) => (
+                  <option key={l.lap} value={l.lap}>
+                    {t('lap.number', { n: l.lap })}
+                    {l.lapTime !== null ? ` — ${formatLapTime(l.lapTime)}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="track-map-calibration-layout">
+            <div className="track-map-calibration-canvas-wrap" style={{ width: BASE_WIDTH, height: BASE_HEIGHT }}>
+              <canvas ref={canvasRef} style={{ width: BASE_WIDTH * zoom, height: BASE_HEIGHT * zoom, cursor: gps ? 'move' : 'default' }} />
+            </div>
+
+            <div className="track-map-calibration-controls">
+              <div className="field">
+                <strong>{t('adminTrackCalibration.zoom')} ({zoom.toFixed(1)}×)</strong>
+                <div className="calibration-slider-row">
+                  <button
+                    type="button"
+                    className="modal-table-action"
+                    aria-label={t('adminTrackCalibration.decrease')}
+                    onClick={() => setZoom((v) => clamp(roundTo(v - 0.1, 0.1), 1, 5))}
+                  >
+                    −
+                  </button>
+                  <input
+                    type="range"
+                    min={1}
+                    max={5}
+                    step={0.1}
+                    value={zoom}
+                    onChange={(e) => setZoom(Number(e.target.value))}
+                  />
+                  <button
+                    type="button"
+                    className="modal-table-action"
+                    aria-label={t('adminTrackCalibration.increase')}
+                    onClick={() => setZoom((v) => clamp(roundTo(v + 0.1, 0.1), 1, 5))}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <div className="field">
+                <strong>
+                  {t('adminTrackCalibration.rotation')} ({rotationDeg.toFixed(1)}°)
+                </strong>
+                <div className="calibration-slider-row">
+                  <button
+                    type="button"
+                    className="modal-table-action"
+                    aria-label={t('adminTrackCalibration.decrease')}
+                    onClick={() => setRotationDeg((v) => clamp(roundTo(v - 0.1, 0.1), -180, 180))}
+                  >
+                    −
+                  </button>
+                  <input
+                    type="range"
+                    min={-180}
+                    max={180}
+                    step={0.1}
+                    value={rotationDeg}
+                    onChange={(e) => setRotationDeg(Number(e.target.value))}
+                  />
+                  <button
+                    type="button"
+                    className="modal-table-action"
+                    aria-label={t('adminTrackCalibration.increase')}
+                    onClick={() => setRotationDeg((v) => clamp(roundTo(v + 0.1, 0.1), -180, 180))}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <div className="field">
+                <strong>
+                  {t('adminTrackCalibration.scale')} ({scale.toFixed(2)}×)
+                </strong>
+                <div className="calibration-slider-row">
+                  <button
+                    type="button"
+                    className="modal-table-action"
+                    aria-label={t('adminTrackCalibration.decrease')}
+                    onClick={() => setScale((v) => clamp(roundTo(v - 0.01, 0.01), 0.2, 3))}
+                  >
+                    −
+                  </button>
+                  <input
+                    type="range"
+                    min={0.2}
+                    max={3}
+                    step={0.01}
+                    value={scale}
+                    onChange={(e) => setScale(Number(e.target.value))}
+                  />
+                  <button
+                    type="button"
+                    className="modal-table-action"
+                    aria-label={t('adminTrackCalibration.increase')}
+                    onClick={() => setScale((v) => clamp(roundTo(v + 0.01, 0.01), 0.2, 3))}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {entry.idealLineColor && (
+                <div className="field">
+                  <strong>{t('adminTrackCalibration.idealLine')}</strong>
+                  <div className="calibration-slider-row">
+                    <label>
+                      <input type="checkbox" checked={showIdealLine} onChange={(e) => setShowIdealLine(e.target.checked)} />
+                      {' '}
+                      {t('adminTrackCalibration.showIdealLine')}
+                    </label>
+                    <input
+                      type="color"
+                      value={entry.idealLineColor}
+                      disabled={idealLineSaving}
+                      onChange={(e) => handleIdealLineColorChange(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {error && <div className="auth-error">{error}</div>}
+              <button className="auth-submit" disabled={saving} onClick={handleSave}>
+                {saving ? t('adminTrackCalibration.saving') : t('adminTrackCalibration.save')}
+              </button>
+              {saved && !saving && <p className="field-hint">{t('adminTrackCalibration.saved')}</p>}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

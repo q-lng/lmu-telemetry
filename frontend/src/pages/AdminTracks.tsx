@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { createAdminTrack, fetchAdminDlcs, fetchAdminTracks, updateAdminTrack, uploadTrackMap, uploadTrackPhoto } from '../api';
+import {
+  createAdminTrack,
+  fetchAdminDlcs,
+  fetchAdminTracks,
+  swapTrackMapStyle,
+  updateAdminTrack,
+  uploadTrackMap,
+  uploadTrackMapFromMas,
+  uploadTrackPhoto,
+} from '../api';
 import type { DlcCatalogEntry, TrackCatalogEntry } from '../types';
 import { t } from '../i18n';
 import { Flag } from '../components/flags';
@@ -17,7 +26,7 @@ function TrackRow({ track, dlcs, onChange }: RowProps) {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(track.name);
   const [countryDraft, setCountryDraft] = useState(track.country);
-  const [busy, setBusy] = useState<'name' | 'country' | 'dlc' | 'photo' | 'map' | null>(null);
+  const [busy, setBusy] = useState<'name' | 'country' | 'dlc' | 'photo' | 'map' | 'mas' | 'swap' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [photoVersion, setPhotoVersion] = useState(0);
 
@@ -98,6 +107,32 @@ function TrackRow({ track, dlcs, onChange }: RowProps) {
     }
   }
 
+  async function handleMas(file: File) {
+    setBusy('mas');
+    setError(null);
+    try {
+      onChange(await uploadTrackMapFromMas(track.slug, file));
+      setPhotoVersion((v) => v + 1);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleSwapStyle() {
+    setBusy('swap');
+    setError(null);
+    try {
+      onChange(await swapTrackMapStyle(track.slug));
+      setPhotoVersion((v) => v + 1);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <tr>
       <td>
@@ -169,6 +204,17 @@ function TrackRow({ track, dlcs, onChange }: RowProps) {
             src={track.mapExt ? `/api/track-photos/${track.slug}-map.${track.mapExt}?v=${photoVersion}` : null}
           />
           <UploadButton label={t('adminTracks.uploadMap')} busy={busy === 'map'} onFile={handleMap} />
+          <UploadButton label={t('adminTracks.uploadFromMas')} busy={busy === 'mas'} onFile={handleMas} accept=".mas" />
+          {track.mapExt === 'svg' && (
+            <button className="modal-table-action" disabled={busy === 'swap'} onClick={handleSwapStyle}>
+              {busy === 'swap' ? t('admin.saving') : t('adminTracks.swapMapStyle')}
+            </button>
+          )}
+          {track.mapExt && (
+            <Link to={`/admin/content/tracks/${track.slug}/calibrate`} className="modal-table-action">
+              {t('adminTracks.calibrateMap')}
+            </Link>
+          )}
         </div>
       </td>
       <td>{error && <div className="auth-error">{error}</div>}</td>

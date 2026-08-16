@@ -1,8 +1,10 @@
 import type { FastifyInstance } from 'fastify';
+import fs from 'node:fs';
 import path from 'node:path';
 import { pgQuery } from './pg.js';
 import { DATA_DIR } from './db.js';
 import { resolveImageExt, serveImage, type ImageExt } from './imageAssets.js';
+import { extractIdealLineColor } from './masTrack.js';
 import { computeTrackTopLaps } from './leaderboard.js';
 
 export type { ImageExt };
@@ -16,6 +18,14 @@ export interface TrackCatalogEntry {
   dlcSlug: string | null;
   dlcName: string | null;
   dlcColor: string | null;
+  mapRotationDeg: number;
+  mapOffsetX: number;
+  mapOffsetY: number;
+  mapScale: number;
+  // Color parsed back out of <slug>-idealline.svg (see masTrack.ts) rather
+  // than stored in its own DB column — null when no ideal-line overlay has
+  // been generated for this track yet.
+  idealLineColor: string | null;
 }
 
 interface TrackRow {
@@ -25,6 +35,10 @@ interface TrackRow {
   dlc_slug: string | null;
   dlc_name: string | null;
   dlc_color: string | null;
+  map_rotation_deg: number;
+  map_offset_x: number;
+  map_offset_y: number;
+  map_scale: number;
 }
 
 export const TRACK_PHOTOS_DIR = path.join(DATA_DIR, 'track-photos');
@@ -32,10 +46,21 @@ export const TRACK_PHOTOS_DIR = path.join(DATA_DIR, 'track-photos');
 export const SLUG_RE = /^[a-z0-9-]{1,64}$/;
 
 const SELECT_TRACK_SQL = `
-  SELECT t.slug, t.name, t.country, t.dlc_slug, d.name AS dlc_name, d.color AS dlc_color
+  SELECT t.slug, t.name, t.country, t.dlc_slug, d.name AS dlc_name, d.color AS dlc_color,
+         t.map_rotation_deg, t.map_offset_x, t.map_offset_y, t.map_scale
   FROM tracks t
   LEFT JOIN dlcs d ON d.slug = t.dlc_slug
 `;
+
+function readIdealLineColor(slug: string): string | null {
+  const filePath = path.join(TRACK_PHOTOS_DIR, `${slug}-idealline.svg`);
+  if (!fs.existsSync(filePath)) return null;
+  try {
+    return extractIdealLineColor(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
 
 function withAssets(row: TrackRow): TrackCatalogEntry {
   return {
@@ -47,6 +72,11 @@ function withAssets(row: TrackRow): TrackCatalogEntry {
     dlcSlug: row.dlc_slug,
     dlcName: row.dlc_name,
     dlcColor: row.dlc_color,
+    mapRotationDeg: row.map_rotation_deg,
+    mapOffsetX: row.map_offset_x,
+    mapOffsetY: row.map_offset_y,
+    mapScale: row.map_scale,
+    idealLineColor: readIdealLineColor(row.slug),
   };
 }
 
@@ -98,6 +128,38 @@ export async function updateTrack(slug: string, patch: TrackPatch): Promise<Trac
   return findTrackBySlug(slug);
 }
 
+export interface TrackMapCalibrationPatch {
+  rotationDeg?: number;
+  offsetX?: number;
+  offsetY?: number;
+  scale?: number;
+}
+
+export async function updateTrackMapCalibration(slug: string, patch: TrackMapCalibrationPatch): Promise<TrackCatalogEntry | null> {
+  const sets: string[] = [];
+  const params: unknown[] = [slug];
+  if (patch.rotationDeg !== undefined) {
+    params.push(patch.rotationDeg);
+    sets.push(`map_rotation_deg = $${params.length}`);
+  }
+  if (patch.offsetX !== undefined) {
+    params.push(patch.offsetX);
+    sets.push(`map_offset_x = $${params.length}`);
+  }
+  if (patch.offsetY !== undefined) {
+    params.push(patch.offsetY);
+    sets.push(`map_offset_y = $${params.length}`);
+  }
+  if (patch.scale !== undefined) {
+    params.push(patch.scale);
+    sets.push(`map_scale = $${params.length}`);
+  }
+  if (sets.length > 0) {
+    await pgQuery(`UPDATE tracks SET ${sets.join(', ')} WHERE slug = $1`, params);
+  }
+  return findTrackBySlug(slug);
+}
+
 export async function registerTracks(app: FastifyInstance): Promise<void> {
   // Public catalog listing — powers the /tracks page. Unlike /api/admin/tracks
   // this needs no auth: it's the same site content the individual track pages
@@ -108,6 +170,25 @@ export async function registerTracks(app: FastifyInstance): Promise<void> {
 
   app.get<{ Params: { slug: string } }>('/api/tracks/:slug', async (req, reply) => {
     const entry = await findTrackBySlug(req.params.slug);
+    if (!entry) {
+      reply.code(404).send({ error: 'TRACK_NOT_FOUND' });
+      return;
+    }
+    reply.send(entry);
+  });
+
+  // Resolves a session's raw metadata.TrackName (free text) to a catalog
+  // entry — public, no auth needed, so the map background works in guest
+  // mode too. A query param rather than a path segment since track names
+  // contain spaces/punctuation that would otherwise need extra care in the
+  // route matcher.
+  app.get<{ Querystring: { name?: string } }>('/api/tracks/by-name', async (req, reply) => {
+    const name = req.query.name;
+    if (!name) {
+      reply.code(400).send({ error: 'INVALID_REQUEST' });
+      return;
+    }
+    const entry = await findTrackCatalogEntryByName(name);
     if (!entry) {
       reply.code(404).send({ error: 'TRACK_NOT_FOUND' });
       return;
