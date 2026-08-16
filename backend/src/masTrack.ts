@@ -114,14 +114,10 @@ function closedPathData(points: Point[]): string {
 const PADDING_RATIO = 0.03;
 const CENTERLINE_WIDTH_RATIO = 0.003;
 const CENTERLINE_OUTLINE_EXTRA_RATIO = 0.002;
-// The real road width (wp_width) varies enough along a lap — pit entries,
-// runoff, curbs — that filling the true left/right edges reads as bumpy and
-// inconsistent rather than like a clean track outline. 'band' instead
-// thickens the centerline itself by a fixed amount, uniform for the whole
-// lap, which looks like a proper road without chasing every real width
-// fluctuation.
-const THICK_CENTERLINE_WIDTH_RATIO = 0.01;
-const THICK_CENTERLINE_OUTLINE_EXTRA_RATIO = 0.006;
+// Thin border around the true-width band fill — this isn't standing in for
+// the road's own width (the fill already is the real width), just a crisp
+// edge line on top of it.
+const BAND_STROKE_RATIO = 0.0025;
 
 /** Renders the parsed waypoints as a map image — either the true road-width
  * ribbon ('band', filled white with a thin black border on both edges — the
@@ -155,11 +151,9 @@ export function generateTrackMapSvg(track: RawWaypoint[], style: MapStyle = 'ban
   const parts: string[] = [];
 
   if (style === 'band') {
-    const lineWidth = minSpan * THICK_CENTERLINE_WIDTH_RATIO;
-    const outlineWidth = lineWidth + minSpan * THICK_CENTERLINE_OUTLINE_EXTRA_RATIO * 2;
-    const centerPath = closedPathData(track.map(centerPoint));
-    parts.push(`<path d="${centerPath}" fill="none" stroke="#000000" stroke-width="${outlineWidth.toFixed(2)}" stroke-linejoin="round" />`);
-    parts.push(`<path d="${centerPath}" fill="none" stroke="#ffffff" stroke-width="${lineWidth.toFixed(2)}" stroke-linejoin="round" />`);
+    const strokeWidth = minSpan * BAND_STROKE_RATIO;
+    const d = `${closedPathData(left)} ${closedPathData(right)}`;
+    parts.push(`<path d="${d}" fill-rule="evenodd" fill="#ffffff" stroke="#000000" stroke-width="${strokeWidth.toFixed(2)}" stroke-linejoin="round" />`);
   } else {
     const lineWidth = minSpan * CENTERLINE_WIDTH_RATIO;
     const outlineWidth = lineWidth + minSpan * CENTERLINE_OUTLINE_EXTRA_RATIO * 2;
