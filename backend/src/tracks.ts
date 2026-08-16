@@ -1,8 +1,10 @@
 import type { FastifyInstance } from 'fastify';
+import fs from 'node:fs';
 import path from 'node:path';
 import { pgQuery } from './pg.js';
 import { DATA_DIR } from './db.js';
 import { resolveImageExt, serveImage, type ImageExt } from './imageAssets.js';
+import { extractIdealLineColor } from './masTrack.js';
 import { computeTrackTopLaps } from './leaderboard.js';
 
 export type { ImageExt };
@@ -20,6 +22,10 @@ export interface TrackCatalogEntry {
   mapOffsetX: number;
   mapOffsetY: number;
   mapScale: number;
+  // Color parsed back out of <slug>-idealline.svg (see masTrack.ts) rather
+  // than stored in its own DB column — null when no ideal-line overlay has
+  // been generated for this track yet.
+  idealLineColor: string | null;
 }
 
 interface TrackRow {
@@ -46,6 +52,16 @@ const SELECT_TRACK_SQL = `
   LEFT JOIN dlcs d ON d.slug = t.dlc_slug
 `;
 
+function readIdealLineColor(slug: string): string | null {
+  const filePath = path.join(TRACK_PHOTOS_DIR, `${slug}-idealline.svg`);
+  if (!fs.existsSync(filePath)) return null;
+  try {
+    return extractIdealLineColor(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
 function withAssets(row: TrackRow): TrackCatalogEntry {
   return {
     slug: row.slug,
@@ -60,6 +76,7 @@ function withAssets(row: TrackRow): TrackCatalogEntry {
     mapOffsetX: row.map_offset_x,
     mapOffsetY: row.map_offset_y,
     mapScale: row.map_scale,
+    idealLineColor: readIdealLineColor(row.slug),
   };
 }
 

@@ -32,12 +32,17 @@ interface RawWaypoint {
   perp: [number, number, number];
   widthLeft: number;
   widthRight: number;
+  /** Lateral offset from centerline for the "FASTEST" named AI path (see
+   * [Features]'s definepath=FASTEST/pathtime) — the game's own ideal/fastest
+   * racing line, distinct from LEFT/RIGHT/BLOCK/FAST_ALT. */
+  fastestOffset: number;
 }
 
 const WP_POS_RE = /wp_pos=\(([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\)/;
 const WP_PERP_RE = /wp_perp=\(([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\)/;
 const WP_BRANCH_RE = /wp_branchID=\((\d+)\)/;
 const WP_WIDTH_RE = /wp_width=\(([-\d.]+),\s*([-\d.]+),/;
+const WP_FASTEST_RE = /wp_pathinfo2=\(0,\s*([-\d.]+),/;
 
 /** Parses the decompressed .mas text for the main track's [Waypoint]
  * entries (branchID 0 — pit lane/garage connectors are ignored). Each
@@ -52,7 +57,9 @@ const WP_WIDTH_RE = /wp_width=\(([-\d.]+),\s*([-\d.]+),/;
  * wp_width's road-left minus road-right across a full lap comes out ~0,
  * i.e. no systematic offset). wp_perp is the lateral (across-track) unit
  * vector at that point, used together with wp_width's road-left/road-right
- * distances to derive the actual track edges for the 'band' map style.
+ * distances to derive the actual track edges for the 'edges' map style, and
+ * with wp_pathinfo2's FASTEST-path offset for the separate ideal-line
+ * overlay (see generateIdealLineSvg).
  *
  * The coordinate mapping (world X, -Z -> map x, y) was verified against a
  * real recorded Spa GPS trace: winding direction and aspect ratio both
@@ -73,11 +80,13 @@ export function parseMasWaypoints(text: string): RawWaypoint[] {
     const branch = block.match(WP_BRANCH_RE);
     const width = block.match(WP_WIDTH_RE);
     if (!pos || !perp || !branch || !width || Number(branch[1]) !== 0) continue;
+    const fastest = block.match(WP_FASTEST_RE);
     track.push({
       pos: [Number(pos[1]), Number(pos[2]), Number(pos[3])],
       perp: [Number(perp[1]), Number(perp[2]), Number(perp[3])],
       widthLeft: Number(width[1]),
       widthRight: Number(width[2]),
+      fastestOffset: fastest ? Number(fastest[1]) : 0,
     });
   }
   return track;
@@ -112,27 +121,21 @@ function closedPathData(points: Point[]): string {
 }
 
 const PADDING_RATIO = 0.03;
-const CENTERLINE_WIDTH_RATIO = 0.003;
-const CENTERLINE_OUTLINE_EXTRA_RATIO = 0.002;
-// The real road width (wp_width) varies enough along a lap — pit entries,
-// runoff, curbs — that filling the true left/right edges reads as bumpy and
-// inconsistent rather than like a clean track outline. 'band' instead
-// thickens the centerline itself by a fixed amount, uniform for the whole
-// lap, which looks like a proper road without chasing every real width
-// fluctuation.
-const THICK_CENTERLINE_WIDTH_RATIO = 0.018;
-const THICK_CENTERLINE_OUTLINE_EXTRA_RATIO = 0.008;
 
-/** Renders the parsed waypoints as a map image — either the true road-width
- * ribbon ('band', filled white with a thin black border on both edges — the
- * left and right edges are each their own closed contour, and putting both
- * in one <path> with fill-rule="evenodd" fills exactly the ring between
- * them, the standard "donut" SVG technique) or just the two edge lines plus
- * a thin centerline ('edges', no fill). Either way it's the same flat
- * white/black-outline look every uploaded map is expected to have. */
-export function generateTrackMapSvg(track: RawWaypoint[], style: MapStyle = 'band'): string {
-  if (track.length < 3) throw new Error('NO_TRACK_WAYPOINTS');
+interface ViewBox {
+  minX: number;
+  minY: number;
+  width: number;
+  height: number;
+  minSpan: number;
+}
 
+/** Shared by generateTrackMapSvg and generateIdealLineSvg so both SVGs
+ * generated from the same .mas upload share the exact same viewBox — the
+ * ideal-line overlay is drawn using the map's own calibration (rotation/
+ * position/scale) rather than having its own, so the two need to be
+ * pixel-for-pixel co-registered rather than merely close. */
+function computeViewBox(track: RawWaypoint[]): ViewBox {
   const left = track.map((w) => edgePoint(w, w.widthLeft));
   const right = track.map((w) => edgePoint(w, -w.widthRight));
   const allPoints = [...left, ...right];
@@ -146,12 +149,37 @@ export function generateTrackMapSvg(track: RawWaypoint[], style: MapStyle = 'ban
   const height = maxY - minY || 1;
   const minSpan = Math.min(width, height);
   const pad = Math.max(minSpan * PADDING_RATIO, 5);
+  return { minX: minX - pad, minY: minY - pad, width: width + pad * 2, height: height + pad * 2, minSpan };
+}
 
-  const viewMinX = minX - pad;
-  const viewMinY = minY - pad;
-  const viewWidth = width + pad * 2;
-  const viewHeight = height + pad * 2;
+function svgTag(viewBox: ViewBox, body: string): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox.minX.toFixed(2)} ${viewBox.minY.toFixed(2)} ${viewBox.width.toFixed(2)} ${viewBox.height.toFixed(2)}" width="${viewBox.width.toFixed(0)}" height="${viewBox.height.toFixed(0)}">
+${body}
+</svg>
+`;
+}
 
+const CENTERLINE_WIDTH_RATIO = 0.003;
+const CENTERLINE_OUTLINE_EXTRA_RATIO = 0.002;
+// The real road width (wp_width) varies enough along a lap — pit entries,
+// runoff, curbs — that filling the true left/right edges reads as bumpy and
+// inconsistent rather than like a clean track outline. 'band' instead
+// thickens the centerline itself by a fixed amount, uniform for the whole
+// lap, which looks like a proper road without chasing every real width
+// fluctuation.
+const THICK_CENTERLINE_WIDTH_RATIO = 0.018;
+const THICK_CENTERLINE_OUTLINE_EXTRA_RATIO = 0.008;
+
+/** Renders the parsed waypoints as a map image — either a thick uniform
+ * centerline stroke ('band', the default — real per-point wp_width reads as
+ * bumpy/inconsistent, so this is a fixed thickness instead) or the true
+ * left/right edges plus a thin centerline ('edges', no fill). Either way
+ * it's the same flat white/black-outline look every uploaded map is
+ * expected to have. */
+export function generateTrackMapSvg(track: RawWaypoint[], style: MapStyle = 'band'): string {
+  if (track.length < 3) throw new Error('NO_TRACK_WAYPOINTS');
+  const viewBox = computeViewBox(track);
+  const { minSpan } = viewBox;
   const parts: string[] = [];
 
   if (style === 'band') {
@@ -161,6 +189,8 @@ export function generateTrackMapSvg(track: RawWaypoint[], style: MapStyle = 'ban
     parts.push(`<path d="${centerPath}" fill="none" stroke="#000000" stroke-width="${outlineWidth.toFixed(2)}" stroke-linejoin="round" />`);
     parts.push(`<path d="${centerPath}" fill="none" stroke="#ffffff" stroke-width="${lineWidth.toFixed(2)}" stroke-linejoin="round" />`);
   } else {
+    const left = track.map((w) => edgePoint(w, w.widthLeft));
+    const right = track.map((w) => edgePoint(w, -w.widthRight));
     const lineWidth = minSpan * CENTERLINE_WIDTH_RATIO;
     const outlineWidth = lineWidth + minSpan * CENTERLINE_OUTLINE_EXTRA_RATIO * 2;
     for (const pts of [left, right]) {
@@ -174,10 +204,7 @@ export function generateTrackMapSvg(track: RawWaypoint[], style: MapStyle = 'ban
     parts.push(`<path d="${centerPath}" fill="none" stroke="#ffffff" stroke-width="${(lineWidth * 0.6).toFixed(2)}" stroke-linejoin="round" />`);
   }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewMinX.toFixed(2)} ${viewMinY.toFixed(2)} ${viewWidth.toFixed(2)} ${viewHeight.toFixed(2)}" width="${viewWidth.toFixed(0)}" height="${viewHeight.toFixed(0)}">
-${parts.join('\n')}
-</svg>
-`;
+  return svgTag(viewBox, parts.join('\n'));
 }
 
 /** End-to-end: raw uploaded .mas file bytes -> ready-to-serve SVG string. */
@@ -185,4 +212,35 @@ export function buildTrackMapSvgFromMas(masBuffer: Buffer, style: MapStyle = 'ba
   const decompressed = extractMasContent(masBuffer);
   const track = parseMasWaypoints(decompressed.toString('utf8'));
   return generateTrackMapSvg(track, style);
+}
+
+export const DEFAULT_IDEAL_LINE_COLOR = '#ff6d00';
+const IDEAL_LINE_WIDTH_RATIO = 0.004;
+const IDEAL_LINE_STROKE_RE = /stroke="(#[0-9a-fA-F]{3,8})"/;
+
+/** The game's own ideal/fastest racing line (the "FASTEST" named AI path),
+ * as a standalone SVG — kept separate from the map itself so it can be
+ * toggled and recolored independently. Uses the exact same viewBox as
+ * generateTrackMapSvg's output for the same track, so it can be drawn with
+ * the map's own calibration transform (see trackMapDraw.ts) rather than
+ * needing its own rotation/position/scale. */
+export function generateIdealLineSvg(track: RawWaypoint[], color: string = DEFAULT_IDEAL_LINE_COLOR): string {
+  if (track.length < 3) throw new Error('NO_TRACK_WAYPOINTS');
+  const viewBox = computeViewBox(track);
+  const lineWidth = viewBox.minSpan * IDEAL_LINE_WIDTH_RATIO;
+  const path = closedPathData(track.map((w) => edgePoint(w, w.fastestOffset)));
+  return svgTag(viewBox, `<path d="${path}" fill="none" stroke="${color}" stroke-width="${lineWidth.toFixed(2)}" stroke-linejoin="round" />`);
+}
+
+/** Reads back the color an ideal-line SVG (as generated above) was last
+ * saved with — so the backend doesn't need a separate DB column just to
+ * track it, and the frontend can show the current color in its picker. */
+export function extractIdealLineColor(svg: string): string | null {
+  return svg.match(IDEAL_LINE_STROKE_RE)?.[1] ?? null;
+}
+
+/** Swaps an ideal-line SVG's stroke color without needing the original .mas
+ * geometry again — there's exactly one colored stroke in the file. */
+export function recolorIdealLineSvg(svg: string, color: string): string {
+  return svg.replace(IDEAL_LINE_STROKE_RE, `stroke="${color}"`);
 }

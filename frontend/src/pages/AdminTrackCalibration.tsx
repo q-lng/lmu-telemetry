@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { fetchSessions, fetchTrackCatalogEntry, updateAdminTrackMapCalibration } from '../api';
+import { fetchSessions, fetchTrackCatalogEntry, setTrackIdealLineColor, updateAdminTrackMapCalibration } from '../api';
 import { createServerDataSource } from '../dataSource';
 import { drawTrackMap } from '../trackMapDraw';
 import { formatLapTime } from '../lapTime';
@@ -42,6 +42,12 @@ export function AdminTrackCalibration() {
   const [gps, setGps] = useState<{ lat: number[]; lon: number[]; t: number[] } | null>(null);
   const [noSession, setNoSession] = useState(false);
   const [mapImage, setMapImage] = useState<HTMLImageElement | null>(null);
+  // Separate overlay file (the game's own ideal/fastest racing line, see
+  // masTrack.ts) — shown/hidden here only for now, not on the public
+  // telemetry viewer.
+  const [idealLineImage, setIdealLineImage] = useState<HTMLImageElement | null>(null);
+  const [showIdealLine, setShowIdealLine] = useState(true);
+  const [idealLineSaving, setIdealLineSaving] = useState(false);
 
   // Reference trace source: which session (of any visibility this admin can
   // see, matching the track's catalog name) and which single lap within it
@@ -99,6 +105,36 @@ export function AdminTrackCalibration() {
       cancelled = true;
     };
   }, [entry]);
+
+  useEffect(() => {
+    if (!entry?.idealLineColor) {
+      setIdealLineImage(null);
+      return;
+    }
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (!cancelled) setIdealLineImage(img);
+    };
+    // Cache-busted on the color itself — the filename never changes, only
+    // its content, and the color string is already a natural version marker.
+    img.src = `/api/track-photos/${entry.slug}-idealline.svg?c=${encodeURIComponent(entry.idealLineColor)}`;
+    return () => {
+      cancelled = true;
+    };
+  }, [entry?.slug, entry?.idealLineColor]);
+
+  async function handleIdealLineColorChange(color: string) {
+    setIdealLineSaving(true);
+    setError(null);
+    try {
+      setEntry(await setTrackIdealLineColor(slug, color));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIdealLineSaving(false);
+    }
+  }
 
   // Sessions matching the track's catalog name — same free-text match every
   // other track-scoped query in the app already relies on. Defaults the
@@ -195,9 +231,10 @@ export function AdminTrackCalibration() {
       cursorT: null,
       viewRange: null,
       mapImage,
+      idealLineImage: showIdealLine ? idealLineImage : null,
       mapCalibration: { rotationDeg, offsetX, offsetY, scale },
     });
-  }, [gps, mapImage, rotationDeg, offsetX, offsetY, scale, zoom]);
+  }, [gps, mapImage, idealLineImage, showIdealLine, rotationDeg, offsetX, offsetY, scale, zoom]);
 
   // Drag-to-reposition — a mount-only effect (stable listeners) using
   // closure-local drag state and the refs above for current offset/zoom, so
@@ -412,6 +449,25 @@ export function AdminTrackCalibration() {
                   </button>
                 </div>
               </div>
+
+              {entry.idealLineColor && (
+                <div className="field">
+                  <strong>{t('adminTrackCalibration.idealLine')}</strong>
+                  <div className="calibration-slider-row">
+                    <label>
+                      <input type="checkbox" checked={showIdealLine} onChange={(e) => setShowIdealLine(e.target.checked)} />
+                      {' '}
+                      {t('adminTrackCalibration.showIdealLine')}
+                    </label>
+                    <input
+                      type="color"
+                      value={entry.idealLineColor}
+                      disabled={idealLineSaving}
+                      onChange={(e) => handleIdealLineColorChange(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
 
               {error && <div className="auth-error">{error}</div>}
               <button className="auth-submit" disabled={saving} onClick={handleSave}>

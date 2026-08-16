@@ -456,6 +456,12 @@ export async function swapTrackMapStyle(slug: string): Promise<TrackCatalogEntry
   return res.json();
 }
 
+// Recolors the ideal-line overlay generated alongside the map from a .mas
+// upload — 400s if this track has no ideal-line SVG yet.
+export function setTrackIdealLineColor(slug: string, color: string): Promise<TrackCatalogEntry> {
+  return patchJson<TrackCatalogEntry>(`/api/admin/tracks/${encodeURIComponent(slug)}/ideal-line-color`, { color });
+}
+
 export function fetchCars(): Promise<CarCatalogEntry[]> {
   return getJson<{ cars: CarCatalogEntry[] }>('/api/cars').then((r) => r.cars);
 }

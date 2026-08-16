@@ -53,7 +53,13 @@ import { listDistinctCarNames, listLiveryMappings, setLiveryMapping } from './li
 import fs from 'node:fs';
 import path from 'node:path';
 import { UPLOAD_CONTENT_TYPES, writeImageAtomic } from './imageAssets.js';
-import { extractMasContent, parseMasWaypoints, generateTrackMapSvg } from './masTrack.js';
+import {
+  extractMasContent,
+  parseMasWaypoints,
+  generateTrackMapSvg,
+  generateIdealLineSvg,
+  recolorIdealLineSvg,
+} from './masTrack.js';
 
 const PSEUDO_RE = /^[a-zA-Z0-9_-]{3,32}$/;
 const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
@@ -436,16 +442,43 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
       const buffer = await data.toBuffer();
       let bandSvg: string;
       let edgesSvg: string;
+      let idealLineSvg: string;
       try {
         const track = parseMasWaypoints(extractMasContent(buffer).toString('utf8'));
         bandSvg = generateTrackMapSvg(track, 'band');
         edgesSvg = generateTrackMapSvg(track, 'edges');
+        idealLineSvg = generateIdealLineSvg(track);
       } catch {
         reply.code(400).send({ error: 'INVALID_MAS_FILE' });
         return;
       }
       writeImageAtomic(TRACK_PHOTOS_DIR, `${req.params.slug}-map`, 'svg', Buffer.from(bandSvg, 'utf8'));
       fs.writeFileSync(path.join(TRACK_PHOTOS_DIR, `${req.params.slug}-map-alt.svg`), edgesSvg, 'utf8');
+      fs.writeFileSync(path.join(TRACK_PHOTOS_DIR, `${req.params.slug}-idealline.svg`), idealLineSvg, 'utf8');
+      reply.send(await findTrackBySlug(req.params.slug));
+    },
+  );
+
+  app.patch<{ Params: { slug: string }; Body: { color?: string } }>(
+    '/api/admin/tracks/:slug/ideal-line-color',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      if (!(await findTrackBySlug(req.params.slug))) {
+        reply.code(404).send({ error: 'TRACK_NOT_FOUND' });
+        return;
+      }
+      const color = req.body?.color;
+      if (!color || !/^#[0-9a-fA-F]{6}$/.test(color)) {
+        reply.code(400).send({ error: 'INVALID_COLOR' });
+        return;
+      }
+      const filePath = path.join(TRACK_PHOTOS_DIR, `${req.params.slug}-idealline.svg`);
+      if (!fs.existsSync(filePath)) {
+        reply.code(400).send({ error: 'NO_IDEAL_LINE' });
+        return;
+      }
+      const recolored = recolorIdealLineSvg(fs.readFileSync(filePath, 'utf8'), color);
+      fs.writeFileSync(filePath, recolored, 'utf8');
       reply.send(await findTrackBySlug(req.params.slug));
     },
   );

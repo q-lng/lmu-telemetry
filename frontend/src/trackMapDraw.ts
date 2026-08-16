@@ -26,6 +26,13 @@ export interface DrawTrackMapOptions {
   viewRange: { min: number; max: number } | null;
   mapImage?: HTMLImageElement | null;
   mapCalibration?: MapCalibration | null;
+  /** The game's own ideal/fastest racing line, generated alongside the map
+   * from the same .mas upload (see backend/src/masTrack.ts) — a separate,
+   * independently toggleable/recolorable file, but drawn with the *same*
+   * mapCalibration transform as mapImage since both share the exact same
+   * viewBox and are meant to be pixel-for-pixel co-registered, not
+   * independently aligned. */
+  idealLineImage?: HTMLImageElement | null;
 }
 
 /** Draws a session's GPS trace onto a 2D canvas context — optionally with the
@@ -34,7 +41,7 @@ export interface DrawTrackMapOptions {
  * the interactive AdminTrackCalibration.tsx share the exact same drawing
  * logic instead of maintaining two copies. */
 export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOptions): void {
-  const { width, height, lat, lon, t, cursorT, viewRange, mapImage, mapCalibration } = opts;
+  const { width, height, lat, lon, t, cursorT, viewRange, mapImage, mapCalibration, idealLineImage } = opts;
   if (lat.length === 0) return;
 
   const minLat = Math.min(...lat);
@@ -78,12 +85,18 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOp
 
   ctx.clearRect(0, 0, width, height);
 
-  if (mapImage && mapCalibration && mapImage.naturalWidth > 0) {
+  const hasMapImage = !!mapImage && mapImage.naturalWidth > 0;
+  const hasIdealLineImage = !!idealLineImage && idealLineImage.naturalWidth > 0;
+  if (mapCalibration && (hasMapImage || hasIdealLineImage)) {
     const boxWidth = traceWidth;
     const boxHeight = traceHeight;
-    // Contain-fit the image's own aspect ratio within the same box the trace
-    // fits into, then apply the admin-calibrated scale on top of that.
-    const imgAspect = mapImage.naturalWidth / mapImage.naturalHeight;
+    // Contain-fit the reference image's own aspect ratio within the same box
+    // the trace fits into, then apply the admin-calibrated scale on top of
+    // that. mapImage is the reference when present (the common case); the
+    // ideal line shares its exact viewBox either way, so falling back to its
+    // own aspect when there's no map image yet still lines up correctly.
+    const referenceImage = hasMapImage ? mapImage! : idealLineImage!;
+    const imgAspect = referenceImage.naturalWidth / referenceImage.naturalHeight;
     const boxAspect = boxWidth / boxHeight;
     let drawWidth: number;
     let drawHeight: number;
@@ -102,10 +115,19 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOp
     ctx.save();
     ctx.translate(centerX, centerY);
     ctx.rotate((mapCalibration.rotationDeg * Math.PI) / 180);
-    // Kept translucent so the trace on top — the thing that actually matters
-    // moment to moment — never has to compete with the background image.
-    ctx.globalAlpha = 0.6;
-    ctx.drawImage(mapImage, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+    if (hasMapImage) {
+      // Kept translucent so the trace on top — the thing that actually
+      // matters moment to moment — never has to compete with the background
+      // image.
+      ctx.globalAlpha = 0.6;
+      ctx.drawImage(mapImage!, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+    }
+    if (hasIdealLineImage) {
+      // Full opacity — it's a thin colored line, not a background layer, so
+      // it needs to actually stand out rather than blend in.
+      ctx.globalAlpha = 1;
+      ctx.drawImage(idealLineImage!, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+    }
     ctx.restore();
   }
 
