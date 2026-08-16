@@ -120,8 +120,8 @@ const CENTERLINE_OUTLINE_EXTRA_RATIO = 0.002;
 // thickens the centerline itself by a fixed amount, uniform for the whole
 // lap, which looks like a proper road without chasing every real width
 // fluctuation.
-const THICK_CENTERLINE_WIDTH_RATIO = 0.01;
-const THICK_CENTERLINE_OUTLINE_EXTRA_RATIO = 0.006;
+const THICK_CENTERLINE_WIDTH_RATIO = 0.018;
+const THICK_CENTERLINE_OUTLINE_EXTRA_RATIO = 0.008;
 
 /** Renders the parsed waypoints as a map image — either the true road-width
  * ribbon ('band', filled white with a thin black border on both edges — the
