@@ -1,5 +1,5 @@
 import type { ElementType } from 'react';
-import type { TrackCatalogEntry } from '../types';
+import type { ImageExt, TrackCatalogEntry } from '../types';
 import { t } from '../i18n';
 import { Flag } from './flags';
 import { Badge } from './Badge';
@@ -9,7 +9,7 @@ import { Badge } from './Badge';
 // fall back to .png on error), which meant a guaranteed 404 for every track
 // missing the guessed format. Falls back to a plain gradient with a small
 // hint when there's no photo at all.
-export function TrackHeroPhoto({ slug, ext }: { slug: string; ext: 'jpg' | 'png' | null }) {
+export function TrackHeroPhoto({ slug, ext }: { slug: string; ext: ImageExt | null }) {
   if (!ext) {
     return <div className="track-hero-fallback">{t('track.photoComingSoon')}</div>;
   }
@@ -20,7 +20,7 @@ export function TrackHeroPhoto({ slug, ext }: { slug: string; ext: 'jpg' | 'png'
 // the real official track layout, not a telemetry-derived outline. Renders
 // nothing at all when there's no map, since it's a secondary decorative
 // element in the corner, not the hero's main content.
-export function TrackHeroMap({ slug, ext }: { slug: string; ext: 'jpg' | 'png' | null }) {
+export function TrackHeroMap({ slug, ext }: { slug: string; ext: ImageExt | null }) {
   if (!ext) return null;
   return (
     <div className="track-hero-map-frame">

@@ -437,6 +437,13 @@ export function uploadTrackMap(slug: string, file: File): Promise<TrackCatalogEn
   return uploadImage(`/api/admin/tracks/${encodeURIComponent(slug)}/map`, file);
 }
 
+// Not an image upload — the file is the track's .mas game content file,
+// parsed server-side into an SVG map (see backend/src/masTrack.ts). Reuses
+// uploadImage's generic FormData/error-handling plumbing regardless.
+export function uploadTrackMapFromMas(slug: string, file: File): Promise<TrackCatalogEntry> {
+  return uploadImage(`/api/admin/tracks/${encodeURIComponent(slug)}/map-from-mas`, file);
+}
+
 export function fetchCars(): Promise<CarCatalogEntry[]> {
   return getJson<{ cars: CarCatalogEntry[] }>('/api/cars').then((r) => r.cars);
 }

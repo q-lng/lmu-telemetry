@@ -51,6 +51,7 @@ import {
 import { createDlc, findDlcBySlug, listDlcs, updateDlc } from './dlcs.js';
 import { listDistinctCarNames, listLiveryMappings, setLiveryMapping } from './liveryMappings.js';
 import { UPLOAD_CONTENT_TYPES, writeImageAtomic } from './imageAssets.js';
+import { buildTrackMapSvgFromMas } from './masTrack.js';
 
 const PSEUDO_RE = /^[a-zA-Z0-9_-]{3,32}$/;
 const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
@@ -396,6 +397,40 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
       if (await handleImageUpload(req, reply, TRACK_PHOTOS_DIR, `${req.params.slug}-map`)) {
         reply.send(await findTrackBySlug(req.params.slug));
       }
+    },
+  );
+
+  // Generates the map instead of accepting one directly — the upload is the
+  // track's own .mas content file (game data, not an image), parsed for its
+  // [Waypoint] path and rendered to an SVG. See masTrack.ts for the format
+  // and the coordinate mapping verified against a real recorded GPS trace.
+  app.post<{ Params: { slug: string } }>(
+    '/api/admin/tracks/:slug/map-from-mas',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      if (!(await findTrackBySlug(req.params.slug))) {
+        reply.code(404).send({ error: 'TRACK_NOT_FOUND' });
+        return;
+      }
+      const data = await req.file();
+      if (!data) {
+        reply.code(400).send({ error: 'NO_FILE_PROVIDED' });
+        return;
+      }
+      if (!data.filename.toLowerCase().endsWith('.mas')) {
+        reply.code(400).send({ error: 'INVALID_MAS_FILE' });
+        return;
+      }
+      const buffer = await data.toBuffer();
+      let svg: string;
+      try {
+        svg = buildTrackMapSvgFromMas(buffer);
+      } catch {
+        reply.code(400).send({ error: 'INVALID_MAS_FILE' });
+        return;
+      }
+      writeImageAtomic(TRACK_PHOTOS_DIR, `${req.params.slug}-map`, 'svg', Buffer.from(svg, 'utf8'));
+      reply.send(await findTrackBySlug(req.params.slug));
     },
   );
 

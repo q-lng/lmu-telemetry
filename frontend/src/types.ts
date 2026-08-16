@@ -146,7 +146,10 @@ export interface SearchResults {
   cars: CarCatalogEntry[];
 }
 
-export type ImageExt = 'jpg' | 'png';
+// 'svg' covers track maps generated server-side from an uploaded .mas file
+// (see AdminTrackCalibration/AdminTracks and the backend's masTrack.ts) —
+// never a raw upload for photos, only ever a resolved/served map extension.
+export type ImageExt = 'jpg' | 'png' | 'svg';
 
 export interface TrackCatalogEntry {
   slug: string;

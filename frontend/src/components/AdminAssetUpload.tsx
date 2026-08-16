@@ -15,16 +15,19 @@ interface UploadButtonProps {
   label: string;
   busy: boolean;
   onFile: (file: File) => void;
+  /** Defaults to images (the original/only use case) — pass e.g. ".mas" for
+   * a non-image file picker (see AdminTracks.tsx's .mas-to-map upload). */
+  accept?: string;
 }
 
-export function UploadButton({ label, busy, onFile }: UploadButtonProps) {
+export function UploadButton({ label, busy, onFile, accept = 'image/png,image/jpeg' }: UploadButtonProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
     <>
       <input
         ref={inputRef}
         type="file"
-        accept="image/png,image/jpeg"
+        accept={accept}
         disabled={busy}
         style={{ display: 'none' }}
         onChange={(e) => {
