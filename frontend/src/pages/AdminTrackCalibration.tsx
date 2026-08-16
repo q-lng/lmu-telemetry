@@ -3,7 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import { fetchSessions, fetchTrackCatalogEntry, updateAdminTrackMapCalibration } from '../api';
 import { createServerDataSource } from '../dataSource';
 import { drawTrackMap } from '../trackMapDraw';
-import type { TrackCatalogEntry } from '../types';
+import { formatLapTime } from '../lapTime';
+import type { LapInfo, SessionSummary, TrackCatalogEntry } from '../types';
 import { t } from '../i18n';
 
 // Fixed reference size for the calibration canvas (unlike TrackMap.tsx's
@@ -41,6 +42,16 @@ export function AdminTrackCalibration() {
   const [gps, setGps] = useState<{ lat: number[]; lon: number[]; t: number[] } | null>(null);
   const [noSession, setNoSession] = useState(false);
   const [mapImage, setMapImage] = useState<HTMLImageElement | null>(null);
+
+  // Reference trace source: which session (of any visibility this admin can
+  // see, matching the track's catalog name) and which single lap within it
+  // — defaults to the first of each, but picking one lap instead of the
+  // whole session avoids overlapping out-laps/in-laps/pit visits muddying
+  // the shape.
+  const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [laps, setLaps] = useState<LapInfo[] | null>(null);
+  const [selectedLap, setSelectedLap] = useState<number | 'full' | null>(null);
 
   const [rotationDeg, setRotationDeg] = useState(0);
   const [offsetX, setOffsetX] = useState(0);
@@ -89,25 +100,24 @@ export function AdminTrackCalibration() {
     };
   }, [entry]);
 
-  // Reference trace: the first session (of any visibility this admin can
-  // see) matching the track's catalog name — same free-text match every
-  // other track-scoped query in the app already relies on.
+  // Sessions matching the track's catalog name — same free-text match every
+  // other track-scoped query in the app already relies on. Defaults the
+  // picker to the first one found.
   useEffect(() => {
     if (!entry) return;
     let cancelled = false;
     setNoSession(false);
-    setGps(null);
+    setSessions(null);
+    setSelectedFile(null);
     fetchSessions({ track: entry.name })
-      .then(async (sessions) => {
-        const first = sessions[0];
-        if (!first) {
-          if (!cancelled) setNoSession(true);
+      .then((list) => {
+        if (cancelled) return;
+        if (list.length === 0) {
+          setNoSession(true);
           return;
         }
-        const ds = createServerDataSource(first.file);
-        const [latS, lonS] = await Promise.all([ds.fetchChannelSeries('GPS Latitude'), ds.fetchChannelSeries('GPS Longitude')]);
-        if (cancelled) return;
-        setGps({ lat: latS.values.value as number[], lon: lonS.values.value as number[], t: latS.t });
+        setSessions(list);
+        setSelectedFile(list[0].file);
       })
       .catch(() => {
         if (!cancelled) setNoSession(true);
@@ -116,6 +126,52 @@ export function AdminTrackCalibration() {
       cancelled = true;
     };
   }, [entry]);
+
+  // Laps within the selected session — defaults the picker to the first
+  // lap (falling back to the whole session if it has none).
+  useEffect(() => {
+    if (!selectedFile) {
+      setLaps(null);
+      setSelectedLap(null);
+      return;
+    }
+    let cancelled = false;
+    setLaps(null);
+    setSelectedLap(null);
+    createServerDataSource(selectedFile)
+      .fetchLaps()
+      .then((list) => {
+        if (cancelled) return;
+        setLaps(list);
+        setSelectedLap(list.length > 0 ? list[0].lap : 'full');
+      })
+      .catch(() => {
+        if (!cancelled) setLaps([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedFile]);
+
+  // The reference trace itself, scoped to the selected lap's time range
+  // (or the whole session when 'full' is picked / no laps exist).
+  useEffect(() => {
+    if (!selectedFile || selectedLap === null) return;
+    let cancelled = false;
+    setGps(null);
+    const lap = selectedLap !== 'full' ? laps?.find((l) => l.lap === selectedLap) : undefined;
+    const range = lap ? { from: lap.startTs, to: lap.endTs } : undefined;
+    const ds = createServerDataSource(selectedFile);
+    Promise.all([ds.fetchChannelSeries('GPS Latitude', range), ds.fetchChannelSeries('GPS Longitude', range)])
+      .then(([latS, lonS]) => {
+        if (cancelled) return;
+        setGps({ lat: latS.values.value as number[], lon: lonS.values.value as number[], t: latS.t });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedFile, selectedLap, laps]);
 
   // Redraws on every visual change. `zoom` scales the canvas's own backing
   // store and CSS size, not the logical width/height drawTrackMap works
@@ -230,6 +286,35 @@ export function AdminTrackCalibration() {
       ) : (
         <>
           <p className="field-hint">{t('adminTrackCalibration.hint')}</p>
+
+          <div className="calibration-slider-row">
+            <div className="field">
+              <strong>{t('adminTrackCalibration.session')}</strong>
+              <select value={selectedFile ?? ''} onChange={(e) => setSelectedFile(e.target.value)}>
+                {sessions?.map((s) => (
+                  <option key={s.file} value={s.file}>
+                    {new Date(s.uploadedAt).toLocaleDateString()} — {s.driverName ?? s.ownerPseudo ?? '?'} ({s.lapCount ?? '?'})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <strong>{t('adminTrackCalibration.lap')}</strong>
+              <select
+                value={selectedLap === null ? '' : String(selectedLap)}
+                onChange={(e) => setSelectedLap(e.target.value === 'full' ? 'full' : Number(e.target.value))}
+              >
+                <option value="full">{t('adminTrackCalibration.fullSession')}</option>
+                {laps?.map((l) => (
+                  <option key={l.lap} value={l.lap}>
+                    {t('lap.number', { n: l.lap })}
+                    {l.lapTime !== null ? ` — ${formatLapTime(l.lapTime)}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div className="track-map-calibration-layout">
             <div className="track-map-calibration-canvas-wrap" style={{ width: BASE_WIDTH, height: BASE_HEIGHT }}>
               <canvas ref={canvasRef} style={{ width: BASE_WIDTH * zoom, height: BASE_HEIGHT * zoom, cursor: gps ? 'move' : 'default' }} />
