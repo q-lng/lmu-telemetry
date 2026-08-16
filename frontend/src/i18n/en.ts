@@ -275,6 +275,7 @@ export const en = {
   'adminTracks.uploadPhoto': 'Upload photo',
   'adminTracks.uploadMap': 'Upload map',
   'adminTracks.uploadFromMas': 'Generate from .mas',
+  'adminTracks.swapMapStyle': 'Swap style',
   'adminTracks.calibrateMap': 'Calibrate map',
 
   'adminTrackCalibration.title': 'Calibrate map',
@@ -496,6 +497,7 @@ export const en = {
   'errors.INVALID_FILE_TYPE': 'File must have a .duckdb extension',
   'errors.INVALID_IMAGE_TYPE': 'File must be a JPG or PNG image',
   'errors.INVALID_MAS_FILE': "Couldn't read a track path from this .mas file",
+  'errors.NO_ALT_MAP_STYLE': "This map wasn't generated from a .mas file, so there's no alternate style to swap to",
   'errors.TRACK_NOT_FOUND': 'Track not found',
   'errors.FILE_TOO_LARGE': 'File too large',
   'errors.SERVER_ERROR': 'Something went wrong on the server',

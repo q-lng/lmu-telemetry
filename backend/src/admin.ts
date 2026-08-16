@@ -50,8 +50,10 @@ import {
 } from './manufacturers.js';
 import { createDlc, findDlcBySlug, listDlcs, updateDlc } from './dlcs.js';
 import { listDistinctCarNames, listLiveryMappings, setLiveryMapping } from './liveryMappings.js';
+import fs from 'node:fs';
+import path from 'node:path';
 import { UPLOAD_CONTENT_TYPES, writeImageAtomic } from './imageAssets.js';
-import { buildTrackMapSvgFromMas } from './masTrack.js';
+import { extractMasContent, parseMasWaypoints, generateTrackMapSvg } from './masTrack.js';
 
 const PSEUDO_RE = /^[a-zA-Z0-9_-]{3,32}$/;
 const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
@@ -394,6 +396,12 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
         reply.code(404).send({ error: 'TRACK_NOT_FOUND' });
         return;
       }
+      // A manually-uploaded image replaces whatever was there — including a
+      // previously .mas-generated map's "alt style" file, which writeImageAtomic
+      // doesn't know about (different basename). Left behind, it'd make the
+      // swap-style button below appear to work on a map that's no longer the
+      // one it was generated alongside.
+      fs.rmSync(path.join(TRACK_PHOTOS_DIR, `${req.params.slug}-map-alt.svg`), { force: true });
       if (await handleImageUpload(req, reply, TRACK_PHOTOS_DIR, `${req.params.slug}-map`)) {
         reply.send(await findTrackBySlug(req.params.slug));
       }
@@ -402,8 +410,12 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
 
   // Generates the map instead of accepting one directly — the upload is the
   // track's own .mas content file (game data, not an image), parsed for its
-  // [Waypoint] path and rendered to an SVG. See masTrack.ts for the format
-  // and the coordinate mapping verified against a real recorded GPS trace.
+  // [Waypoint] path. See masTrack.ts for the format, the coordinate mapping
+  // verified against a real recorded GPS trace, and the two render styles
+  // ('band': true road-width ribbon, 'edges': two edge lines + centerline).
+  // Both are generated up front — 'band' becomes the active map, 'edges' is
+  // stashed as "-map-alt.svg" so the swap-style route below can flip between
+  // them without needing the original .mas file again.
   app.post<{ Params: { slug: string } }>(
     '/api/admin/tracks/:slug/map-from-mas',
     { preHandler: requireAdmin },
@@ -422,14 +434,40 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
         return;
       }
       const buffer = await data.toBuffer();
-      let svg: string;
+      let bandSvg: string;
+      let edgesSvg: string;
       try {
-        svg = buildTrackMapSvgFromMas(buffer);
+        const track = parseMasWaypoints(extractMasContent(buffer).toString('utf8'));
+        bandSvg = generateTrackMapSvg(track, 'band');
+        edgesSvg = generateTrackMapSvg(track, 'edges');
       } catch {
         reply.code(400).send({ error: 'INVALID_MAS_FILE' });
         return;
       }
-      writeImageAtomic(TRACK_PHOTOS_DIR, `${req.params.slug}-map`, 'svg', Buffer.from(svg, 'utf8'));
+      writeImageAtomic(TRACK_PHOTOS_DIR, `${req.params.slug}-map`, 'svg', Buffer.from(bandSvg, 'utf8'));
+      fs.writeFileSync(path.join(TRACK_PHOTOS_DIR, `${req.params.slug}-map-alt.svg`), edgesSvg, 'utf8');
+      reply.send(await findTrackBySlug(req.params.slug));
+    },
+  );
+
+  app.post<{ Params: { slug: string } }>(
+    '/api/admin/tracks/:slug/map-swap-style',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      if (!(await findTrackBySlug(req.params.slug))) {
+        reply.code(404).send({ error: 'TRACK_NOT_FOUND' });
+        return;
+      }
+      const activePath = path.join(TRACK_PHOTOS_DIR, `${req.params.slug}-map.svg`);
+      const altPath = path.join(TRACK_PHOTOS_DIR, `${req.params.slug}-map-alt.svg`);
+      if (!fs.existsSync(activePath) || !fs.existsSync(altPath)) {
+        reply.code(400).send({ error: 'NO_ALT_MAP_STYLE' });
+        return;
+      }
+      const tmpPath = `${activePath}.swaptmp`;
+      fs.renameSync(activePath, tmpPath);
+      fs.renameSync(altPath, activePath);
+      fs.renameSync(tmpPath, altPath);
       reply.send(await findTrackBySlug(req.params.slug));
     },
   );

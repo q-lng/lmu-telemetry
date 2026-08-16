@@ -444,6 +444,18 @@ export function uploadTrackMapFromMas(slug: string, file: File): Promise<TrackCa
   return uploadImage(`/api/admin/tracks/${encodeURIComponent(slug)}/map-from-mas`, file);
 }
 
+// Flips between the two styles generated from a .mas upload ('band'/'edges'
+// — see masTrack.ts) without re-uploading the file. 400s if the current map
+// wasn't generated from a .mas (no alt style stashed alongside it).
+export async function swapTrackMapStyle(slug: string): Promise<TrackCatalogEntry> {
+  const res = await fetch(`/api/admin/tracks/${encodeURIComponent(slug)}/map-swap-style`, { method: 'POST' });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(tError((body as { error?: string }).error));
+  }
+  return res.json();
+}
+
 export function fetchCars(): Promise<CarCatalogEntry[]> {
   return getJson<{ cars: CarCatalogEntry[] }>('/api/cars').then((r) => r.cars);
 }
