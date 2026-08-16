@@ -484,6 +484,10 @@ export default function TelemetryViewer() {
   const [deltaByLapId, setDeltaByLapId] = useState<Record<string, (number | null)[]>>({});
   const [distRef, setDistRef] = useState<ChannelSeries | null>(null);
   const [gps, setGps] = useState<{ t: number[]; lat: number[]; lon: number[] } | null>(null);
+  // Compared laps' own GPS traces for the track map — see the fetch effect
+  // below. Keyed by ComparedLap.id, shape only (no distance/time alignment
+  // needed the way the channel comparisons below require).
+  const [comparedGps, setComparedGps] = useState<Record<string, { lat: number[]; lon: number[] }>>({});
   const [trackEntry, setTrackEntry] = useState<TrackCatalogEntry | null>(null);
   const [mapImage, setMapImage] = useState<HTMLImageElement | null>(null);
 
@@ -859,6 +863,46 @@ export default function TelemetryViewer() {
       cancelled = true;
     };
   }, [dataSource, effectiveRange]);
+
+  // Compared laps' own GPS traces for the track map — shape only, each
+  // lap's own lat/lon over its own startTs..endTs range. Simpler than the
+  // channel comparisons below (no distance/time resampling onto a shared
+  // grid needed) since the map just draws each lap's line in its own color.
+  useEffect(() => {
+    if (comparedLaps.length === 0) {
+      setComparedGps({});
+      return;
+    }
+    let cancelled = false;
+    Promise.all(
+      comparedLaps.map(async (cl) => {
+        const resolved = resolveComparedLapSource(cl);
+        if (!resolved) return null;
+        const { ds, lapInfo } = resolved;
+        const range = { from: lapInfo.startTs, to: lapInfo.endTs };
+        try {
+          const [latS, lonS] = await Promise.all([
+            ds.fetchChannelSeries('GPS Latitude', range),
+            ds.fetchChannelSeries('GPS Longitude', range),
+          ]);
+          return [cl.id, { lat: latS.values.value as number[], lon: lonS.values.value as number[] }] as const;
+        } catch {
+          return null;
+        }
+      }),
+    ).then((entries) => {
+      if (cancelled) return;
+      const next: Record<string, { lat: number[]; lon: number[] }> = {};
+      entries.forEach((entry) => {
+        if (entry) next[entry[0]] = entry[1];
+      });
+      setComparedGps(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataSource, externalSources, comparedLaps]);
 
   // Compared laps — every value column resampled onto the reference lap's
   // x-grid (multi-column/4-wheel channels included: each column is fetched and
@@ -1515,6 +1559,14 @@ export default function TelemetryViewer() {
     label: comparedLapLabel(cl),
     color: comparedLapColorAt(index),
   }));
+  // Each compared lap's own GPS trace for the track map, in the same color
+  // it already uses in the legend/graphs above.
+  const extraTraces = comparedLaps
+    .map((cl, index) => {
+      const g = comparedGps[cl.id];
+      return g ? { id: cl.id, color: comparedLapColorAt(index), lat: g.lat, lon: g.lon } : null;
+    })
+    .filter((tr): tr is { id: string; color: string; lat: number[]; lon: number[] } => tr !== null);
 
   const currentSession = selectedFile ? sessions.find((s) => s.file === selectedFile) : undefined;
   const currentSessionLabel = currentSession
@@ -2154,6 +2206,7 @@ export default function TelemetryViewer() {
                 viewRange={viewRange}
                 height={340}
                 mapImage={mapImage}
+                extraTraces={extraTraces}
                 mapCalibration={
                   trackEntry && {
                     rotationDeg: trackEntry.mapRotationDeg,

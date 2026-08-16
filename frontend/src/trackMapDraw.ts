@@ -12,6 +12,16 @@ export interface MapCalibration {
   scale: number;
 }
 
+/** A compared lap's own GPS trace, drawn in the same color it already uses
+ * in the legend/graphs (see TelemetryViewer's comparedLapColorAt) — shape
+ * only, no cursor dot or zoom-highlight (those stay primary-trace-only). */
+export interface ExtraTrace {
+  id: string;
+  color: string;
+  lat: number[];
+  lon: number[];
+}
+
 export interface DrawTrackMapOptions {
   width: number;
   height: number;
@@ -33,6 +43,25 @@ export interface DrawTrackMapOptions {
    * viewBox and are meant to be pixel-for-pixel co-registered, not
    * independently aligned. */
   idealLineImage?: HTMLImageElement | null;
+  /** Other laps currently being compared (see TelemetryViewer's
+   * comparedLaps) — each drawn in its own color, sharing the same bounding
+   * box/scale as the primary trace so they're all on one consistent map. */
+  extraTraces?: ExtraTrace[];
+}
+
+/** Loop-based instead of Math.min/max(...arr) — safe for the combined size
+ * of several laps' GPS arrays, where spreading into a function call risks
+ * blowing the engine's argument-count limit. */
+function minMax(arrays: number[][]): [number, number] {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const arr of arrays) {
+    for (const v of arr) {
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+  }
+  return [min, max];
 }
 
 /** Draws a session's GPS trace onto a 2D canvas context — optionally with the
@@ -41,13 +70,13 @@ export interface DrawTrackMapOptions {
  * the interactive AdminTrackCalibration.tsx share the exact same drawing
  * logic instead of maintaining two copies. */
 export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOptions): void {
-  const { width, height, lat, lon, t, cursorT, viewRange, mapImage, mapCalibration, idealLineImage } = opts;
+  const { width, height, lat, lon, t, cursorT, viewRange, mapImage, mapCalibration, idealLineImage, extraTraces } = opts;
   if (lat.length === 0) return;
 
-  const minLat = Math.min(...lat);
-  const maxLat = Math.max(...lat);
-  const minLon = Math.min(...lon);
-  const maxLon = Math.max(...lon);
+  // Union with any compared laps' traces so the bounding box/scale fits all
+  // of them, not just the primary one.
+  const [minLat, maxLat] = minMax([lat, ...(extraTraces?.map((tr) => tr.lat) ?? [])]);
+  const [minLon, maxLon] = minMax([lon, ...(extraTraces?.map((tr) => tr.lon) ?? [])]);
   const pad = 16;
   const spanLat = maxLat - minLat || 1;
   const spanLon = maxLon - minLon || 1;
@@ -129,6 +158,20 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOp
       ctx.drawImage(idealLineImage!, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
     }
     ctx.restore();
+  }
+
+  if (extraTraces) {
+    for (const trace of extraTraces) {
+      ctx.strokeStyle = trace.color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      trace.lat.forEach((la, i) => {
+        const [x, y] = toXY(la, trace.lon[i]);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    }
   }
 
   const fullMin = t[0];
