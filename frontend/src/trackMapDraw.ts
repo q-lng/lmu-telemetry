@@ -179,6 +179,39 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOp
   const tolerance = (fullMax - fullMin) * 0.005;
   const isZoomed = !!viewRange && (viewRange.min > fullMin + tolerance || viewRange.max < fullMax - tolerance);
 
+  if (isZoomed && viewRange) {
+    // Highlights the ROAD itself for the current zoomed-in section — a
+    // wide, translucent halo drawn over the map, under the trace — rather
+    // than thickening the trace's own line (which used to happen here and
+    // read as the trace changing shape/weight instead of a stretch of track
+    // being highlighted).
+    ctx.strokeStyle = 'rgba(255, 196, 0, 0.35)';
+    ctx.lineWidth = 7;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    let haloPenDown = false;
+    lat.forEach((la, i) => {
+      const inRange = t[i] >= viewRange.min && t[i] <= viewRange.max;
+      if (!inRange) {
+        haloPenDown = false;
+        return;
+      }
+      const [x, y] = toXY(la, lon[i]);
+      if (!haloPenDown) {
+        ctx.moveTo(x, y);
+        haloPenDown = true;
+      } else {
+        ctx.lineTo(x, y);
+      }
+    });
+    ctx.stroke();
+  }
+
+  // The trace itself always stays the same width — when zoomed, the
+  // in-range segment keeps full color while the rest dims, so the
+  // selection is still legible even without the halo, but nothing about
+  // the line's own thickness ever changes.
   ctx.strokeStyle = isZoomed ? 'rgba(57, 135, 229, 0.25)' : '#3987e5';
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -191,7 +224,7 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOp
 
   if (isZoomed && viewRange) {
     ctx.strokeStyle = '#3987e5';
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 1;
     ctx.beginPath();
     let penDown = false;
     lat.forEach((la, i) => {
