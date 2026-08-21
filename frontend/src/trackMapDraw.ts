@@ -47,6 +47,12 @@ export interface DrawTrackMapOptions {
    * comparedLaps) — each drawn in its own color, sharing the same bounding
    * box/scale as the primary trace so they're all on one consistent map. */
   extraTraces?: ExtraTrace[];
+  /** The primary/reference lap's own trace color — defaults to the
+   * long-standing fixed blue when omitted (SharedLap.tsx has no per-lap
+   * color concept to pass here). TelemetryViewer.tsx passes its reference
+   * lap's actual color (REFERENCE_UNIFORM_COLOR / the user's preference)
+   * so this trace matches the same identity compared laps already do. */
+  traceColor?: string;
 }
 
 /** Loop-based instead of Math.min/max(...arr) — safe for the combined size
@@ -70,7 +76,7 @@ function minMax(arrays: number[][]): [number, number] {
  * the interactive AdminTrackCalibration.tsx share the exact same drawing
  * logic instead of maintaining two copies. */
 export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOptions): void {
-  const { width, height, lat, lon, t, cursorT, viewRange, mapImage, mapCalibration, idealLineImage, extraTraces } = opts;
+  const { width, height, lat, lon, t, cursorT, viewRange, mapImage, mapCalibration, idealLineImage, extraTraces, traceColor = '#3987e5' } = opts;
   if (lat.length === 0) return;
 
   // Union with any compared laps' traces so the bounding box/scale fits all
@@ -163,7 +169,7 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOp
   if (extraTraces) {
     for (const trace of extraTraces) {
       ctx.strokeStyle = trace.color;
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 0.4;
       ctx.beginPath();
       trace.lat.forEach((la, i) => {
         const [x, y] = toXY(la, trace.lon[i]);
@@ -211,9 +217,12 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOp
   // The trace itself always stays the same width — when zoomed, the
   // in-range segment keeps full color while the rest dims, so the
   // selection is still legible even without the halo, but nothing about
-  // the line's own thickness ever changes.
-  ctx.strokeStyle = isZoomed ? 'rgba(57, 135, 229, 0.25)' : '#3987e5';
-  ctx.lineWidth = 1;
+  // the line's own thickness ever changes. Dimming via globalAlpha rather
+  // than baking a fixed blue into an rgba() string, since traceColor is
+  // caller-supplied (the reference lap's own color) and can be anything.
+  ctx.strokeStyle = traceColor;
+  ctx.globalAlpha = isZoomed ? 0.25 : 1;
+  ctx.lineWidth = 0.4;
   ctx.beginPath();
   lat.forEach((la, i) => {
     const [x, y] = toXY(la, lon[i]);
@@ -221,10 +230,11 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOp
     else ctx.lineTo(x, y);
   });
   ctx.stroke();
+  ctx.globalAlpha = 1;
 
   if (isZoomed && viewRange) {
-    ctx.strokeStyle = '#3987e5';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = traceColor;
+    ctx.lineWidth = 0.4;
     ctx.beginPath();
     let penDown = false;
     lat.forEach((la, i) => {

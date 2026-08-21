@@ -20,12 +20,16 @@ interface Props {
   /** Other laps currently being compared, each in its own color — see
    * TelemetryViewer.tsx's comparedLaps/comparedLapColorAt. */
   extraTraces?: ExtraTrace[];
+  /** The primary/reference lap's own trace color — omitted here falls back
+   * to the fixed blue in trackMapDraw.ts (SharedLap.tsx has no per-lap
+   * color concept to pass). */
+  traceColor?: string;
 }
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 6;
 
-export function TrackMap({ lat, lon, t, cursorT, viewRange, height = 260, mapImage, mapCalibration, extraTraces }: Props) {
+export function TrackMap({ lat, lon, t, cursorT, viewRange, height = 260, mapImage, mapCalibration, extraTraces, traceColor }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -55,8 +59,8 @@ export function TrackMap({ lat, lon, t, cursorT, viewRange, height = 260, mapIma
     ctx.translate(pan.x, pan.y);
     ctx.scale(zoom, zoom);
 
-    drawTrackMap(ctx, { width, height, lat, lon, t, cursorT, viewRange, mapImage, mapCalibration, extraTraces });
-  }, [lat, lon, t, cursorT, viewRange, height, mapImage, mapCalibration, extraTraces, zoom, pan]);
+    drawTrackMap(ctx, { width, height, lat, lon, t, cursorT, viewRange, mapImage, mapCalibration, extraTraces, traceColor });
+  }, [lat, lon, t, cursorT, viewRange, height, mapImage, mapCalibration, extraTraces, traceColor, zoom, pan]);
 
   // Wheel-to-zoom (centered on the cursor) + drag-to-pan once zoomed in — a
   // mount-once effect (stable listeners) using refs for the current
