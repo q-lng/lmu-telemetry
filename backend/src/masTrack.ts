@@ -217,6 +217,7 @@ export function buildTrackMapSvgFromMas(masBuffer: Buffer, style: MapStyle = 'ba
 export const DEFAULT_IDEAL_LINE_COLOR = '#ff6d00';
 const IDEAL_LINE_WIDTH_RATIO = 0.004;
 const IDEAL_LINE_STROKE_RE = /stroke="(#[0-9a-fA-F]{3,8})"/;
+const IDEAL_LINE_STROKE_WIDTH_RE = /stroke-width="([\d.]+)"/;
 
 /** The game's own ideal/fastest racing line (the "FASTEST" named AI path),
  * as a standalone SVG — kept separate from the map itself so it can be
@@ -243,4 +244,20 @@ export function extractIdealLineColor(svg: string): string | null {
  * geometry again — there's exactly one colored stroke in the file. */
 export function recolorIdealLineSvg(svg: string, color: string): string {
   return svg.replace(IDEAL_LINE_STROKE_RE, `stroke="${color}"`);
+}
+
+/** Reads back the stroke width an ideal-line SVG was last saved with — same
+ * derive-from-file approach as the color, no separate DB column needed. The
+ * admin can adjust this directly (a slider, not a fixed ratio) since the
+ * "right" width to actually see the line clearly varies enough per track
+ * that no single ratio-of-track-span looked right for every one of them. */
+export function extractIdealLineWidth(svg: string): number | null {
+  const match = svg.match(IDEAL_LINE_STROKE_WIDTH_RE);
+  return match ? Number(match[1]) : null;
+}
+
+/** Resizes an ideal-line SVG's stroke width in place — same rationale as
+ * recolorIdealLineSvg, just the other adjustable attribute. */
+export function resizeIdealLineSvg(svg: string, width: number): string {
+  return svg.replace(IDEAL_LINE_STROKE_WIDTH_RE, `stroke-width="${width}"`);
 }
