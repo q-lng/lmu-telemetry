@@ -4,7 +4,7 @@ import path from 'node:path';
 import { pgQuery } from './pg.js';
 import { DATA_DIR } from './db.js';
 import { resolveImageExt, serveImage, type ImageExt } from './imageAssets.js';
-import { extractIdealLineColor } from './masTrack.js';
+import { extractIdealLineColor, extractIdealLineWidth } from './masTrack.js';
 import { computeTrackTopLaps } from './leaderboard.js';
 
 export type { ImageExt };
@@ -22,10 +22,11 @@ export interface TrackCatalogEntry {
   mapOffsetX: number;
   mapOffsetY: number;
   mapScale: number;
-  // Color parsed back out of <slug>-idealline.svg (see masTrack.ts) rather
-  // than stored in its own DB column — null when no ideal-line overlay has
-  // been generated for this track yet.
+  // Parsed back out of <slug>-idealline.svg (see masTrack.ts) rather than
+  // stored in their own DB columns — both null when no ideal-line overlay
+  // has been generated for this track yet.
   idealLineColor: string | null;
+  idealLineWidth: number | null;
 }
 
 interface TrackRow {
@@ -52,17 +53,19 @@ const SELECT_TRACK_SQL = `
   LEFT JOIN dlcs d ON d.slug = t.dlc_slug
 `;
 
-function readIdealLineColor(slug: string): string | null {
+function readIdealLineMeta(slug: string): { color: string | null; width: number | null } {
   const filePath = path.join(TRACK_PHOTOS_DIR, `${slug}-idealline.svg`);
-  if (!fs.existsSync(filePath)) return null;
+  if (!fs.existsSync(filePath)) return { color: null, width: null };
   try {
-    return extractIdealLineColor(fs.readFileSync(filePath, 'utf8'));
+    const svg = fs.readFileSync(filePath, 'utf8');
+    return { color: extractIdealLineColor(svg), width: extractIdealLineWidth(svg) };
   } catch {
-    return null;
+    return { color: null, width: null };
   }
 }
 
 function withAssets(row: TrackRow): TrackCatalogEntry {
+  const idealLine = readIdealLineMeta(row.slug);
   return {
     slug: row.slug,
     name: row.name,
@@ -76,7 +79,8 @@ function withAssets(row: TrackRow): TrackCatalogEntry {
     mapOffsetX: row.map_offset_x,
     mapOffsetY: row.map_offset_y,
     mapScale: row.map_scale,
-    idealLineColor: readIdealLineColor(row.slug),
+    idealLineColor: idealLine.color,
+    idealLineWidth: idealLine.width,
   };
 }
 

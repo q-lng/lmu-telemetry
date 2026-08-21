@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { fetchSessions, fetchTrackCatalogEntry, setTrackIdealLineColor, updateAdminTrackMapCalibration } from '../api';
+import {
+  fetchSessions,
+  fetchTrackCatalogEntry,
+  setTrackIdealLineColor,
+  setTrackIdealLineWidth,
+  updateAdminTrackMapCalibration,
+} from '../api';
 import { createServerDataSource } from '../dataSource';
 import { drawTrackMap } from '../trackMapDraw';
 import { formatLapTime } from '../lapTime';
@@ -116,13 +122,13 @@ export function AdminTrackCalibration() {
     img.onload = () => {
       if (!cancelled) setIdealLineImage(img);
     };
-    // Cache-busted on the color itself — the filename never changes, only
-    // its content, and the color string is already a natural version marker.
-    img.src = `/api/track-photos/${entry.slug}-idealline.svg?c=${encodeURIComponent(entry.idealLineColor)}`;
+    // Cache-busted on color+width together — the filename never changes,
+    // only its content, and these two are already natural version markers.
+    img.src = `/api/track-photos/${entry.slug}-idealline.svg?c=${encodeURIComponent(entry.idealLineColor)}&w=${entry.idealLineWidth}`;
     return () => {
       cancelled = true;
     };
-  }, [entry?.slug, entry?.idealLineColor]);
+  }, [entry?.slug, entry?.idealLineColor, entry?.idealLineWidth]);
 
   async function handleIdealLineColorChange(color: string) {
     setIdealLineSaving(true);
@@ -134,6 +140,34 @@ export function AdminTrackCalibration() {
     } finally {
       setIdealLineSaving(false);
     }
+  }
+
+  // Local draft so the slider itself feels responsive while dragging —
+  // range inputs fire on every drag tick (React's onChange = native
+  // 'input', not 'change'), so saving on every tick would spam the API.
+  // Debounced instead of committing on mouseup/keyup so it works the same
+  // for mouse, touch, and keyboard adjustment alike.
+  const [idealLineWidthDraft, setIdealLineWidthDraft] = useState(entry?.idealLineWidth ?? 5);
+  const idealLineWidthTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (entry?.idealLineWidth != null) setIdealLineWidthDraft(entry.idealLineWidth);
+  }, [entry?.idealLineWidth]);
+
+  function handleIdealLineWidthChange(width: number) {
+    setIdealLineWidthDraft(width);
+    if (idealLineWidthTimeoutRef.current) clearTimeout(idealLineWidthTimeoutRef.current);
+    idealLineWidthTimeoutRef.current = setTimeout(async () => {
+      setIdealLineSaving(true);
+      setError(null);
+      try {
+        setEntry(await setTrackIdealLineWidth(slug, width));
+      } catch (err) {
+        setError((err as Error).message);
+      } finally {
+        setIdealLineSaving(false);
+      }
+    }, 400);
   }
 
   // Sessions matching the track's catalog name — same free-text match every
@@ -465,6 +499,33 @@ export function AdminTrackCalibration() {
                       disabled={idealLineSaving}
                       onChange={(e) => handleIdealLineColorChange(e.target.value)}
                     />
+                  </div>
+                  <div className="calibration-slider-row">
+                    <button
+                      type="button"
+                      className="modal-table-action"
+                      aria-label={t('adminTrackCalibration.decrease')}
+                      onClick={() => handleIdealLineWidthChange(clamp(roundTo(idealLineWidthDraft - 0.5, 0.5), 0.5, 30))}
+                    >
+                      −
+                    </button>
+                    <input
+                      type="range"
+                      min={0.5}
+                      max={30}
+                      step={0.5}
+                      value={idealLineWidthDraft}
+                      onChange={(e) => handleIdealLineWidthChange(Number(e.target.value))}
+                    />
+                    <button
+                      type="button"
+                      className="modal-table-action"
+                      aria-label={t('adminTrackCalibration.increase')}
+                      onClick={() => handleIdealLineWidthChange(clamp(roundTo(idealLineWidthDraft + 0.5, 0.5), 0.5, 30))}
+                    >
+                      +
+                    </button>
+                    <span className="field-hint">{idealLineWidthDraft.toFixed(1)}</span>
                   </div>
                 </div>
               )}

@@ -59,6 +59,7 @@ import {
   generateTrackMapSvg,
   generateIdealLineSvg,
   recolorIdealLineSvg,
+  resizeIdealLineSvg,
 } from './masTrack.js';
 
 const PSEUDO_RE = /^[a-zA-Z0-9_-]{3,32}$/;
@@ -479,6 +480,30 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
       }
       const recolored = recolorIdealLineSvg(fs.readFileSync(filePath, 'utf8'), color);
       fs.writeFileSync(filePath, recolored, 'utf8');
+      reply.send(await findTrackBySlug(req.params.slug));
+    },
+  );
+
+  app.patch<{ Params: { slug: string }; Body: { width?: number } }>(
+    '/api/admin/tracks/:slug/ideal-line-width',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      if (!(await findTrackBySlug(req.params.slug))) {
+        reply.code(404).send({ error: 'TRACK_NOT_FOUND' });
+        return;
+      }
+      const width = req.body?.width;
+      if (typeof width !== 'number' || !Number.isFinite(width) || width <= 0) {
+        reply.code(400).send({ error: 'INVALID_IDEAL_LINE_WIDTH' });
+        return;
+      }
+      const filePath = path.join(TRACK_PHOTOS_DIR, `${req.params.slug}-idealline.svg`);
+      if (!fs.existsSync(filePath)) {
+        reply.code(400).send({ error: 'NO_IDEAL_LINE' });
+        return;
+      }
+      const resized = resizeIdealLineSvg(fs.readFileSync(filePath, 'utf8'), width);
+      fs.writeFileSync(filePath, resized, 'utf8');
       reply.send(await findTrackBySlug(req.params.slug));
     },
   );

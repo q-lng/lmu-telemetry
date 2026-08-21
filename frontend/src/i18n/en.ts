@@ -504,6 +504,7 @@ export const en = {
   'errors.INVALID_MAS_FILE': "Couldn't read a track path from this .mas file",
   'errors.NO_ALT_MAP_STYLE': "This map wasn't generated from a .mas file, so there's no alternate style to swap to",
   'errors.NO_IDEAL_LINE': "This track has no ideal-line overlay yet — generate the map from a .mas file first",
+  'errors.INVALID_IDEAL_LINE_WIDTH': 'Invalid ideal line width',
   'errors.TRACK_NOT_FOUND': 'Track not found',
   'errors.FILE_TOO_LARGE': 'File too large',
   'errors.SERVER_ERROR': 'Something went wrong on the server',

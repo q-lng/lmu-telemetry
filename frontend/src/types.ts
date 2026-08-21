@@ -167,10 +167,14 @@ export interface TrackCatalogEntry {
   mapOffsetX: number;
   mapOffsetY: number;
   mapScale: number;
-  // Color of <slug>-idealline.svg (the game's own FASTEST-path racing line,
-  // generated alongside the map from a .mas upload — see
-  // backend/src/masTrack.ts) — null when no ideal-line overlay exists yet.
+  // Color/stroke-width of <slug>-idealline.svg (the game's own FASTEST-path
+  // racing line, generated alongside the map from a .mas upload — see
+  // backend/src/masTrack.ts) — both null when no ideal-line overlay exists
+  // yet. Width is in the SVG's own units (world meters, same as the map) —
+  // adjustable via a slider rather than a fixed ratio since no single
+  // ratio-of-track-span looked right across every track's own scale.
   idealLineColor: string | null;
+  idealLineWidth: number | null;
 }
 
 export interface CarCatalogEntry {

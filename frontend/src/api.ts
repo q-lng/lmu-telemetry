@@ -462,6 +462,10 @@ export function setTrackIdealLineColor(slug: string, color: string): Promise<Tra
   return patchJson<TrackCatalogEntry>(`/api/admin/tracks/${encodeURIComponent(slug)}/ideal-line-color`, { color });
 }
 
+export function setTrackIdealLineWidth(slug: string, width: number): Promise<TrackCatalogEntry> {
+  return patchJson<TrackCatalogEntry>(`/api/admin/tracks/${encodeURIComponent(slug)}/ideal-line-width`, { width });
+}
+
 export function fetchCars(): Promise<CarCatalogEntry[]> {
   return getJson<{ cars: CarCatalogEntry[] }>('/api/cars').then((r) => r.cars);
 }
