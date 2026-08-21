@@ -2,13 +2,24 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSiteSettings } from '../SiteSettingsContext';
 import { updateSiteSettings } from '../api';
-import type { SiteSettings } from '../types';
+import type { NavItemKey, SiteSettings } from '../types';
+import { NAV_ITEM_KEYS } from '../types';
 import { t } from '../i18n';
 import { CloseIcon } from '../components/icons';
 import { ColorPicker } from '../components/ColorPicker';
 import { DATA_FONT_CATALOG, FONT_CATALOG } from '../fonts';
 
 const MAX_PRESETS = 12;
+
+// Reuses the navbar's own labels (nav.*) rather than inventing separate
+// admin-only copy for the same items.
+const NAV_ITEM_LABEL_KEYS: Record<NavItemKey, 'nav.app' | 'nav.browse' | 'nav.leaderboard' | 'nav.content' | 'nav.mySessions'> = {
+  telemetry: 'nav.app',
+  browse: 'nav.browse',
+  leaderboard: 'nav.leaderboard',
+  content: 'nav.content',
+  mySessions: 'nav.mySessions',
+};
 
 /** Site-wide "Affichage" settings — a local draft committed with one Save
  * (rather than auto-saving each field like the users table) since these are
@@ -43,6 +54,15 @@ export function AdminDisplay() {
 
   function removePreset(index: number) {
     setDraft((d) => (d && d.accentPresets.length > 1 ? { ...d, accentPresets: d.accentPresets.filter((_, i) => i !== index) } : d));
+    setSaved(false);
+  }
+
+  function toggleNavItem(key: NavItemKey, visible: boolean) {
+    setDraft((d) => {
+      if (!d) return d;
+      const hiddenNavItems = visible ? d.hiddenNavItems.filter((k) => k !== key) : [...d.hiddenNavItems, key];
+      return { ...d, hiddenNavItems };
+    });
     setSaved(false);
   }
 
@@ -197,6 +217,24 @@ export function AdminDisplay() {
                   {t('admin.neonGlow')}
                 </label>
                 <p className="field-hint">{t('admin.neonGlowHint')}</p>
+              </div>
+
+              <div className="field">
+                <strong>{t('admin.navVisibility')}</strong>
+                <div className="admin-nav-visibility-list">
+                  {NAV_ITEM_KEYS.map((key) => (
+                    <label className="admin-toggle-row" key={key}>
+                      <input
+                        type="checkbox"
+                        className="checkbox-custom"
+                        checked={!draft.hiddenNavItems.includes(key)}
+                        onChange={(e) => toggleNavItem(key, e.target.checked)}
+                      />
+                      {t(NAV_ITEM_LABEL_KEYS[key])}
+                    </label>
+                  ))}
+                </div>
+                <p className="field-hint">{t('admin.navVisibilityHint')}</p>
               </div>
 
               <div className="admin-display-actions">

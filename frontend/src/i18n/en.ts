@@ -205,6 +205,8 @@ export const en = {
   'admin.removeColor': 'Remove this color',
   'admin.neonGlow': 'Neon glow effect',
   'admin.neonGlowHint': 'The glowing outline on buttons and accents. Disabling it site-wide affects every user.',
+  'admin.navVisibility': 'Navbar items',
+  'admin.navVisibilityHint': 'Unchecking an item hides it from the navbar for everyone, including guests.',
   'admin.save': 'Save',
   'admin.saved': 'Saved.',
 
@@ -496,6 +498,7 @@ export const en = {
   'errors.INVALID_VISIBILITY': 'Invalid visibility',
   'errors.INVALID_CAR': 'Invalid car',
   'errors.INVALID_MAP_CALIBRATION': 'Invalid map calibration values',
+  'errors.INVALID_NAV_ITEMS': 'Invalid navbar item selection',
   'errors.ACCESS_DENIED': 'Access denied',
   'errors.LAP_NOT_FOUND': 'Lap not found',
   'errors.NO_FILE_PROVIDED': 'No file provided',

@@ -69,3 +69,11 @@ ALTER TABLE site_settings VALIDATE CONSTRAINT site_settings_font_check;
 -- while the rest of the sidebar stayed on the site font; this replaces that
 -- fixed split with one explicit choice covering the entire page.
 ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS telemetry_font TEXT NOT NULL DEFAULT 'mono' CHECK (telemetry_font IN ('site', 'mono'));
+
+-- Top-level navbar items an admin has hidden (see siteSettings.ts's
+-- NAV_ITEM_KEYS) — validated at the app layer, not a DB CHECK, since
+-- checking every element of an array against a whitelist isn't a plain
+-- column CHECK the way the enum columns above are. Defaults to hiding
+-- 'leaderboard' — the page wasn't pulling its weight yet — reversible any
+-- time from the admin display settings.
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS hidden_nav_items TEXT[] NOT NULL DEFAULT ARRAY['leaderboard'];

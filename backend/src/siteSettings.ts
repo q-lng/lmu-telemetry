@@ -78,6 +78,12 @@ export const DATA_FONTS: DataFont[] = [
 export type TelemetryFontMode = 'site' | 'mono';
 export const TELEMETRY_FONT_MODES: TelemetryFontMode[] = ['site', 'mono'];
 
+// Top-level navbar items an admin can hide — 'home' isn't in this list (the
+// brand/landing link always shows), and 'content' covers the Tracks/Cars
+// dropdown as one toggle, not each of its two links separately.
+export type NavItemKey = 'telemetry' | 'browse' | 'leaderboard' | 'content' | 'mySessions';
+export const NAV_ITEM_KEYS: NavItemKey[] = ['telemetry', 'browse', 'leaderboard', 'content', 'mySessions'];
+
 export interface SiteSettings {
   siteName: string;
   font: SiteFont;
@@ -87,6 +93,7 @@ export interface SiteSettings {
   defaultAccentColor: string;
   accentPresets: string[];
   neonGlowEnabled: boolean;
+  hiddenNavItems: NavItemKey[];
 }
 
 interface SiteSettingsRow {
@@ -98,6 +105,7 @@ interface SiteSettingsRow {
   default_accent_color: string;
   accent_presets: string[];
   neon_glow_enabled: boolean;
+  hidden_nav_items: NavItemKey[];
 }
 
 function fromRow(r: SiteSettingsRow): SiteSettings {
@@ -110,6 +118,7 @@ function fromRow(r: SiteSettingsRow): SiteSettings {
     defaultAccentColor: r.default_accent_color,
     accentPresets: r.accent_presets,
     neonGlowEnabled: r.neon_glow_enabled,
+    hiddenNavItems: r.hidden_nav_items,
   };
 }
 
@@ -127,6 +136,7 @@ export interface SiteSettingsPatch {
   defaultAccentColor?: string;
   accentPresets?: string[];
   neonGlowEnabled?: boolean;
+  hiddenNavItems?: NavItemKey[];
 }
 
 export async function updateSiteSettings(patch: SiteSettingsPatch): Promise<SiteSettings> {
@@ -163,6 +173,10 @@ export async function updateSiteSettings(patch: SiteSettingsPatch): Promise<Site
   if (patch.neonGlowEnabled !== undefined) {
     params.push(patch.neonGlowEnabled);
     sets.push(`neon_glow_enabled = $${params.length}`);
+  }
+  if (patch.hiddenNavItems !== undefined) {
+    params.push(patch.hiddenNavItems);
+    sets.push(`hidden_nav_items = $${params.length}`);
   }
   if (sets.length === 0) return getSiteSettings();
   const rows = await pgQuery<SiteSettingsRow>(`UPDATE site_settings SET ${sets.join(', ')} WHERE id = 1 RETURNING *`, params);

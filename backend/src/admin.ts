@@ -18,9 +18,11 @@ import {
   SITE_FONTS,
   DATA_FONTS,
   TELEMETRY_FONT_MODES,
+  NAV_ITEM_KEYS,
   type SiteFont,
   type DataFont,
   type TelemetryFontMode,
+  type NavItemKey,
   type SiteSettingsPatch,
 } from './siteSettings.js';
 import {
@@ -203,10 +205,20 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
       defaultAccentColor?: string;
       accentPresets?: string[];
       neonGlowEnabled?: boolean;
+      hiddenNavItems?: string[];
     };
   }>('/api/admin/site-settings', { preHandler: requireAdmin }, async (req, reply) => {
-    const { siteName, font, dataFont, telemetryFont, fontSizeScale, defaultAccentColor, accentPresets, neonGlowEnabled } =
-      req.body ?? {};
+    const {
+      siteName,
+      font,
+      dataFont,
+      telemetryFont,
+      fontSizeScale,
+      defaultAccentColor,
+      accentPresets,
+      neonGlowEnabled,
+      hiddenNavItems,
+    } = req.body ?? {};
     const patch: SiteSettingsPatch = {};
 
     if (siteName !== undefined) {
@@ -266,6 +278,13 @@ export async function registerAdmin(app: FastifyInstance): Promise<void> {
     }
     if (neonGlowEnabled !== undefined) {
       patch.neonGlowEnabled = neonGlowEnabled;
+    }
+    if (hiddenNavItems !== undefined) {
+      if (!Array.isArray(hiddenNavItems) || !hiddenNavItems.every((k) => NAV_ITEM_KEYS.includes(k as NavItemKey))) {
+        reply.code(400).send({ error: 'INVALID_NAV_ITEMS' });
+        return;
+      }
+      patch.hiddenNavItems = hiddenNavItems as NavItemKey[];
     }
 
     reply.send(await updateSiteSettings(patch));
