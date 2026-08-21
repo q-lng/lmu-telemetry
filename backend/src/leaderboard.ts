@@ -5,7 +5,12 @@ import { getLaps, type LapInfo } from './channels.js';
 import { listLmuPseudoMatches } from './users.js';
 import { listLiveryToCarSlug, resolveCarSlug } from './carResolution.js';
 
-export type LeaderboardClass = 'hypercar' | 'lmp2' | 'lmp3' | 'gte' | 'gt3' | 'unknown';
+// 'lmp2' is a fallback bucket, not a real series — for sessions whose car
+// couldn't be resolved via the catalog (see resolveCar), only a raw
+// "LMP2" telemetry string, which carries no WEC/ELMS distinction. Whenever
+// the catalog *does* know the car, it lands in 'lmp2-wec'/'lmp2-elms'
+// directly (see catalogCategoryToLeaderboardClass).
+export type LeaderboardClass = 'hypercar' | 'lmp2-wec' | 'lmp2-elms' | 'lmp2' | 'lmp3' | 'gte' | 'gt3' | 'unknown';
 
 export interface LeaderboardEntry {
   track: string;
@@ -24,8 +29,9 @@ export interface LeaderboardEntry {
 // into 'unknown' rather than being dropped, so gaps are visible in the UI and
 // this map can be extended as real values are observed. Not tied to the
 // cars.category catalog enum (gte/gt3/lmp3/lmp2-wec/lmp2-elms/hypercar):
-// telemetry can't distinguish LMP2 WEC vs ELMS, so this feature uses one flat
-// 'lmp2' bucket instead.
+// the raw telemetry string alone can't distinguish LMP2 WEC vs ELMS, so this
+// path always lands in the generic 'lmp2' fallback — only a catalog match
+// (see catalogCategoryToLeaderboardClass) can resolve the real series.
 const CAR_CLASS_ALIASES: Record<string, LeaderboardClass> = {
   Hyper: 'hypercar',
   Hypercar: 'hypercar',
@@ -43,12 +49,12 @@ function normalizeCarClass(raw: string | undefined): LeaderboardClass {
   return CAR_CLASS_ALIASES[raw.trim()] ?? 'unknown';
 }
 
-/** Collapses the cars catalog's category enum onto LeaderboardClass —
- * identical for gte/gt3/lmp3/hypercar, lmp2-wec/lmp2-elms both flatten to
- * the same 'lmp2' bucket this feature already uses (telemetry-derived
- * classing can't distinguish the two anyway, see normalizeCarClass above). */
+/** Maps the cars catalog's category enum onto LeaderboardClass — identical
+ * for gte/gt3/lmp3/hypercar; lmp2-wec/lmp2-elms carry straight through as
+ * their own distinct classes here, unlike the raw-telemetry-only fallback
+ * in normalizeCarClass above, which can't tell them apart. */
 function catalogCategoryToLeaderboardClass(category: string): LeaderboardClass {
-  if (category === 'lmp2-wec' || category === 'lmp2-elms') return 'lmp2';
+  if (category === 'lmp2-wec' || category === 'lmp2-elms') return category;
   if (category === 'gte' || category === 'gt3' || category === 'lmp3' || category === 'hypercar') return category;
   return 'unknown';
 }
@@ -146,41 +152,6 @@ async function buildEntry(
   };
 }
 
-/** Every valid lap in a file, not just its best — a "top N laps" board needs
- * individual laps (a single session can legitimately place more than once,
- * e.g. several of one driver's own laps beating everyone else's), unlike
- * computeLeaderboard's one-record-per-group which only ever wants each
- * file's single best. */
-async function buildAllValidEntries(
-  f: PublicFile,
-  carInfo: Map<string, CarInfo>,
-  liveryMap: Map<string, string>,
-): Promise<LeaderboardEntry[]> {
-  const [meta, laps] = await Promise.all([
-    getSessionMetadata(f.filename).catch(() => null),
-    getLaps(f.filename).catch(() => []),
-  ]);
-  if (!meta) return [];
-  const track = meta.info.TrackName;
-  if (!track) return [];
-  const carSlug = resolveCarSlug(f, liveryMap);
-  const { car, carClass } = resolveCar(carSlug, meta.info.CarName ?? null, meta.info.CarClass, carInfo);
-  const driverName = meta.info.DriverName ?? null;
-  return laps
-    .filter((l) => l.lapTime) // excludes null and 0 (game-invalidated)
-    .map((l) => ({
-      track,
-      carClass,
-      car,
-      driverName,
-      lapTime: l.lapTime!,
-      lapNumber: l.lap,
-      filename: f.filename,
-      uploadedAt: f.uploadedAt,
-      matchedUser: null, // resolved afterwards, once per request — see resolveMatchedUsers
-    }));
-}
-
 /** Resolves each entry's matchedUser in place by comparing its driverName
  * (trim+lowercase) against every registered lmu_pseudo — done once per
  * request over the final entry list, not per file, since it's a single small
@@ -219,9 +190,13 @@ export async function computeLeaderboard(): Promise<LeaderboardEntry[]> {
   return result;
 }
 
-/** Top `limit` laps per car class, scoped to one track — classes with zero
- * public valid laps on this track are omitted entirely rather than included
- * as empty arrays, so the UI never renders a section with nothing in it. */
+/** Top `limit` laps per car class, scoped to one track, one entry per
+ * driver — each driver's own personal best across every session they've
+ * uploaded on this track, not every lap or every session separately (a
+ * driver who ran 5 sessions here shouldn't take 5 of the 10 leaderboard
+ * slots for one class). Classes with zero public valid laps on this track
+ * are omitted entirely rather than included as empty arrays, so the UI
+ * never renders a section with nothing in it. */
 export async function computeTrackTopLaps(
   trackName: string,
   limit = 10,
@@ -231,12 +206,25 @@ export async function computeTrackTopLaps(
     listCarInfo(),
     listLiveryToCarSlug(),
   ]);
-  const perFile = await Promise.all(files.map((f) => buildAllValidEntries(f, carInfo, liveryMap)));
-  const flat = perFile.flat();
-  await resolveMatchedUsers(flat);
+  const perFile = await Promise.all(files.map((f) => buildEntry(f, carInfo, liveryMap)));
+
+  const bestByDriver = new Map<string, LeaderboardEntry>();
+  for (const entry of perFile) {
+    if (!entry) continue;
+    // Anonymous (no DriverName recorded) sessions aren't deduped against
+    // each other — falling back to a shared key would collapse distinct
+    // anonymous drivers into one, discarding real entries.
+    const driverKey = entry.driverName ? entry.driverName.trim().toLowerCase() : `file:${entry.filename}`;
+    const key = `${entry.carClass}::${driverKey}`;
+    const existing = bestByDriver.get(key);
+    if (!existing || entry.lapTime < existing.lapTime) bestByDriver.set(key, entry);
+  }
+
+  const deduped = [...bestByDriver.values()];
+  await resolveMatchedUsers(deduped);
 
   const byClass = new Map<LeaderboardClass, LeaderboardEntry[]>();
-  for (const entry of flat) {
+  for (const entry of deduped) {
     const list = byClass.get(entry.carClass) ?? [];
     list.push(entry);
     byClass.set(entry.carClass, list);

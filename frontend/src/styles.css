@@ -1656,10 +1656,23 @@ body {
   object-fit: contain;
 }
 
+/* Caps its own width and centers itself on the track page, rather than
+   stretching edge-to-edge like the hero/session-table sections above and
+   below it (see .page-shell's own comment: individual sections center
+   themselves, not the shell). */
+.track-leaderboard {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .track-leaderboard-class {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
   margin-bottom: 16px;
 }

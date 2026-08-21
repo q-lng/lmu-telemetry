@@ -12,33 +12,55 @@ interface Props {
   slug: string;
 }
 
-/** One ranked mini-table per car class present on this track — classes with
- * no public valid laps here are simply absent from the response, not shown
- * as empty sections (see backend/src/leaderboard.ts's computeTrackTopLaps). */
+/** One ranked mini-table per car class, switched via tabs (the `.segmented`
+ * control) rather than all stacked at once. Every REAL class always gets
+ * its own tab, even ones with zero public valid laps on this track (the
+ * backend omits those from the response entirely — see
+ * backend/src/leaderboard.ts's computeTrackTopLaps) — picking such a tab
+ * just shows a placeholder instead of an empty table, rather than the tab
+ * disappearing depending on what's been uploaded so far. 'unknown' and
+ * plain 'lmp2' aren't real classes (just fallback buckets — for an
+ * unresolved car, and for an LMP2 car with no WEC/ELMS distinction
+ * available, respectively — see LeaderboardClass), so unlike the others
+ * they stay hidden unless they actually have something in them. */
 export function TrackLeaderboard({ slug }: Props) {
   const [classes, setClasses] = useState<Partial<Record<LeaderboardClass, LeaderboardEntry[]>>>({});
   const [loading, setLoading] = useState(true);
+  const [activeClass, setActiveClass] = useState<LeaderboardClass>(LEADERBOARD_CLASS_ORDER[0]);
 
   useEffect(() => {
     setLoading(true);
     fetchTrackLeaderboard(slug)
-      .then(setClasses)
+      .then((next) => {
+        setClasses(next);
+        // Lands on the first class that actually has data, so switching
+        // tracks doesn't default to an empty tab when a populated one exists.
+        const present = LEADERBOARD_CLASS_ORDER.filter((cls) => next[cls]?.length);
+        setActiveClass(present[0] ?? LEADERBOARD_CLASS_ORDER[0]);
+      })
       .finally(() => setLoading(false));
   }, [slug]);
 
   if (loading) return null;
 
-  const present = LEADERBOARD_CLASS_ORDER.filter((cls) => classes[cls]?.length);
-
-  if (present.length === 0) {
-    return <p className="field-hint">{t('track.leaderboardEmpty')}</p>;
-  }
+  const entries = classes[activeClass] ?? [];
+  const fallbackClasses: LeaderboardClass[] = ['lmp2', 'unknown'];
+  const tabs = LEADERBOARD_CLASS_ORDER.filter((cls) => !fallbackClasses.includes(cls) || classes[cls]?.length);
 
   return (
-    <>
-      {present.map((cls) => (
-        <div key={cls} className="track-leaderboard-class">
-          <Badge tone={LEADERBOARD_CLASS_TONES[cls]}>{LEADERBOARD_CLASS_LABELS[cls]}</Badge>
+    <div className="track-leaderboard">
+      <div className="segmented track-leaderboard-tabs">
+        {tabs.map((cls) => (
+          <button key={cls} className={cls === activeClass ? 'active' : ''} onClick={() => setActiveClass(cls)}>
+            {LEADERBOARD_CLASS_LABELS[cls]}
+          </button>
+        ))}
+      </div>
+      <div className="track-leaderboard-class">
+        <Badge tone={LEADERBOARD_CLASS_TONES[activeClass]}>{LEADERBOARD_CLASS_LABELS[activeClass]}</Badge>
+        {entries.length === 0 ? (
+          <p className="field-hint">{t('track.leaderboardClassEmpty')}</p>
+        ) : (
           <div className="modal-table-wrap">
             <table className="modal-table">
               <thead>
@@ -51,7 +73,7 @@ export function TrackLeaderboard({ slug }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {classes[cls]!.map((entry, i) => (
+                {entries.map((entry, i) => (
                   <tr key={`${entry.filename}-${entry.lapNumber}`}>
                     <td>{i + 1}</td>
                     <td>
@@ -69,8 +91,8 @@ export function TrackLeaderboard({ slug }: Props) {
               </tbody>
             </table>
           </div>
-        </div>
-      ))}
-    </>
+        )}
+      </div>
+    </div>
   );
 }
