@@ -13,12 +13,15 @@ interface Props {
 }
 
 /** One ranked mini-table per car class, switched via tabs (the `.segmented`
- * control) rather than all stacked at once. Every class always gets its own
- * tab, even ones with zero public valid laps on this track (the backend
- * omits those from the response entirely — see
+ * control) rather than all stacked at once. Every REAL class always gets
+ * its own tab, even ones with zero public valid laps on this track (the
+ * backend omits those from the response entirely — see
  * backend/src/leaderboard.ts's computeTrackTopLaps) — picking such a tab
  * just shows a placeholder instead of an empty table, rather than the tab
- * disappearing depending on what's been uploaded so far. */
+ * disappearing depending on what's been uploaded so far. 'unknown' isn't a
+ * real class (just the fallback bucket for laps whose car couldn't be
+ * resolved to one), so unlike the others it stays hidden unless it
+ * actually has something in it. */
 export function TrackLeaderboard({ slug }: Props) {
   const [classes, setClasses] = useState<Partial<Record<LeaderboardClass, LeaderboardEntry[]>>>({});
   const [loading, setLoading] = useState(true);
@@ -40,11 +43,12 @@ export function TrackLeaderboard({ slug }: Props) {
   if (loading) return null;
 
   const entries = classes[activeClass] ?? [];
+  const tabs = LEADERBOARD_CLASS_ORDER.filter((cls) => cls !== 'unknown' || classes.unknown?.length);
 
   return (
     <div className="track-leaderboard">
       <div className="segmented track-leaderboard-tabs">
-        {LEADERBOARD_CLASS_ORDER.map((cls) => (
+        {tabs.map((cls) => (
           <button key={cls} className={cls === activeClass ? 'active' : ''} onClick={() => setActiveClass(cls)}>
             {LEADERBOARD_CLASS_LABELS[cls]}
           </button>
