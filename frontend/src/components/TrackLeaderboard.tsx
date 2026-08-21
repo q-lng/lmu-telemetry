@@ -18,10 +18,11 @@ interface Props {
  * backend omits those from the response entirely — see
  * backend/src/leaderboard.ts's computeTrackTopLaps) — picking such a tab
  * just shows a placeholder instead of an empty table, rather than the tab
- * disappearing depending on what's been uploaded so far. 'unknown' isn't a
- * real class (just the fallback bucket for laps whose car couldn't be
- * resolved to one), so unlike the others it stays hidden unless it
- * actually has something in it. */
+ * disappearing depending on what's been uploaded so far. 'unknown' and
+ * plain 'lmp2' aren't real classes (just fallback buckets — for an
+ * unresolved car, and for an LMP2 car with no WEC/ELMS distinction
+ * available, respectively — see LeaderboardClass), so unlike the others
+ * they stay hidden unless they actually have something in them. */
 export function TrackLeaderboard({ slug }: Props) {
   const [classes, setClasses] = useState<Partial<Record<LeaderboardClass, LeaderboardEntry[]>>>({});
   const [loading, setLoading] = useState(true);
@@ -43,7 +44,8 @@ export function TrackLeaderboard({ slug }: Props) {
   if (loading) return null;
 
   const entries = classes[activeClass] ?? [];
-  const tabs = LEADERBOARD_CLASS_ORDER.filter((cls) => cls !== 'unknown' || classes.unknown?.length);
+  const fallbackClasses: LeaderboardClass[] = ['lmp2', 'unknown'];
+  const tabs = LEADERBOARD_CLASS_ORDER.filter((cls) => !fallbackClasses.includes(cls) || classes[cls]?.length);
 
   return (
     <div className="track-leaderboard">

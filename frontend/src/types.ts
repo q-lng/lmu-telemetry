@@ -260,11 +260,14 @@ export interface SharedLapResult {
   car: string | null;
 }
 
-// Not the same taxonomy as CarCategory (which distinguishes lmp2-wec/lmp2-elms
-// via the cars catalog) — this comes from the DuckDB file's own metadata.CarClass
-// value, normalized by a small alias map in backend/src/leaderboard.ts. LMP2 is
-// intentionally one flat bucket here since telemetry can't tell WEC from ELMS.
-export type LeaderboardClass = 'hypercar' | 'lmp2' | 'lmp3' | 'gte' | 'gt3' | 'unknown';
+// Mostly mirrors CarCategory (the cars catalog's taxonomy, which already
+// distinguishes lmp2-wec/lmp2-elms) — whenever a session's car resolves to
+// a catalog entry it carries the real lmp2-wec/lmp2-elms class straight
+// through. Plain 'lmp2' stays as a fallback bucket for sessions with no
+// catalog match, going only off the DuckDB file's own metadata.CarClass
+// string (normalized by a small alias map in backend/src/leaderboard.ts),
+// which carries no WEC/ELMS marker to go by.
+export type LeaderboardClass = 'hypercar' | 'lmp2-wec' | 'lmp2-elms' | 'lmp2' | 'lmp3' | 'gte' | 'gt3' | 'unknown';
 
 export interface LeaderboardEntry {
   track: string;

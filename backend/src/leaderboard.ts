@@ -5,7 +5,12 @@ import { getLaps, type LapInfo } from './channels.js';
 import { listLmuPseudoMatches } from './users.js';
 import { listLiveryToCarSlug, resolveCarSlug } from './carResolution.js';
 
-export type LeaderboardClass = 'hypercar' | 'lmp2' | 'lmp3' | 'gte' | 'gt3' | 'unknown';
+// 'lmp2' is a fallback bucket, not a real series — for sessions whose car
+// couldn't be resolved via the catalog (see resolveCar), only a raw
+// "LMP2" telemetry string, which carries no WEC/ELMS distinction. Whenever
+// the catalog *does* know the car, it lands in 'lmp2-wec'/'lmp2-elms'
+// directly (see catalogCategoryToLeaderboardClass).
+export type LeaderboardClass = 'hypercar' | 'lmp2-wec' | 'lmp2-elms' | 'lmp2' | 'lmp3' | 'gte' | 'gt3' | 'unknown';
 
 export interface LeaderboardEntry {
   track: string;
@@ -24,8 +29,9 @@ export interface LeaderboardEntry {
 // into 'unknown' rather than being dropped, so gaps are visible in the UI and
 // this map can be extended as real values are observed. Not tied to the
 // cars.category catalog enum (gte/gt3/lmp3/lmp2-wec/lmp2-elms/hypercar):
-// telemetry can't distinguish LMP2 WEC vs ELMS, so this feature uses one flat
-// 'lmp2' bucket instead.
+// the raw telemetry string alone can't distinguish LMP2 WEC vs ELMS, so this
+// path always lands in the generic 'lmp2' fallback — only a catalog match
+// (see catalogCategoryToLeaderboardClass) can resolve the real series.
 const CAR_CLASS_ALIASES: Record<string, LeaderboardClass> = {
   Hyper: 'hypercar',
   Hypercar: 'hypercar',
@@ -43,12 +49,12 @@ function normalizeCarClass(raw: string | undefined): LeaderboardClass {
   return CAR_CLASS_ALIASES[raw.trim()] ?? 'unknown';
 }
 
-/** Collapses the cars catalog's category enum onto LeaderboardClass —
- * identical for gte/gt3/lmp3/hypercar, lmp2-wec/lmp2-elms both flatten to
- * the same 'lmp2' bucket this feature already uses (telemetry-derived
- * classing can't distinguish the two anyway, see normalizeCarClass above). */
+/** Maps the cars catalog's category enum onto LeaderboardClass — identical
+ * for gte/gt3/lmp3/hypercar; lmp2-wec/lmp2-elms carry straight through as
+ * their own distinct classes here, unlike the raw-telemetry-only fallback
+ * in normalizeCarClass above, which can't tell them apart. */
 function catalogCategoryToLeaderboardClass(category: string): LeaderboardClass {
-  if (category === 'lmp2-wec' || category === 'lmp2-elms') return 'lmp2';
+  if (category === 'lmp2-wec' || category === 'lmp2-elms') return category;
   if (category === 'gte' || category === 'gt3' || category === 'lmp3' || category === 'hypercar') return category;
   return 'unknown';
 }
