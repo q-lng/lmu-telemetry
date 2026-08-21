@@ -2207,6 +2207,7 @@ export default function TelemetryViewer() {
                 height={340}
                 mapImage={mapImage}
                 extraTraces={extraTraces}
+                traceColor={preferredReferenceLapColor ?? REFERENCE_UNIFORM_COLOR}
                 mapCalibration={
                   trackEntry && {
                     rotationDeg: trackEntry.mapRotationDeg,
