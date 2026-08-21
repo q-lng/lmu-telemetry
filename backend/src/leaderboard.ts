@@ -146,41 +146,6 @@ async function buildEntry(
   };
 }
 
-/** Every valid lap in a file, not just its best — a "top N laps" board needs
- * individual laps (a single session can legitimately place more than once,
- * e.g. several of one driver's own laps beating everyone else's), unlike
- * computeLeaderboard's one-record-per-group which only ever wants each
- * file's single best. */
-async function buildAllValidEntries(
-  f: PublicFile,
-  carInfo: Map<string, CarInfo>,
-  liveryMap: Map<string, string>,
-): Promise<LeaderboardEntry[]> {
-  const [meta, laps] = await Promise.all([
-    getSessionMetadata(f.filename).catch(() => null),
-    getLaps(f.filename).catch(() => []),
-  ]);
-  if (!meta) return [];
-  const track = meta.info.TrackName;
-  if (!track) return [];
-  const carSlug = resolveCarSlug(f, liveryMap);
-  const { car, carClass } = resolveCar(carSlug, meta.info.CarName ?? null, meta.info.CarClass, carInfo);
-  const driverName = meta.info.DriverName ?? null;
-  return laps
-    .filter((l) => l.lapTime) // excludes null and 0 (game-invalidated)
-    .map((l) => ({
-      track,
-      carClass,
-      car,
-      driverName,
-      lapTime: l.lapTime!,
-      lapNumber: l.lap,
-      filename: f.filename,
-      uploadedAt: f.uploadedAt,
-      matchedUser: null, // resolved afterwards, once per request — see resolveMatchedUsers
-    }));
-}
-
 /** Resolves each entry's matchedUser in place by comparing its driverName
  * (trim+lowercase) against every registered lmu_pseudo — done once per
  * request over the final entry list, not per file, since it's a single small
@@ -219,9 +184,13 @@ export async function computeLeaderboard(): Promise<LeaderboardEntry[]> {
   return result;
 }
 
-/** Top `limit` laps per car class, scoped to one track — classes with zero
- * public valid laps on this track are omitted entirely rather than included
- * as empty arrays, so the UI never renders a section with nothing in it. */
+/** Top `limit` laps per car class, scoped to one track, one entry per
+ * driver — each driver's own personal best across every session they've
+ * uploaded on this track, not every lap or every session separately (a
+ * driver who ran 5 sessions here shouldn't take 5 of the 10 leaderboard
+ * slots for one class). Classes with zero public valid laps on this track
+ * are omitted entirely rather than included as empty arrays, so the UI
+ * never renders a section with nothing in it. */
 export async function computeTrackTopLaps(
   trackName: string,
   limit = 10,
@@ -231,12 +200,25 @@ export async function computeTrackTopLaps(
     listCarInfo(),
     listLiveryToCarSlug(),
   ]);
-  const perFile = await Promise.all(files.map((f) => buildAllValidEntries(f, carInfo, liveryMap)));
-  const flat = perFile.flat();
-  await resolveMatchedUsers(flat);
+  const perFile = await Promise.all(files.map((f) => buildEntry(f, carInfo, liveryMap)));
+
+  const bestByDriver = new Map<string, LeaderboardEntry>();
+  for (const entry of perFile) {
+    if (!entry) continue;
+    // Anonymous (no DriverName recorded) sessions aren't deduped against
+    // each other — falling back to a shared key would collapse distinct
+    // anonymous drivers into one, discarding real entries.
+    const driverKey = entry.driverName ? entry.driverName.trim().toLowerCase() : `file:${entry.filename}`;
+    const key = `${entry.carClass}::${driverKey}`;
+    const existing = bestByDriver.get(key);
+    if (!existing || entry.lapTime < existing.lapTime) bestByDriver.set(key, entry);
+  }
+
+  const deduped = [...bestByDriver.values()];
+  await resolveMatchedUsers(deduped);
 
   const byClass = new Map<LeaderboardClass, LeaderboardEntry[]>();
-  for (const entry of flat) {
+  for (const entry of deduped) {
     const list = byClass.get(entry.carClass) ?? [];
     list.push(entry);
     byClass.set(entry.carClass, list);
