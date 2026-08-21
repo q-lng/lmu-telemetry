@@ -252,7 +252,7 @@ export const en = {
   'track.notFound': 'Track not found.',
   'track.photoComingSoon': 'Photo coming soon',
   'track.leaderboard': 'Top 10 laps',
-  'track.leaderboardEmpty': 'No public laps recorded on this track yet.',
+  'track.leaderboardClassEmpty': 'No public laps recorded in this class yet.',
   'track.leaderboardRank': 'Rank',
   'track.leaderboardDriver': 'Driver',
   'track.leaderboardCar': 'Car',
