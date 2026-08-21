@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { useSiteSettings } from '../SiteSettingsContext';
 import { searchAll } from '../api';
-import type { SearchResults } from '../types';
+import type { NavItemKey, SearchResults } from '../types';
 import { t } from '../i18n';
 import { AccentPicker } from './AccentPicker';
 import { AccountMenu } from './AccountMenu';
@@ -26,6 +26,11 @@ export function Navbar() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const siteName = siteSettings?.siteName ?? t('brand');
+  // Settings haven't loaded yet -> nothing's hidden, matching how every
+  // other siteSettings-derived default already falls back before load.
+  function isNavItemHidden(key: NavItemKey): boolean {
+    return siteSettings?.hiddenNavItems?.includes(key) ?? false;
+  }
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -186,17 +191,23 @@ export function Navbar() {
               <Link to="/" aria-current={pathname === '/' ? 'page' : undefined}>
                 {t('nav.home')}
               </Link>
-              <Link to="/telemetry" aria-current={pathname === '/telemetry' ? 'page' : undefined}>
-                {t('nav.app')}
-              </Link>
-              <Link to="/browse" aria-current={pathname === '/browse' ? 'page' : undefined}>
-                {t('nav.browse')}
-              </Link>
-              <Link to="/leaderboard" aria-current={pathname === '/leaderboard' ? 'page' : undefined}>
-                {t('nav.leaderboard')}
-              </Link>
-              <ContentMenu />
-              {user && (
+              {!isNavItemHidden('telemetry') && (
+                <Link to="/telemetry" aria-current={pathname === '/telemetry' ? 'page' : undefined}>
+                  {t('nav.app')}
+                </Link>
+              )}
+              {!isNavItemHidden('browse') && (
+                <Link to="/browse" aria-current={pathname === '/browse' ? 'page' : undefined}>
+                  {t('nav.browse')}
+                </Link>
+              )}
+              {!isNavItemHidden('leaderboard') && (
+                <Link to="/leaderboard" aria-current={pathname === '/leaderboard' ? 'page' : undefined}>
+                  {t('nav.leaderboard')}
+                </Link>
+              )}
+              {!isNavItemHidden('content') && <ContentMenu />}
+              {user && !isNavItemHidden('mySessions') && (
                 <Link to="/my-sessions" aria-current={pathname === '/my-sessions' ? 'page' : undefined}>
                   {t('nav.mySessions')}
                 </Link>

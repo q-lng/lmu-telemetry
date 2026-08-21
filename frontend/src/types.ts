@@ -57,6 +57,13 @@ export type DataFont =
 // graph) uses, as one choice — see backend/src/siteSettings.ts.
 export type TelemetryFontMode = 'site' | 'mono';
 
+// Top-level navbar items an admin can hide — mirrors backend/src/siteSettings.ts's
+// NAV_ITEM_KEYS. 'home' isn't included (the brand/landing link always shows);
+// 'content' covers the Tracks/Cars dropdown as one toggle, not its two links
+// separately.
+export type NavItemKey = 'telemetry' | 'browse' | 'leaderboard' | 'content' | 'mySessions';
+export const NAV_ITEM_KEYS: NavItemKey[] = ['telemetry', 'browse', 'leaderboard', 'content', 'mySessions'];
+
 export interface SiteSettings {
   siteName: string;
   font: SiteFont;
@@ -66,6 +73,7 @@ export interface SiteSettings {
   defaultAccentColor: string;
   accentPresets: string[];
   neonGlowEnabled: boolean;
+  hiddenNavItems: NavItemKey[];
 }
 
 export interface StorageUsage {

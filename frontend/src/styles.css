@@ -3580,6 +3580,12 @@ input[type='range']::-moz-range-track {
   cursor: pointer;
 }
 
+.admin-nav-visibility-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .admin-display-actions {
   display: flex;
   align-items: center;
