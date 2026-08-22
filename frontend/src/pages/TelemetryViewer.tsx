@@ -70,6 +70,12 @@ interface GroupLayoutItem {
   // Marks the built-in Pedals group so the sidebar can show its extra
   // clutch/group-display toggles — not set on user-made groups.
   special?: 'pedals';
+  // Only meaningful when grouped === false (unlinked pedals): overlays the TC
+  // event channel onto the Throttle lane, resp. ABS + Brakes Force onto the
+  // Brake lane — for correlating pedal input against what the car actually
+  // did, without cluttering the linked/combined view.
+  throttleTC?: boolean;
+  brakeExtras?: boolean;
 }
 type LayoutItem = ChannelLayoutItem | GroupLayoutItem;
 
@@ -85,9 +91,22 @@ const KNOWN_COLORS: Record<string, string> = {
 };
 
 const CLUTCH_CHANNEL = 'Clutch Pos Unfiltered';
+const THROTTLE_CHANNEL = 'Throttle Pos Unfiltered';
+const BRAKE_CHANNEL = 'Brake Pos Unfiltered';
 // Display order when the Pedals group is split into separate graphs — brake
 // above throttle, clutch (if enabled) last.
-const PEDALS_SPLIT_ORDER = ['Brake Pos Unfiltered', 'Throttle Pos Unfiltered', CLUTCH_CHANNEL];
+const PEDALS_SPLIT_ORDER = [BRAKE_CHANNEL, THROTTLE_CHANNEL, CLUTCH_CHANNEL];
+
+// TC/ABS overlays on the unlinked pedals graphs (see GroupLayoutItem's
+// throttleTC/brakeExtras) — diagnostic annotations, not "reference lap
+// identity" data, so like CORNER_STYLE below they always use these fixed
+// colors regardless of colorMode (byLap mode would otherwise flatten them to
+// the same neutral gray as the pedal trace they're overlaid on).
+const TC_CHANNEL = 'TC';
+const ABS_CHANNEL = 'ABS';
+const BRAKES_FORCE_CHANNEL = 'Brakes Force';
+const TC_COLOR = '#ffb300';
+const ABS_COLOR = '#7e57c2';
 
 // Reserved synthetic channel name — never a real backend channel, special-cased
 // throughout (excluded from selectedChannels' real fetch, built entirely
@@ -415,7 +434,13 @@ export default function TelemetryViewer() {
   const appliedPedalsPrefsRef = useRef(false);
   useEffect(() => {
     if (appliedPedalsPrefsRef.current) return;
-    if (preferences.pedalsGrouped === undefined && preferences.pedalsClutch === undefined) return;
+    if (
+      preferences.pedalsGrouped === undefined &&
+      preferences.pedalsClutch === undefined &&
+      preferences.pedalsThrottleTC === undefined &&
+      preferences.pedalsBrakeExtras === undefined
+    )
+      return;
     appliedPedalsPrefsRef.current = true;
     setLayout((prev) =>
       prev.map((item) => {
@@ -429,7 +454,9 @@ export default function TelemetryViewer() {
             : wantsClutch
               ? [...item.channels, CLUTCH_CHANNEL]
               : item.channels.filter((c) => c !== CLUTCH_CHANNEL);
-        return { ...item, grouped, channels };
+        const throttleTC = typeof preferences.pedalsThrottleTC === 'boolean' ? preferences.pedalsThrottleTC : item.throttleTC;
+        const brakeExtras = typeof preferences.pedalsBrakeExtras === 'boolean' ? preferences.pedalsBrakeExtras : item.brakeExtras;
+        return { ...item, grouped, channels, throttleTC, brakeExtras };
       }),
     );
   }, [preferences]);
@@ -697,7 +724,20 @@ export default function TelemetryViewer() {
   const selectedChannels = useMemo(
     () =>
       layout
-        .flatMap((it) => (it.type === 'channel' ? [it.name] : it.channels))
+        .flatMap((it) => {
+          if (it.type === 'channel') return [it.name];
+          // Pedals-only overlay extras (see throttleTC/brakeExtras) aren't
+          // lanes of their own — fetch them alongside the group's own
+          // channels only while they're actually toggled on and visible
+          // (unlinked), so they don't show up as extra useless requests
+          // otherwise.
+          const extras: string[] = [];
+          if (it.special === 'pedals' && it.grouped === false) {
+            if (it.throttleTC) extras.push(TC_CHANNEL);
+            if (it.brakeExtras) extras.push(ABS_CHANNEL, BRAKES_FORCE_CHANNEL);
+          }
+          return [...it.channels, ...extras];
+        })
         .filter((name) => name !== DELTA_CHANNEL_NAME),
     [layout],
   );
@@ -1139,6 +1179,34 @@ export default function TelemetryViewer() {
     });
   }
 
+  function toggleThrottleTC(index: number) {
+    const item = layout[index];
+    if (item.type !== 'group') return;
+    const throttleTC = !item.throttleTC;
+    setPreference('pedalsThrottleTC', throttleTC);
+    setLayout((prev) => {
+      const cur = prev[index];
+      if (cur.type !== 'group') return prev;
+      const next = [...prev];
+      next[index] = { ...cur, throttleTC };
+      return next;
+    });
+  }
+
+  function toggleBrakeExtras(index: number) {
+    const item = layout[index];
+    if (item.type !== 'group') return;
+    const brakeExtras = !item.brakeExtras;
+    setPreference('pedalsBrakeExtras', brakeExtras);
+    setLayout((prev) => {
+      const cur = prev[index];
+      if (cur.type !== 'group') return prev;
+      const next = [...prev];
+      next[index] = { ...cur, brakeExtras };
+      return next;
+    });
+  }
+
   function toggleCornerSplit(index: number) {
     setLayout((prev) => {
       const cur = prev[index];
@@ -1400,6 +1468,37 @@ export default function TelemetryViewer() {
       return { series: alignedSeries, compares: alignedCompares };
     }
 
+    // Appends extra diagnostic columns (TC on Throttle, ABS/Brakes Force on
+    // Brake — see GroupLayoutItem's throttleTC/brakeExtras) onto an existing
+    // lane series, resampled onto that lane's OWN grid (never expanding it).
+    // Deliberately doesn't touch `base.t`/its own column or `compares` — those
+    // go through the exact same alignEventCompares/buildLaneCompares path as
+    // every other lane, unaffected by whichever extras are toggled on. A
+    // compared lap simply won't have data for these extra columns (they're
+    // never part of `targets` in the compare-fetch effect above), so
+    // ChannelPlot's per-column compare lookup silently skips them — the
+    // overlay is reference-lap-only by construction, not a special case.
+    function withOverlayColumns(
+      base: ChannelSeries,
+      extras: { key: string; label: string; color: string; dash?: number[]; series: ChannelSeries; column: string }[],
+    ): { series: ChannelSeries; columnStyles: { label: string; color: string; dash?: number[] }[] } {
+      const baseCol = base.valueColumns[0];
+      const columnStyles = [{ label: base.name, color: nextColor(base.name) }, ...extras.map((m) => ({ label: m.label, color: m.color, dash: m.dash }))];
+      if (extras.length === 0) return { series: base, columnStyles };
+      const values: ChannelSeries['values'] = { ...base.values };
+      extras.forEach((m) => {
+        const raw = m.series.values[m.column];
+        values[m.key] =
+          m.series.kind === 'continuous'
+            ? resampleContinuous(m.series.t, raw as (number | null)[], base.t)
+            : resampleStep(m.series.t, raw, base.t);
+      });
+      return {
+        series: { ...base, valueColumns: [baseCol, ...extras.map((m) => m.key)], values },
+        columnStyles,
+      };
+    }
+
     for (const item of layout) {
       if (item.type === 'group') {
         const present = item.channels.filter((c) => seriesByName[c]);
@@ -1415,12 +1514,36 @@ export default function TelemetryViewer() {
               : present;
           orderedPresent.forEach((c) => {
             const rawSeries = withXAxis(seriesByName[c]);
-            const { series, compares } = alignEventCompares(rawSeries, buildLaneCompares([c], rawSeries));
+            const { series: alignedSeries, compares } = alignEventCompares(rawSeries, buildLaneCompares([c], rawSeries));
+
+            const extras: { key: string; label: string; color: string; dash?: number[]; series: ChannelSeries; column: string }[] = [];
+            if (item.special === 'pedals' && c === THROTTLE_CHANNEL && item.throttleTC && seriesByName[TC_CHANNEL]) {
+              extras.push({ key: TC_CHANNEL, label: TC_CHANNEL, color: TC_COLOR, series: withXAxis(seriesByName[TC_CHANNEL]), column: 'value' });
+            }
+            if (item.special === 'pedals' && c === BRAKE_CHANNEL && item.brakeExtras) {
+              if (seriesByName[ABS_CHANNEL]) {
+                extras.push({ key: ABS_CHANNEL, label: ABS_CHANNEL, color: ABS_COLOR, series: withXAxis(seriesByName[ABS_CHANNEL]), column: 'value' });
+              }
+              if (seriesByName[BRAKES_FORCE_CHANNEL]) {
+                const bfSeries = withXAxis(seriesByName[BRAKES_FORCE_CHANNEL]);
+                bfSeries.valueColumns.forEach((col, i) => {
+                  extras.push({
+                    key: col,
+                    label: CORNER_STYLE[i]?.label ?? col,
+                    color: CORNER_STYLE[i]?.color ?? channelColor(i),
+                    dash: CORNER_STYLE[i]?.dash,
+                    series: bfSeries,
+                    column: col,
+                  });
+                });
+              }
+            }
+            const { series, columnStyles } = withOverlayColumns(alignedSeries, extras);
             result.push({
               key: `${item.id}__${c}`,
               label: c,
               series,
-              columnStyles: [{ label: c, color: nextColor(c) }],
+              columnStyles,
               compares,
               boxId: item.id,
               boxLabel: item.name,
@@ -2119,6 +2242,24 @@ export default function TelemetryViewer() {
                         >
                           {item.grouped === false ? <GridIcon /> : <SquareIcon />}
                         </button>
+                        {item.grouped === false && (
+                          <>
+                            <button
+                              className={item.throttleTC ? 'active' : ''}
+                              onClick={() => toggleThrottleTC(i)}
+                              title={t('tv.pedalsToggleTC')}
+                            >
+                              TC
+                            </button>
+                            <button
+                              className={item.brakeExtras ? 'active' : ''}
+                              onClick={() => toggleBrakeExtras(i)}
+                              title={t('tv.pedalsToggleBrakeExtras')}
+                            >
+                              ABS
+                            </button>
+                          </>
+                        )}
                       </>
                     )}
                     {item.type === 'channel' && (seriesByName[item.name]?.valueColumns.length ?? 0) > 1 && (
