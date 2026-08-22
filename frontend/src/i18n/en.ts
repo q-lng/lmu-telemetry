@@ -449,6 +449,8 @@ export const en = {
   'tv.dragToReorder': 'Drag to reorder',
   'tv.pedalsToggleClutch': 'Show/hide the clutch channel in this group',
   'tv.pedalsToggleGrouped': 'Switch between one combined graph and separate graphs (kept together)',
+  'tv.pedalsToggleTC': 'Overlay the TC (traction control) channel on the Throttle graph',
+  'tv.pedalsToggleBrakeExtras': 'Overlay ABS + Brakes Force (per wheel) on the Brake graph',
   'tv.cornerSplitToggle': 'Split into one graph per wheel — enables compared laps and color mode',
   'tv.laneSizeToggle': 'Graph size',
   'tv.laneSizeSmall': 'Small',
