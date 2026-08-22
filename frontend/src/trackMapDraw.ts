@@ -282,7 +282,7 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOp
     const tipY = y + dy * length * 0.6;
     const backX = x - dx * length * 0.4;
     const backY = y - dy * length * 0.4;
-    ctx.fillStyle = '#d95926';
+    ctx.fillStyle = traceColor;
     ctx.beginPath();
     ctx.moveTo(tipX, tipY);
     ctx.lineTo(backX + perpX * halfWidth, backY + perpY * halfWidth);
