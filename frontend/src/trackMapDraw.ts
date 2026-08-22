@@ -257,9 +257,37 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, opts: DrawTrackMapOp
   if (cursorT !== null && t.length > 0) {
     const idx = nearestIndex(t, cursorT);
     const [x, y] = toXY(lat[idx], lon[idx]);
-    ctx.fillStyle = '#d95926';
+    // Heading from the trace's own local direction (neighboring points, in
+    // already-projected screen space so the cos-latitude correction/scale
+    // don't need separate handling) rather than a fixed shape — a thin dart
+    // pointing the way the car was actually going, not just a plain dot.
+    const beforeIdx = Math.max(0, idx - 1);
+    const afterIdx = Math.min(lat.length - 1, idx + 1);
+    let dx = 1;
+    let dy = 0;
+    if (afterIdx !== beforeIdx) {
+      const [bx, by] = toXY(lat[beforeIdx], lon[beforeIdx]);
+      const [ax, ay] = toXY(lat[afterIdx], lon[afterIdx]);
+      const len = Math.hypot(ax - bx, ay - by);
+      if (len > 0) {
+        dx = (ax - bx) / len;
+        dy = (ay - by) / len;
+      }
+    }
+    const perpX = -dy;
+    const perpY = dx;
+    const length = 9;
+    const halfWidth = 2.2;
+    const tipX = x + dx * length * 0.6;
+    const tipY = y + dy * length * 0.6;
+    const backX = x - dx * length * 0.4;
+    const backY = y - dy * length * 0.4;
+    ctx.fillStyle = traceColor;
     ctx.beginPath();
-    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(backX + perpX * halfWidth, backY + perpY * halfWidth);
+    ctx.lineTo(backX - perpX * halfWidth, backY - perpY * halfWidth);
+    ctx.closePath();
     ctx.fill();
   }
 }
